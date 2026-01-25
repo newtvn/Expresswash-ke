@@ -14,7 +14,7 @@ const Header = () => {
   ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
       <div className="container mx-auto">
         <nav className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
@@ -42,11 +42,11 @@ const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm">
-              Sign In
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/signin">Sign In</Link>
             </Button>
-            <Button variant="default" size="sm">
-              Get Started
+            <Button variant="default" size="sm" asChild>
+              <Link to="/signup">Get Started</Link>
             </Button>
           </div>
 
@@ -74,8 +74,12 @@ const Header = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Button variant="ghost">Sign In</Button>
-                <Button variant="default">Get Started</Button>
+                <Button variant="ghost" asChild>
+                  <Link to="/signin">Sign In</Link>
+                </Button>
+                <Button variant="default" asChild>
+                  <Link to="/signup">Get Started</Link>
+                </Button>
               </div>
             </div>
           </div>
