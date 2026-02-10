@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X, Sparkles, LayoutDashboard } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuthStore } from "@/stores/authStore";
+import { UserRole } from "@/types";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated } = useAuthStore();
 
   const navLinks = [
     { name: "Services", href: "#services" },
@@ -12,6 +16,32 @@ const Header = () => {
     { name: "Pricing", href: "#pricing" },
     { name: "Track Order", href: "/track" },
   ];
+
+  const getDashboardPath = () => {
+    if (!user) return "/signin";
+    switch (user.role) {
+      case UserRole.ADMIN:
+      case UserRole.SUPER_ADMIN:
+        return "/admin";
+      case UserRole.CUSTOMER:
+        return "/customer";
+      case UserRole.DRIVER:
+        return "/driver";
+      case UserRole.WAREHOUSE_STAFF:
+        return "/warehouse";
+      default:
+        return "/signin";
+    }
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
@@ -42,12 +72,36 @@ const Header = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/signin">Sign In</Link>
-            </Button>
-            <Button variant="default" size="sm" asChild>
-              <Link to="/signup">Get Started</Link>
-            </Button>
+            {isAuthenticated && user ? (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to={getDashboardPath()} className="flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                </Button>
+                <Link to={getDashboardPath()} className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarFallback className="text-xs">
+                      {getInitials(user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium text-foreground">
+                    {user.name}
+                  </span>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link to="/signin">Sign In</Link>
+                </Button>
+                <Button variant="default" size="sm" asChild>
+                  <Link to="/signup">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -74,12 +128,40 @@ const Header = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Button variant="ghost" asChild>
-                  <Link to="/signin">Sign In</Link>
-                </Button>
-                <Button variant="default" asChild>
-                  <Link to="/signup">Get Started</Link>
-                </Button>
+                {isAuthenticated && user ? (
+                  <>
+                    <div className="flex items-center gap-3 py-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.avatarUrl} alt={user.name} />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium text-foreground">
+                        {user.name}
+                      </span>
+                    </div>
+                    <Button variant="default" asChild>
+                      <Link
+                        to={getDashboardPath()}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2"
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="ghost" asChild>
+                      <Link to="/signin">Sign In</Link>
+                    </Button>
+                    <Button variant="default" asChild>
+                      <Link to="/signup">Get Started</Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>
