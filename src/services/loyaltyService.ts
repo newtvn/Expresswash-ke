@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { retrySupabaseQuery } from '@/lib/retryUtils';
 import {
   LoyaltyAccount,
   LoyaltyTransaction,
@@ -68,11 +69,10 @@ function mapReferral(row: Record<string, unknown>): Referral {
 export const getLoyaltyAccount = async (
   customerId: string,
 ): Promise<LoyaltyAccount | null> => {
-  const { data } = await supabase
-    .from('loyalty_accounts')
-    .select('*')
-    .eq('customer_id', customerId)
-    .single();
+  const { data } = await retrySupabaseQuery(
+    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).single(),
+    { maxRetries: 2 }
+  );
 
   return data ? mapLoyaltyAccount(data) : null;
 };
@@ -80,21 +80,24 @@ export const getLoyaltyAccount = async (
 export const getLoyaltyTransactions = async (
   customerId: string,
 ): Promise<LoyaltyTransaction[]> => {
-  const { data, error } = await supabase
-    .from('loyalty_transactions')
-    .select('*')
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false });
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('loyalty_transactions')
+      .select('*')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false }),
+    { maxRetries: 2 }
+  );
 
   if (error || !data) return [];
   return data.map(mapTransaction);
 };
 
 export const getRewards = async (): Promise<Reward[]> => {
-  const { data, error } = await supabase
-    .from('rewards')
-    .select('*')
-    .order('points_cost', { ascending: true });
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.from('rewards').select('*').order('points_cost', { ascending: true }),
+    { maxRetries: 2 }
+  );
 
   if (error || !data) return [];
   return data.map(mapReward);
@@ -104,21 +107,19 @@ export const redeemReward = async (
   customerId: string,
   rewardId: string,
 ): Promise<{ success: boolean; message: string; remainingPoints?: number }> => {
-  const { data: account } = await supabase
-    .from('loyalty_accounts')
-    .select('*')
-    .eq('customer_id', customerId)
-    .single();
+  const { data: account } = await retrySupabaseQuery(
+    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).single(),
+    { maxRetries: 2 }
+  );
 
   if (!account) {
     return { success: false, message: 'Loyalty account not found' };
   }
 
-  const { data: reward } = await supabase
-    .from('rewards')
-    .select('*')
-    .eq('id', rewardId)
-    .single();
+  const { data: reward } = await retrySupabaseQuery(
+    () => supabase.from('rewards').select('*').eq('id', rewardId).single(),
+    { maxRetries: 2 }
+  );
 
   if (!reward) {
     return { success: false, message: 'Reward not found' };
@@ -132,18 +133,24 @@ export const redeemReward = async (
 
   const newBalance = account.points - reward.points_cost;
 
-  await supabase
-    .from('loyalty_accounts')
-    .update({ points: newBalance, updated_at: new Date().toISOString() })
-    .eq('customer_id', customerId);
+  await retrySupabaseQuery(
+    () => supabase
+      .from('loyalty_accounts')
+      .update({ points: newBalance, updated_at: new Date().toISOString() })
+      .eq('customer_id', customerId),
+    { maxRetries: 3 }
+  );
 
-  await supabase.from('loyalty_transactions').insert({
-    customer_id: customerId,
-    points: -reward.points_cost,
-    type: 'redeemed',
-    description: `Redeemed: ${reward.name}`,
-    balance_after: newBalance,
-  });
+  await retrySupabaseQuery(
+    () => supabase.from('loyalty_transactions').insert({
+      customer_id: customerId,
+      points: -reward.points_cost,
+      type: 'redeemed',
+      description: `Redeemed: ${reward.name}`,
+      balance_after: newBalance,
+    }),
+    { maxRetries: 3 }
+  );
 
   return { success: true, message: `Successfully redeemed "${reward.name}"`, remainingPoints: newBalance };
 };
@@ -160,7 +167,7 @@ export const getReferrals = async (
     query = query.eq('referrer_id', customerId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error || !data) return [];
   return data.map(mapReferral);
 };
@@ -169,22 +176,24 @@ export const createReferral = async (
   referrerId: string,
   email: string,
 ): Promise<{ success: boolean; referral?: Referral; message: string }> => {
-  const { data: account } = await supabase
-    .from('loyalty_accounts')
-    .select('customer_name')
-    .eq('customer_id', referrerId)
-    .single();
+  const { data: account } = await retrySupabaseQuery(
+    () => supabase.from('loyalty_accounts').select('customer_name').eq('customer_id', referrerId).single(),
+    { maxRetries: 2 }
+  );
 
   if (!account) {
     return { success: false, message: 'Loyalty account not found' };
   }
 
-  const { data: existing } = await supabase
-    .from('referrals')
-    .select('id')
-    .eq('referee_email', email)
-    .neq('status', 'expired')
-    .limit(1);
+  const { data: existing } = await retrySupabaseQuery(
+    () => supabase
+      .from('referrals')
+      .select('id')
+      .eq('referee_email', email)
+      .neq('status', 'expired')
+      .limit(1),
+    { maxRetries: 2 }
+  );
 
   if (existing && existing.length > 0) {
     return { success: false, message: 'This email has already been referred' };
@@ -193,18 +202,21 @@ export const createReferral = async (
   const referrerName = account.customer_name as string;
   const code = `${referrerName.split(' ')[0].toUpperCase()}-REF-${new Date().getFullYear()}`;
 
-  const { data: newReferral, error } = await supabase
-    .from('referrals')
-    .insert({
-      referrer_id: referrerId,
-      referrer_name: referrerName,
-      referee_email: email,
-      referral_code: code,
-      status: 'pending',
-      points_earned: 0,
-    })
-    .select()
-    .single();
+  const { data: newReferral, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('referrals')
+      .insert({
+        referrer_id: referrerId,
+        referrer_name: referrerName,
+        referee_email: email,
+        referral_code: code,
+        status: 'pending',
+        points_earned: 0,
+      })
+      .select()
+      .single(),
+    { maxRetries: 3 }
+  );
 
   if (error || !newReferral) {
     return { success: false, message: 'Failed to create referral' };

@@ -7,6 +7,7 @@ import BubbleBackground from './components/BubbleBackground';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
+import { SessionTimeoutWarning } from '@/components/SessionTimeout';
 import { UserRole } from '@/types';
 
 // Layouts
@@ -94,6 +95,7 @@ const App = () => (
     <TooltipProvider>
       <BubbleBackground />
       <Sonner />
+      <SessionTimeoutWarning />
       <ErrorBoundary>
         <BrowserRouter>
           <LazyLoader>

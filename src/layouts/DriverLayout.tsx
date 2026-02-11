@@ -3,6 +3,7 @@ import { LayoutDashboard, Route, Package, Banknote, LogOut, Sparkles } from 'luc
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
+import { PageErrorBoundary } from '@/components/ErrorBoundary';
 
 const bottomNavItems = [
   { name: 'Dashboard', href: '/driver/dashboard', icon: LayoutDashboard },
@@ -45,7 +46,9 @@ const DriverLayout = () => {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-4 pb-20">
-        <Outlet />
+        <PageErrorBoundary fallbackTitle="Driver Page Error">
+          <Outlet />
+        </PageErrorBoundary>
       </main>
 
       {/* Bottom Navigation */}
