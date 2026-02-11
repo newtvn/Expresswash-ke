@@ -1,9 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, KPICard } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet, AlertCircle } from 'lucide-react';
+import { getPayments } from '@/services/invoiceService';
+import { queryKeys } from '@/config/queryKeys';
 
-type Payment = {
+type PaymentTableRow = {
   id: string;
   date: string;
   invoiceId: string;
@@ -13,9 +17,6 @@ type Payment = {
   reference: string;
 };
 
-// TODO: Connect to real payment service
-const payments: Payment[] = [];
-
 const methodLabels: Record<string, string> = {
   mpesa: 'M-Pesa',
   card: 'Card',
@@ -23,7 +24,7 @@ const methodLabels: Record<string, string> = {
   bank_transfer: 'Bank Transfer',
 };
 
-const columns: Column<Payment>[] = [
+const columns: Column<PaymentTableRow>[] = [
   { key: 'date', header: 'Date', sortable: true },
   { key: 'invoiceId', header: 'Invoice #', sortable: true },
   {
@@ -50,10 +51,49 @@ const columns: Column<Payment>[] = [
 ];
 
 export const PaymentHistory = () => {
+  const { data: payments = [], isLoading } = useQuery({
+    queryKey: queryKeys.payments.list(),
+    queryFn: () => getPayments(),
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Transform payments to table rows
+  const tableData: PaymentTableRow[] = payments.map((payment) => ({
+    id: payment.id,
+    date: new Date(payment.createdAt).toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }),
+    invoiceId: payment.invoiceNumber,
+    method: payment.method,
+    amount: payment.amount,
+    status: payment.status,
+    reference: payment.reference || payment.mpesaReceiptNumber || 'N/A',
+  }));
+
   const completedPayments = payments.filter((p) => p.status === 'completed');
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   const totalPaidThisMonth = completedPayments
-    .filter((p) => p.date.startsWith('2025-01'))
+    .filter((p) => p.createdAt.startsWith(currentMonth))
     .reduce((sum, p) => sum + p.amount, 0);
+
+  const pendingPayments = payments.filter((p) => p.status === 'pending');
+  const outstanding = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Payment History" description="Track all your payments" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -71,7 +111,7 @@ export const PaymentHistory = () => {
         />
         <KPICard
           label="Outstanding"
-          value={0}
+          value={outstanding}
           change={0}
           changeDirection="flat"
           format="currency"
@@ -80,7 +120,7 @@ export const PaymentHistory = () => {
       </div>
 
       <DataTable
-        data={payments}
+        data={tableData}
         columns={columns}
         searchable
         searchPlaceholder="Search payments..."

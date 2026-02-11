@@ -6,12 +6,13 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { AuthLayout } from '@/components/auth';
 import { ROUTES } from '@/config/routes';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 
 /**
  * OTP Verification Page
  * 6-digit OTP input with individual boxes.
  * Resend OTP button with 60s countdown timer.
- * Any 6-digit code works (mock).
+ * Verifies OTP via Supabase for password recovery.
  */
 export const OTPVerification = () => {
   const navigate = useNavigate();
@@ -79,27 +80,78 @@ export const OTPVerification = () => {
       return;
     }
 
+    // Retrieve email from sessionStorage
+    const email = sessionStorage.getItem('reset_email');
+    if (!email) {
+      toast.error('Session expired. Please request a new code.');
+      navigate(ROUTES.FORGOT_PASSWORD);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      // Mock: any 6-digit code works
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      toast.success('Verified successfully!', {
-        description: 'Your identity has been confirmed.',
+      // Verify OTP with Supabase
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: otpString,
+        type: 'recovery',
       });
-      navigate(ROUTES.SIGN_IN);
-    } catch {
+
+      if (error) {
+        toast.error('Invalid or expired code', {
+          description: error.message || 'Please try again or request a new code.',
+        });
+        return;
+      }
+
+      if (data.session) {
+        toast.success('Verified successfully!', {
+          description: 'Your identity has been confirmed.',
+        });
+        // Clear stored email
+        sessionStorage.removeItem('reset_email');
+        // User is now authenticated and can reset password
+        // Redirect to profile or a dedicated password reset page
+        navigate(ROUTES.CUSTOMER_PROFILE);
+      }
+    } catch (error) {
+      console.error('OTP verification error:', error);
       toast.error('Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (!canResend) return;
-    startCountdown();
-    toast.success('Code resent', {
-      description: 'A new verification code has been sent to your email.',
-    });
+
+    const email = sessionStorage.getItem('reset_email');
+    if (!email) {
+      toast.error('Session expired. Please start over.');
+      navigate(ROUTES.FORGOT_PASSWORD);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}${ROUTES.OTP_VERIFICATION}`,
+      });
+
+      if (error) {
+        toast.error('Failed to resend code', {
+          description: error.message,
+        });
+        return;
+      }
+
+      startCountdown();
+      toast.success('Code resent', {
+        description: 'A new verification code has been sent to your email.',
+      });
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      toast.error('Failed to resend code. Please try again.');
+    }
   };
 
   return (
@@ -131,10 +183,6 @@ export const OTPVerification = () => {
             />
           ))}
         </div>
-
-        <p className="text-xs text-center text-muted-foreground">
-          Demo: any 6-digit code works
-        </p>
 
         <Button
           type="submit"

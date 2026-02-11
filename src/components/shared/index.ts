@@ -12,3 +12,4 @@ export { SearchInput } from './SearchInput';
 export { ConfirmDialog } from './ConfirmDialog';
 export { DateRangePicker } from './DateRangePicker';
 export { ErrorBoundary } from './ErrorBoundary';
+export { LoadingState } from './LoadingState';

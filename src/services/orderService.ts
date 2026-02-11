@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
+import { retrySupabaseQuery } from '@/lib/retryUtils';
+import { orderLogger } from '@/lib/logger';
 
 export interface OrderListFilters {
   status?: number;
@@ -158,95 +160,153 @@ export function calculateItemPrice(
 export const createOrder = async (
   payload: CreateOrderPayload,
 ): Promise<{ success: boolean; order?: Order; error?: string }> => {
-  let trackingCode = generateTrackingCode();
-
-  // Ensure unique tracking code
-  let attempts = 0;
-  while (attempts < 5) {
-    const { data: existing } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('tracking_code', trackingCode)
-      .maybeSingle();
-    if (!existing) break;
-    trackingCode = generateTrackingCode();
-    attempts++;
-  }
-
-  const eta = calculateETA(payload.zone);
-
-  const { data: inserted, error } = await supabase
-    .from('orders')
-    .insert({
-      tracking_code: trackingCode,
-      customer_id: payload.customerId,
-      customer_name: payload.customerName,
-      status: 1, // pending
-      pickup_date: payload.pickupDate,
-      estimated_delivery: eta.date,
+  try {
+    orderLogger.info('Creating new order', {
+      customerId: payload.customerId,
       zone: payload.zone,
-      pickup_address: payload.pickupAddress,
-      subtotal: payload.subtotal,
-      delivery_fee: payload.deliveryFee,
-      vat: payload.vat,
+      itemCount: payload.items.length,
       total: payload.total,
-      notes: payload.notes ?? null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+    });
 
-  if (error || !inserted) {
-    return { success: false, error: error?.message ?? 'Failed to create order' };
-  }
+    let trackingCode = generateTrackingCode();
 
-  // Insert order items with dimensions
-  if (payload.items.length > 0) {
-    const { error: itemsError } = await supabase.from('order_items').insert(
-      payload.items.map((item) => ({
-        order_id: inserted.id,
-        name: item.name,
-        quantity: item.quantity,
-        item_type: item.itemType,
-        length_inches: item.lengthInches,
-        width_inches: item.widthInches,
-        unit_price: item.unitPrice,
-        total_price: item.totalPrice,
-      })),
+    // Ensure unique tracking code with retry logic
+    let attempts = 0;
+    while (attempts < 5) {
+      const { data: existing, error } = await retrySupabaseQuery(
+        () => supabase
+          .from('orders')
+          .select('id')
+          .eq('tracking_code', trackingCode)
+          .maybeSingle(),
+        { maxRetries: 2 }
+      );
+
+      if (error) {
+        orderLogger.error('Failed to check tracking code uniqueness', error);
+        throw error;
+      }
+
+      if (!existing) break;
+      trackingCode = generateTrackingCode();
+      attempts++;
+    }
+
+    if (attempts >= 5) {
+      orderLogger.warn('Failed to generate unique tracking code after 5 attempts');
+      return { success: false, error: 'Failed to generate unique tracking code' };
+    }
+
+    const eta = calculateETA(payload.zone);
+
+    const { data: inserted, error } = await retrySupabaseQuery(
+      () => supabase
+        .from('orders')
+        .insert({
+          tracking_code: trackingCode,
+          customer_id: payload.customerId,
+          customer_name: payload.customerName,
+          status: 1, // pending
+          pickup_date: payload.pickupDate,
+          estimated_delivery: eta.date,
+          zone: payload.zone,
+          pickup_address: payload.pickupAddress,
+          subtotal: payload.subtotal,
+          delivery_fee: payload.deliveryFee,
+          vat: payload.vat,
+          total: payload.total,
+          notes: payload.notes ?? null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single(),
+      { maxRetries: 3 }
     );
 
-    if (itemsError) {
-      // Rollback order if items failed
-      await supabase.from('orders').delete().eq('id', inserted.id);
-      return { success: false, error: 'Failed to save order items' };
+    if (error || !inserted) {
+      orderLogger.error('Failed to create order', error || new Error('No data returned'));
+      return { success: false, error: error?.message ?? 'Failed to create order' };
     }
+
+    // Insert order items with dimensions
+    if (payload.items.length > 0) {
+      const { error: itemsError } = await retrySupabaseQuery(
+        () => supabase.from('order_items').insert(
+          payload.items.map((item) => ({
+            order_id: inserted.id,
+            name: item.name,
+            quantity: item.quantity,
+            item_type: item.itemType,
+            length_inches: item.lengthInches,
+            width_inches: item.widthInches,
+            unit_price: item.unitPrice,
+            total_price: item.totalPrice,
+          })),
+        ),
+        { maxRetries: 3 }
+      );
+
+      if (itemsError) {
+        orderLogger.error('Failed to save order items, rolling back order', itemsError);
+        // Rollback order if items failed
+        await supabase.from('orders').delete().eq('id', inserted.id);
+        return { success: false, error: 'Failed to save order items' };
+      }
+    }
+
+    // Update customer profile stats (non-critical, ignore errors)
+    await supabase.rpc('increment_customer_orders', { customer_id: payload.customerId }).catch((err) => {
+      orderLogger.warn('Failed to increment customer order count', { error: err.message });
+    });
+
+    const order = await getOrderById(trackingCode);
+
+    orderLogger.info('Order created successfully', {
+      trackingCode,
+      orderId: inserted.id,
+      total: payload.total,
+    });
+
+    return { success: true, order: order ?? undefined };
+  } catch (error) {
+    orderLogger.error('Unexpected error creating order', error instanceof Error ? error : new Error(String(error)));
+    return { success: false, error: 'An unexpected error occurred while creating your order' };
   }
-
-  // Update customer profile stats
-  await supabase.rpc('increment_customer_orders', { customer_id: payload.customerId }).catch(() => null);
-
-  const order = await getOrderById(trackingCode);
-  return { success: true, order: order ?? undefined };
 };
 
 export const trackOrder = async (trackingCode: string): Promise<TrackingResponse> => {
-  const { data: order, error } = await supabase
-    .from('orders')
-    .select('*')
-    .ilike('tracking_code', trackingCode)
-    .single();
+  try {
+    orderLogger.info('Tracking order', { trackingCode });
 
-  if (error || !order) {
-    return { success: false, error: 'Order not found. Please check your tracking code.' };
+    const { data: order, error } = await retrySupabaseQuery(
+      () => supabase
+        .from('orders')
+        .select('*')
+        .ilike('tracking_code', trackingCode)
+        .single(),
+      { maxRetries: 2 }
+    );
+
+    if (error || !order) {
+      orderLogger.warn('Order not found', { trackingCode, error: error?.message });
+      return { success: false, error: 'Order not found. Please check your tracking code.' };
+    }
+
+    const { data: items } = await retrySupabaseQuery(
+      () => supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', order.id),
+      { maxRetries: 2 }
+    );
+
+    orderLogger.info('Order tracked successfully', { trackingCode, orderId: order.id });
+    return { success: true, order: mapOrder(order, items ?? []) };
+  } catch (error) {
+    orderLogger.error('Error tracking order', error instanceof Error ? error : new Error(String(error)), { trackingCode });
+    return { success: false, error: 'Unable to track order at this time. Please try again later.' };
   }
-
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('*')
-    .eq('order_id', order.id);
-
-  return { success: true, order: mapOrder(order, items ?? []) };
 };
 
 export const getOrders = async (

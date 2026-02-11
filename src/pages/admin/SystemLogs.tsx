@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { PageHeader, ExportButton, DateRangePicker } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -14,6 +16,8 @@ import {
 } from "@/components/ui/select";
 import { RefreshCw, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getSystemLogs } from "@/services/auditService";
+import type { SystemLogFilters } from "@/types";
 
 const levelStyles: Record<string, string> = {
   info: "bg-blue-100 text-blue-700 border-blue-200",
@@ -22,20 +26,10 @@ const levelStyles: Record<string, string> = {
   debug: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-type Log = {
-  id: number;
-  timestamp: string;
-  level: string;
-  service: string;
-  message: string;
-};
-
-// TODO: Connect to real system logs service
-const logs: Log[] = [];
-
 /**
  * Admin System Logs Page
  * Log viewer with level filters, service dropdown, search, and auto-refresh toggle.
+ * Connected to real Supabase system logs.
  */
 export const SystemLogs = () => {
   const [levels, setLevels] = useState({
@@ -47,20 +41,54 @@ export const SystemLogs = () => {
   const [serviceFilter, setServiceFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [dateRange, setDateRange] = useState({ start: "2024-12-15", end: "2024-12-15" });
+  const [dateRange, setDateRange] = useState({
+    start: new Date().toISOString().split('T')[0],
+    end: new Date().toISOString().split('T')[0]
+  });
+  const [page] = useState(1);
 
   const toggleLevel = (level: string) => {
     setLevels((prev) => ({ ...prev, [level]: !prev[level as keyof typeof prev] }));
   };
 
+  // Build filters for API call
+  const filters: SystemLogFilters = {
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    service: serviceFilter !== "all" ? serviceFilter : undefined,
+    search: search || undefined,
+    page,
+    limit: 100,
+  };
+
+  // Fetch logs with filters
+  const { data: logsData, isLoading, refetch } = useQuery({
+    queryKey: ['systemLogs', filters],
+    queryFn: () => getSystemLogs(filters),
+    staleTime: autoRefresh ? 5000 : 2 * 60 * 1000, // 5s if auto-refresh, else 2 minutes
+    refetchInterval: autoRefresh ? 10000 : false, // Auto-refresh every 10s if enabled
+  });
+
+  const logs = logsData?.data || [];
+
+  // Extract unique services from logs
   const services = [...new Set(logs.map((l) => l.service))];
 
+  // Client-side level filtering (since API doesn't support multiple levels)
   const filteredLogs = logs.filter((log) => {
     if (!levels[log.level as keyof typeof levels]) return false;
-    if (serviceFilter !== "all" && log.service !== serviceFilter) return false;
-    if (search && !log.message.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="System Logs" description="Monitor application logs and system events" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -72,6 +100,14 @@ export const SystemLogs = () => {
         >
           <RefreshCw className={cn("w-4 h-4 mr-2", autoRefresh && "animate-spin")} />
           {autoRefresh ? "Auto-Refreshing" : "Auto-Refresh"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
         </Button>
         <ExportButton data={filteredLogs} filename="system-logs-export" />
       </PageHeader>
