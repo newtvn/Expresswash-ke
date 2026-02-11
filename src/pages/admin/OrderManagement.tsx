@@ -99,8 +99,19 @@ export const OrderManagement = () => {
   const orders = result?.data ?? [];
 
   const handleTrackOrder = async () => {
-    if (!trackingCodeInput.trim()) {
+    const code = trackingCodeInput.trim();
+
+    if (!code) {
       toast.error('Please enter a tracking code');
+      return;
+    }
+
+    // Validate tracking code format (EW-YYYY-NNNNN)
+    const trackingCodeRegex = /^EW-\d{4}-\d{5}$/i;
+    if (!trackingCodeRegex.test(code)) {
+      toast.error('Invalid tracking code format', {
+        description: 'Tracking code should be in format: EW-YYYY-NNNNN (e.g., EW-2026-12345)',
+      });
       return;
     }
 
@@ -108,7 +119,7 @@ export const OrderManagement = () => {
     setTrackedOrder(null);
 
     try {
-      const result = await trackOrder(trackingCodeInput.trim());
+      const result = await trackOrder(code);
       if (result.success && result.order) {
         setTrackedOrder(result.order);
         toast.success('Order found!');

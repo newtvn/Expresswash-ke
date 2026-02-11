@@ -10,14 +10,39 @@ interface UseSessionTimeoutOptions {
   onWarning?: () => void;
 }
 
+/**
+ * Get timeout duration based on user role
+ * - super_admin, admin: 60 minutes
+ * - warehouse_staff, driver: 45 minutes
+ * - customer: 30 minutes
+ * - default: 30 minutes (from env or fallback)
+ */
+function getRoleBasedTimeout(role?: string): number {
+  const envTimeout = parseInt(import.meta.env.VITE_SESSION_TIMEOUT_MINUTES || '30', 10);
+
+  if (!role) return envTimeout;
+
+  const timeoutMap: Record<string, number> = {
+    super_admin: 60,
+    admin: 60,
+    warehouse_staff: 45,
+    driver: 45,
+    customer: 30,
+  };
+
+  return timeoutMap[role] ?? envTimeout;
+}
+
 export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
+  const navigate = useNavigate();
+  const { clearAuth, isAuthenticated, user } = useAuthStore();
+
+  // Get role-based timeout (can be overridden by options)
+  const roleBasedTimeout = getRoleBasedTimeout(user?.role);
   const {
-    timeoutMinutes = parseInt(import.meta.env.VITE_SESSION_TIMEOUT_MINUTES || '30', 10),
+    timeoutMinutes = options.timeoutMinutes ?? roleBasedTimeout,
     warningMinutes = 2, // Warn 2 minutes before timeout
   } = options;
-
-  const navigate = useNavigate();
-  const { clearAuth, isAuthenticated } = useAuthStore();
   const [showWarning, setShowWarning] = useState(false);
   const [remainingTime, setRemainingTime] = useState(timeoutMinutes * 60);
 

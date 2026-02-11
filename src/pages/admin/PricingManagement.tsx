@@ -1,15 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { DollarSign, Truck, Package, TrendingUp, Save } from 'lucide-react';
+import { DollarSign, Truck, Package, TrendingUp, Save, Shield, AlertCircle, Loader2 } from 'lucide-react';
 import { PRICING } from '@/services/orderService';
+import { getPricingConfig, updatePricingConfig, type PricingConfig } from '@/services/pricingService';
+import { useAuth } from '@/hooks/useAuth';
 
 const PricingManagement = () => {
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
+
+  // Check if user is super_admin
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  // Fetch current pricing from backend
+  const { data: pricingData, isLoading, refetch } = useQuery({
+    queryKey: ['pricing', 'config'],
+    queryFn: getPricingConfig,
+  });
+
   // Item Pricing State
   const [itemPrices, setItemPrices] = useState({
     carpet: PRICING.pricePerSqInch.carpet,
@@ -35,35 +52,105 @@ const PricingManagement = () => {
   const [vatRate, setVatRate] = useState(PRICING.vatRate * 100); // Convert to percentage
   const [minimumOrder, setMinimumOrder] = useState(PRICING.minimumOrder);
 
-  const handleSaveItemPrices = () => {
-    // In a real app, this would call an API to update the database
-    // For now, we'll just show a success message
-    toast.success('Item prices updated successfully!', {
-      description: 'Changes will take effect immediately for new orders.',
-    });
-    console.log('Updated item prices:', itemPrices);
+  // Load pricing from backend when available
+  useEffect(() => {
+    if (pricingData?.success && pricingData.config) {
+      const config = pricingData.config;
+      setItemPrices(config.pricePerSqInch);
+      setDeliveryFees(config.deliveryFees);
+      setVatRate(config.vatRate * 100);
+      setMinimumOrder(config.minimumOrder);
+    }
+  }, [pricingData]);
+
+  const handleSaveAll = async () => {
+    if (!isSuperAdmin) {
+      toast.error('Unauthorized', {
+        description: 'Only super admins can modify pricing configuration',
+      });
+      return;
+    }
+
+    if (!user) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    setSaving(true);
+
+    const config: PricingConfig = {
+      pricePerSqInch: itemPrices,
+      deliveryFees,
+      vatRate: vatRate / 100,
+      minimumOrder,
+    };
+
+    const result = await updatePricingConfig(config, user.id);
+    setSaving(false);
+
+    if (result.success) {
+      toast.success('Pricing updated successfully!', {
+        description: 'Changes will take effect immediately for new orders.',
+      });
+      refetch();
+    } else if (result.errors) {
+      toast.error('Validation failed', {
+        description: result.errors.join('\n'),
+      });
+    } else {
+      toast.error('Failed to update pricing', {
+        description: result.message,
+      });
+    }
   };
 
-  const handleSaveDeliveryFees = () => {
-    toast.success('Delivery fees updated successfully!', {
-      description: 'Changes will take effect immediately for new orders.',
-    });
-    console.log('Updated delivery fees:', deliveryFees);
-  };
-
-  const handleSaveGeneralSettings = () => {
-    toast.success('General settings updated successfully!', {
-      description: `VAT: ${vatRate}%, Minimum Order: KES ${minimumOrder}`,
-    });
-    console.log('Updated settings:', { vatRate: vatRate / 100, minimumOrder });
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Pricing Management"
+          description="Configure pricing for items, delivery, and system-wide settings"
+        />
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-64 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Pricing Management"
         description="Configure pricing for items, delivery, and system-wide settings"
-      />
+      >
+        {isSuperAdmin && (
+          <Button onClick={handleSaveAll} disabled={saving} className="gap-2">
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save All Changes
+              </>
+            )}
+          </Button>
+        )}
+      </PageHeader>
+
+      {!isSuperAdmin && (
+        <Alert variant="destructive">
+          <Shield className="h-4 w-4" />
+          <AlertDescription>
+            You do not have permission to modify pricing. Only super admins can change pricing configuration.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="items" className="space-y-4">
         <TabsList>
@@ -104,20 +191,23 @@ const PricingManagement = () => {
                       id={key}
                       type="number"
                       step="0.05"
-                      min="0"
+                      min="0.1"
                       value={value}
                       onChange={(e) =>
                         setItemPrices({ ...itemPrices, [key]: parseFloat(e.target.value) || 0 })
                       }
                       className="font-mono"
+                      disabled={!isSuperAdmin}
                     />
                   </div>
                 ))}
               </div>
-              <Button onClick={handleSaveItemPrices} className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Item Prices
-              </Button>
+              {!isSuperAdmin && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Read-only: Only super admins can modify prices
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -145,20 +235,23 @@ const PricingManagement = () => {
                       id={`delivery-${key}`}
                       type="number"
                       step="50"
-                      min="0"
+                      min="100"
                       value={value}
                       onChange={(e) =>
                         setDeliveryFees({ ...deliveryFees, [key]: parseFloat(e.target.value) || 0 })
                       }
                       className="font-mono"
+                      disabled={!isSuperAdmin}
                     />
                   </div>
                 ))}
               </div>
-              <Button onClick={handleSaveDeliveryFees} className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Delivery Fees
-              </Button>
+              {!isSuperAdmin && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Read-only: Only super admins can modify delivery fees
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -181,10 +274,11 @@ const PricingManagement = () => {
                     type="number"
                     step="0.5"
                     min="0"
-                    max="100"
+                    max="30"
                     value={vatRate}
                     onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
                     className="font-mono"
+                    disabled={!isSuperAdmin}
                   />
                   <p className="text-xs text-muted-foreground">
                     Currently: {vatRate}% VAT will be added to orders
@@ -207,10 +301,11 @@ const PricingManagement = () => {
                     id="minimum"
                     type="number"
                     step="50"
-                    min="0"
+                    min="100"
                     value={minimumOrder}
                     onChange={(e) => setMinimumOrder(parseFloat(e.target.value) || 0)}
                     className="font-mono"
+                    disabled={!isSuperAdmin}
                   />
                   <p className="text-xs text-muted-foreground">
                     Orders below KES {minimumOrder.toLocaleString()} will be rejected
@@ -220,10 +315,12 @@ const PricingManagement = () => {
             </Card>
           </div>
 
-          <Button onClick={handleSaveGeneralSettings} className="gap-2">
-            <Save className="w-4 h-4" />
-            Save General Settings
-          </Button>
+          {!isSuperAdmin && (
+            <p className="text-sm text-muted-foreground flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              Read-only: Only super admins can modify settings
+            </p>
+          )}
         </TabsContent>
       </Tabs>
 

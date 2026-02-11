@@ -12,9 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { UserPlus, ToggleLeft, ToggleRight, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getUsers, updateUser, toggleUserActive } from '@/services/userService';
+import { getUsers, updateUser, toggleUserActive, softDeleteUser } from '@/services/userService';
 import { UserProfile } from '@/types';
 import { UserRole } from '@/types/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export const UserManagement = () => {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -73,17 +75,19 @@ export const UserManagement = () => {
   };
 
   const handleDeleteUser = async () => {
-    if (!deletingUser) return;
+    if (!deletingUser || !user) return;
     setDeleting(true);
     try {
-      const { error } = await supabase.auth.admin.deleteUser(deletingUser.id);
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success(`User ${deletingUser.name} deleted successfully`);
+      const result = await softDeleteUser(deletingUser.id, user.id);
+      if (result.success) {
+        toast.success(`User ${deletingUser.name} deleted successfully`, {
+          description: 'User data has been anonymized and marked as deleted',
+        });
         setDeleteDialogOpen(false);
         setDeletingUser(null);
         qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      } else {
+        toast.error(result.message || 'Failed to delete user');
       }
     } catch (error) {
       toast.error('An error occurred while deleting user');
