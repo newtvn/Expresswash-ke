@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const mockOrderDetails: Record<string, {
+const /* mockOrderDetails */ []: Record<string, {
   id: string;
   status: string;
   date: string;
@@ -90,7 +90,7 @@ export const OrderDetails = () => {
   const navigate = useNavigate();
   const [cancelOpen, setCancelOpen] = useState(false);
 
-  const order = mockOrderDetails[id ?? ''] ?? { ...fallbackOrder, id: id ?? fallbackOrder.id };
+  const order = /* mockOrderDetails */ [][id ?? ''] ?? { ...fallbackOrder, id: id ?? fallbackOrder.id };
   const canCancel = ['pending', 'picked_up'].includes(order.status);
 
   return (

@@ -22,24 +22,16 @@ const levelStyles: Record<string, string> = {
   debug: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-const mockLogs = [
-  { id: 1, timestamp: "2024-12-15 14:32:15.123", level: "info", service: "OrderService", message: "Order EW-2024-01284 status updated to in_washing" },
-  { id: 2, timestamp: "2024-12-15 14:32:14.998", level: "debug", service: "QueueWorker", message: "Processing job #45892 for order EW-2024-01284" },
-  { id: 3, timestamp: "2024-12-15 14:30:05.456", level: "info", service: "AuthService", message: "User admin@expresswash.co.ke logged in from 192.168.1.45" },
-  { id: 4, timestamp: "2024-12-15 14:28:00.789", level: "info", service: "OrderService", message: "New order EW-2024-01284 created by customer Grace Wanjiku" },
-  { id: 5, timestamp: "2024-12-15 14:15:30.012", level: "warn", service: "PaymentService", message: "M-Pesa callback timeout for transaction RLK456789, retrying..." },
-  { id: 6, timestamp: "2024-12-15 14:10:22.345", level: "error", service: "SMSService", message: "Failed to send SMS to +254711000004: Gateway timeout after 30s" },
-  { id: 7, timestamp: "2024-12-15 14:05:11.678", level: "info", service: "DriverService", message: "Driver Joseph Mwangi location updated: -1.4812, 36.9634" },
-  { id: 8, timestamp: "2024-12-15 13:55:00.901", level: "debug", service: "CacheService", message: "Cache miss for key order:EW-2024-01282, fetching from DB" },
-  { id: 9, timestamp: "2024-12-15 13:45:30.234", level: "info", service: "DeliveryService", message: "Delivery EW-2024-01280 marked as completed by driver d-1" },
-  { id: 10, timestamp: "2024-12-15 13:40:15.567", level: "warn", service: "InventoryService", message: "Item ITM-4009 has been in warehouse for 5 days (threshold: 3 days)" },
-  { id: 11, timestamp: "2024-12-15 13:30:00.890", level: "error", service: "EmailService", message: "SMTP connection failed: Connection refused to mail.expresswash.co.ke:587" },
-  { id: 12, timestamp: "2024-12-15 13:25:45.123", level: "info", service: "AuthService", message: "Password reset requested for customer@test.com" },
-  { id: 13, timestamp: "2024-12-15 13:20:00.456", level: "debug", service: "AnalyticsService", message: "Daily report generation started for 2024-12-14" },
-  { id: 14, timestamp: "2024-12-15 13:15:30.789", level: "warn", service: "RateLimiter", message: "Rate limit warning: IP 45.33.32.156 approaching threshold (80/100)" },
-  { id: 15, timestamp: "2024-12-15 13:10:00.012", level: "error", service: "AuthService", message: "Brute force detection: 5 failed login attempts from 45.33.32.156 in 60s" },
-  { id: 16, timestamp: "2024-12-15 13:00:00.345", level: "info", service: "SchedulerService", message: "Cron job [send-pickup-reminders] executed successfully, 12 reminders sent" },
-];
+type Log = {
+  id: number;
+  timestamp: string;
+  level: string;
+  service: string;
+  message: string;
+};
+
+// TODO: Connect to real system logs service
+const logs: Log[] = [];
 
 /**
  * Admin System Logs Page
@@ -61,9 +53,9 @@ export const SystemLogs = () => {
     setLevels((prev) => ({ ...prev, [level]: !prev[level as keyof typeof prev] }));
   };
 
-  const services = [...new Set(mockLogs.map((l) => l.service))];
+  const services = [...new Set(logs.map((l) => l.service))];
 
-  const filteredLogs = mockLogs.filter((log) => {
+  const filteredLogs = logs.filter((log) => {
     if (!levels[log.level as keyof typeof levels]) return false;
     if (serviceFilter !== "all" && log.service !== serviceFilter) return false;
     if (search && !log.message.toLowerCase().includes(search.toLowerCase())) return false;
@@ -173,7 +165,7 @@ export const SystemLogs = () => {
       </div>
 
       <p className="text-xs text-muted-foreground text-center">
-        Showing {filteredLogs.length} of {mockLogs.length} log entries
+        Showing {filteredLogs.length} of {logs.length} log entries
       </p>
     </div>
   );

@@ -5,22 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Star, ThumbsUp, ThumbsDown, MessageSquare, TrendingUp } from "lucide-react";
 
 const reviewStats = [
-  { label: "Average Rating", value: "4.7", icon: Star, color: "bg-yellow-100 text-yellow-600" },
-  { label: "Total Reviews", value: "1,284", icon: MessageSquare, color: "bg-blue-100 text-blue-600" },
-  { label: "Pending Approval", value: "8", icon: TrendingUp, color: "bg-orange-100 text-orange-600" },
-  { label: "This Month", value: "42", icon: ThumbsUp, color: "bg-emerald-100 text-emerald-600" },
+  { label: "Average Rating", value: "0", icon: Star, color: "bg-yellow-100 text-yellow-600" },
+  { label: "Total Reviews", value: "0", icon: MessageSquare, color: "bg-blue-100 text-blue-600" },
+  { label: "Pending Approval", value: "0", icon: TrendingUp, color: "bg-orange-100 text-orange-600" },
+  { label: "This Month", value: "0", icon: ThumbsUp, color: "bg-emerald-100 text-emerald-600" },
 ];
 
-const mockReviews = [
-  { id: "R-501", customer: "Grace Wanjiku", orderId: "EW-2024-01250", rating: 5, review: "Excellent service! My carpets look brand new. Very professional team.", status: "approved", date: "2024-12-14" },
-  { id: "R-502", customer: "Peter Kamau", orderId: "EW-2024-01248", rating: 4, review: "Good job on the curtains. Delivery was on time. Minor wrinkle issue.", status: "approved", date: "2024-12-13" },
-  { id: "R-503", customer: "Mary Njeri", orderId: "EW-2024-01245", rating: 5, review: "Fantastic! The mattress sanitization was thorough. Will definitely use again.", status: "approved", date: "2024-12-12" },
-  { id: "R-504", customer: "John Odera", orderId: "EW-2024-01240", rating: 2, review: "Delivery was delayed by two days. Cleaning was okay but not worth the wait.", status: "pending", date: "2024-12-11" },
-  { id: "R-505", customer: "Sarah Wambui", orderId: "EW-2024-01238", rating: 5, review: "Love the sofa cleaning result! Looks amazing. Great customer support.", status: "approved", date: "2024-12-10" },
-  { id: "R-506", customer: "David Maina", orderId: "EW-2024-01235", rating: 3, review: "Average experience. Carpet cleaning was fine but could be better.", status: "pending", date: "2024-12-09" },
-  { id: "R-507", customer: "Faith Akinyi", orderId: "EW-2024-01230", rating: 4, review: "Happy with the chair cleaning. Professional service overall.", status: "approved", date: "2024-12-08" },
-  { id: "R-508", customer: "James Mwangi", orderId: "EW-2024-01228", rating: 1, review: "Very poor experience. Items returned with stains still visible. Unacceptable.", status: "pending", date: "2024-12-07" },
-];
+type Review = {
+  id: string;
+  customer: string;
+  orderId: string;
+  rating: number;
+  review: string;
+  status: string;
+  date: string;
+};
+
+// TODO: Connect to real reviews service
+const reviews: Review[] = [];
 
 const StarRating = ({ rating }: { rating: number }) => (
   <div className="flex items-center gap-0.5">
@@ -37,7 +39,7 @@ const StarRating = ({ rating }: { rating: number }) => (
   </div>
 );
 
-const reviewColumns: Column<(typeof mockReviews)[0]>[] = [
+const reviewColumns: Column<Review>[] = [
   { key: "customer", header: "Customer", sortable: true },
   { key: "orderId", header: "Order" },
   {
@@ -105,7 +107,7 @@ export const ReviewsModeration = () => {
 
       {/* Reviews Table */}
       <DataTable
-        data={mockReviews}
+        data={reviews}
         columns={reviewColumns}
         searchPlaceholder="Search reviews..."
       />
