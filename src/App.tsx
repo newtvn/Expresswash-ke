@@ -47,6 +47,7 @@ const Communications = lazy(() => import('@/pages/admin/Communications'));
 const SystemConfig = lazy(() => import('@/pages/admin/SystemConfig'));
 const AuditLogs = lazy(() => import('@/pages/admin/AuditLogs'));
 const SystemLogs = lazy(() => import('@/pages/admin/SystemLogs'));
+const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -145,6 +146,7 @@ const App = () => (
               <Route path="system-config" element={<SystemConfig />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="system-logs" element={<SystemLogs />} />
+              <Route path="pricing" element={<PricingManagement />} />
             </Route>
 
             {/* Customer Portal */}

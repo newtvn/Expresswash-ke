@@ -17,6 +17,7 @@ import {
   FileText,
   Sparkles,
   ChevronUp,
+  DollarSign,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -86,6 +87,7 @@ const navGroups = [
   {
     label: 'System',
     items: [
+      { title: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { title: 'Configuration', href: '/admin/system-config', icon: Settings },
       { title: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
       { title: 'System Logs', href: '/admin/system-logs', icon: FileText },
