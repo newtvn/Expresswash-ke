@@ -77,30 +77,66 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
   };
 }
 
-// Calculate ETA based on zone
+// Calculate ETA based on zone with business day logic
+// Rules:
+// - Kitengela/Athi River: Same day delivery (if ordered early) or next business day
+// - Greater Nairobi (Westlands, etc.): 2 business days (48 hours, skip weekends)
+// - Deliveries only Monday to Friday
+// - Example: Order Monday in Nairobi → Delivered Wednesday
 export function calculateETA(zone: string): { label: string; date: string } {
   const now = new Date();
-  let daysToAdd = 2; // default
-  let label = '2-3 Business Days';
-
   const z = zone.toLowerCase();
-  if (z.includes('kitengela')) {
-    daysToAdd = 1;
-    label = 'Same Day / Next Day';
-  } else if (z.includes('athi river') || z.includes('syokimau')) {
-    daysToAdd = 1;
-    label = 'Same Day / Next Day';
-  } else if (z.includes('nairobi')) {
-    daysToAdd = 2;
-    label = '1-2 Business Days';
+
+  let businessDaysToAdd = 0;
+  let label = '';
+
+  // Determine business days based on zone
+  if (z.includes('kitengela') || z.includes('athi river')) {
+    businessDaysToAdd = 0; // Same day / Next business day
+    label = 'Same Day / Next Business Day';
+  } else if (z.includes('syokimau')) {
+    businessDaysToAdd = 1; // 1 business day
+    label = '1 Business Day';
+  } else if (z.includes('nairobi') || z.includes('westlands') || z.includes('karen') ||
+             z.includes('ngong') || z.includes('langata')) {
+    businessDaysToAdd = 2; // 2 business days (48 hours)
+    label = '2 Business Days (48 hours)';
   } else {
-    daysToAdd = 3;
-    label = '2-3 Business Days';
+    // Other zones - 3 business days
+    businessDaysToAdd = 3;
+    label = '3 Business Days';
   }
 
+  // Calculate delivery date, adding only business days (Mon-Fri)
   const eta = new Date(now);
-  eta.setDate(eta.getDate() + daysToAdd);
-  // Skip weekends
+  let addedDays = 0;
+
+  while (addedDays < businessDaysToAdd) {
+    eta.setDate(eta.getDate() + 1);
+
+    // Skip weekends (Saturday = 6, Sunday = 0)
+    if (eta.getDay() !== 0 && eta.getDay() !== 6) {
+      addedDays++;
+    }
+  }
+
+  // If same day delivery but it's already late or weekend, move to next business day
+  if (businessDaysToAdd === 0) {
+    const currentHour = now.getHours();
+    // If it's past 2 PM or it's a weekend, move to next business day
+    if (currentHour >= 14 || eta.getDay() === 0 || eta.getDay() === 6) {
+      while (eta.getDay() === 0 || eta.getDay() === 6) {
+        eta.setDate(eta.getDate() + 1);
+      }
+      // Move to next business day
+      eta.setDate(eta.getDate() + 1);
+      while (eta.getDay() === 0 || eta.getDay() === 6) {
+        eta.setDate(eta.getDate() + 1);
+      }
+    }
+  }
+
+  // Final check: ensure delivery is not on weekend
   while (eta.getDay() === 0 || eta.getDay() === 6) {
     eta.setDate(eta.getDate() + 1);
   }
