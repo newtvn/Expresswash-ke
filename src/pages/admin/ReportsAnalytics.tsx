@@ -21,6 +21,16 @@ import type {
 
 // ── Column Definitions ───────────────────────────────────────────────
 
+// Temporary type for zone performance data
+type ZonePerformanceRow = {
+  zone: string;
+  orders: number;
+  revenue: number;
+  customerSatisfaction: number;
+  avgDeliveryTime: number;
+  onTimeRate: number;
+};
+
 const salesColumns: Column<SalesDataPoint>[] = [
   { key: "date", header: "Date", sortable: true },
   { key: "orders", header: "Orders", sortable: true },
@@ -32,7 +42,7 @@ const salesColumns: Column<SalesDataPoint>[] = [
   },
 ];
 
-const zoneColumns: Column<any>[] = [
+const zoneColumns: Column<ZonePerformanceRow>[] = [
   { key: "zone", header: "Zone", sortable: true },
   { key: "orders", header: "Orders", sortable: true },
   {
