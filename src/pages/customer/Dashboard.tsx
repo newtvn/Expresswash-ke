@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader, KPICard } from '@/components/shared';
 import { OrderCard } from '@/components/customer/OrderCard';
 import { LoyaltyProgress } from '@/components/customer/LoyaltyProgress';
+import { PlaceOrderDialog } from '@/components/customer/PlaceOrderDialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,6 +27,7 @@ const mockOrders = [
 export const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [orderOpen, setOrderOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -34,7 +37,7 @@ export const Dashboard = () => {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <KPICard
           label="Active Orders"
           value={3}
@@ -97,7 +100,7 @@ export const Dashboard = () => {
             <CardContent className="space-y-3">
               <Button
                 className="w-full justify-start"
-                onClick={() => navigate(ROUTES.CUSTOMER_ORDERS)}
+                onClick={() => setOrderOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 New Order
@@ -122,6 +125,8 @@ export const Dashboard = () => {
           </Card>
         </div>
       </div>
+
+      <PlaceOrderDialog open={orderOpen} onOpenChange={setOrderOpen} />
     </div>
   );
 };

@@ -37,7 +37,7 @@ export function AdminTopBar() {
 
   const handleLogout = () => {
     clearAuth();
-    navigate('/signin');
+    navigate('/auth/signin');
   };
 
   // Build breadcrumbs from the path

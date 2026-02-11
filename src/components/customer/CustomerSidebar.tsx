@@ -20,6 +20,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -35,18 +36,38 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/authStore';
 
-const navItems = [
-  { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
-  { title: 'My Orders', href: '/portal/orders', icon: Package },
-  { title: 'Favorites', href: '/portal/favorites', icon: Heart },
-  { title: 'Addresses', href: '/portal/addresses', icon: MapPin },
-  { title: 'Invoices', href: '/portal/invoices', icon: FileText },
-  { title: 'Payments', href: '/portal/payments', icon: CreditCard },
-  { title: 'Loyalty & Rewards', href: '/portal/loyalty', icon: Award },
-  { title: 'Referrals', href: '/portal/referrals', icon: Users },
-  { title: 'Reviews', href: '/portal/reviews', icon: Star },
-  { title: 'Profile', href: '/portal/profile', icon: UserCircle },
-  { title: 'Notifications', href: '/portal/notifications', icon: Bell },
+const navGroups = [
+  {
+    label: 'Main',
+    items: [
+      { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
+      { title: 'My Orders', href: '/portal/orders', icon: Package },
+      { title: 'Favorites', href: '/portal/favorites', icon: Heart },
+    ],
+  },
+  {
+    label: 'Billing',
+    items: [
+      { title: 'Invoices', href: '/portal/invoices', icon: FileText },
+      { title: 'Payments', href: '/portal/payments', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Rewards',
+    items: [
+      { title: 'Loyalty', href: '/portal/loyalty', icon: Award },
+      { title: 'Referrals', href: '/portal/referrals', icon: Users },
+      { title: 'Reviews', href: '/portal/reviews', icon: Star },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { title: 'Addresses', href: '/portal/addresses', icon: MapPin },
+      { title: 'Profile', href: '/portal/profile', icon: UserCircle },
+      { title: 'Notifications', href: '/portal/notifications', icon: Bell },
+    ],
+  },
 ];
 
 export function CustomerSidebar() {
@@ -64,7 +85,7 @@ export function CustomerSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="pb-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -82,33 +103,38 @@ export function CustomerSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive =
-                  item.href === '/portal/dashboard'
-                    ? location.pathname === '/portal/dashboard' || location.pathname === '/portal'
-                    : location.pathname.startsWith(item.href);
+      <SidebarContent className="gap-0">
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label} className="py-1">
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-3 py-1">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const isActive =
+                    item.href === '/portal/dashboard'
+                      ? location.pathname === '/portal/dashboard' || location.pathname === '/portal'
+                      : location.pathname.startsWith(item.href);
 
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                      <Link to={item.href}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title} className="h-8">
+                        <Link to={item.href}>
+                          <item.icon className="size-4" />
+                          <span className="text-sm">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="pt-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -117,15 +143,15 @@ export function CustomerSidebar() {
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <Avatar className="h-8 w-8 rounded-lg">
+                  <Avatar className="h-7 w-7 rounded-lg">
                     <AvatarImage src={user?.avatarUrl} alt={user?.name} />
                     <AvatarFallback className="rounded-lg text-xs">
                       {user?.name ? getInitials(user.name) : 'CU'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user?.name ?? 'Customer'}</span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate font-medium text-xs">{user?.name ?? 'Customer'}</span>
+                    <span className="truncate text-[10px] text-muted-foreground">
                       {user?.email ?? 'customer@example.com'}
                     </span>
                   </div>

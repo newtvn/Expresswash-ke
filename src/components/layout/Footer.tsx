@@ -6,7 +6,7 @@ const Footer = () => {
 
   return (
     <footer className="bg-foreground text-background">
-      <div className="container mx-auto py-16">
+      <div className="container mx-auto py-12 sm:py-16 px-4">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
           <div>
@@ -57,8 +57,8 @@ const Footer = () => {
                 { name: "How It Works", href: "#process" },
                 { name: "Pricing", href: "#pricing" },
                 { name: "Track Order", href: "/track" },
-                { name: "FAQ", href: "#" },
-                { name: "Contact", href: "#" },
+                { name: "FAQ", href: "/faq" },
+                { name: "Contact", href: "/contact" },
               ].map((item) => (
                 <li key={item.name}>
                   <a href={item.href} className="text-sm text-background/60 hover:text-primary transition-colors">

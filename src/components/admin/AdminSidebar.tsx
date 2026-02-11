@@ -45,25 +45,25 @@ const navGroups = [
     label: 'Overview',
     items: [
       { title: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+      { title: 'Orders', href: '/admin/orders', icon: Package },
     ],
   },
   {
-    label: 'Management',
+    label: 'People',
     items: [
       { title: 'Users', href: '/admin/users', icon: Users },
-      { title: 'Orders', href: '/admin/orders', icon: Package },
       { title: 'Drivers', href: '/admin/drivers', icon: Truck },
     ],
   },
   {
-    label: 'Financial',
+    label: 'Finance',
     items: [
       { title: 'Billing', href: '/admin/billing', icon: Receipt },
       { title: 'Profit & Expense', href: '/admin/profit-expense', icon: TrendingUp },
     ],
   },
   {
-    label: 'Marketing',
+    label: 'Growth',
     items: [
       { title: 'Campaigns', href: '/admin/marketing', icon: Megaphone },
       { title: 'Loyalty', href: '/admin/loyalty', icon: Heart },
@@ -71,15 +71,10 @@ const navGroups = [
     ],
   },
   {
-    label: 'Analytics',
+    label: 'Operations',
     items: [
       { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
       { title: 'Inventory', href: '/admin/inventory', icon: Boxes },
-    ],
-  },
-  {
-    label: 'Communications',
-    items: [
       { title: 'Messages', href: '/admin/communications', icon: MessageSquare },
     ],
   },
@@ -108,7 +103,7 @@ export function AdminSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="pb-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
@@ -126,10 +121,12 @@ export function AdminSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-0">
         {navGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+          <SidebarGroup key={group.label} className="py-1">
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60 px-3 py-1">
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
@@ -140,10 +137,10 @@ export function AdminSidebar() {
 
                   return (
                     <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title} className="h-8">
                         <Link to={item.href}>
-                          <item.icon />
-                          <span>{item.title}</span>
+                          <item.icon className="size-4" />
+                          <span className="text-sm">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -155,7 +152,7 @@ export function AdminSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="pt-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -164,15 +161,15 @@ export function AdminSidebar() {
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <Avatar className="h-8 w-8 rounded-lg">
+                  <Avatar className="h-7 w-7 rounded-lg">
                     <AvatarImage src={user?.avatarUrl} alt={user?.name} />
                     <AvatarFallback className="rounded-lg text-xs">
                       {user?.name ? getInitials(user.name) : 'AD'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user?.name ?? 'Admin'}</span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate font-medium text-xs">{user?.name ?? 'Admin'}</span>
+                    <span className="truncate text-[10px] text-muted-foreground">
                       {user?.email ?? 'admin@expresswash.co.ke'}
                     </span>
                   </div>

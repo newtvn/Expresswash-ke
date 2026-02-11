@@ -5,9 +5,11 @@ import { Menu, X, Sparkles, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { UserRole } from "@/types";
+import { PlaceOrderDialog } from "@/components/customer/PlaceOrderDialog";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
   const { user, isAuthenticated } = useAuthStore();
 
   const navLinks = [
@@ -18,19 +20,19 @@ const Header = () => {
   ];
 
   const getDashboardPath = () => {
-    if (!user) return "/signin";
+    if (!user) return "/auth/signin";
     switch (user.role) {
       case UserRole.ADMIN:
       case UserRole.SUPER_ADMIN:
-        return "/admin";
+        return "/admin/dashboard";
       case UserRole.CUSTOMER:
-        return "/customer";
+        return "/portal/dashboard";
       case UserRole.DRIVER:
-        return "/driver";
+        return "/driver/dashboard";
       case UserRole.WAREHOUSE_STAFF:
         return "/warehouse";
       default:
-        return "/signin";
+        return "/auth/signin";
     }
   };
 
@@ -45,7 +47,7 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
-      <div className="container mx-auto">
+      <div className="container mx-auto px-4">
         <nav className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
@@ -95,10 +97,10 @@ const Header = () => {
             ) : (
               <>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/signin">Sign In</Link>
+                  <Link to="/auth/signin">Sign In</Link>
                 </Button>
                 <Button variant="default" size="sm" asChild>
-                  <Link to="/signup">Get Started</Link>
+                  <Link to="/auth/signup">Get Started</Link>
                 </Button>
               </>
             )}
@@ -108,6 +110,7 @@ const Header = () => {
           <button
             className="md:hidden p-2 text-foreground"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -115,22 +118,33 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden pb-6 animate-fade-in">
-            <div className="flex flex-col gap-4">
+          <div className="md:hidden pb-6 animate-fade-in bg-background/95 backdrop-blur-sm rounded-b-2xl px-2">
+            <div className="flex flex-col gap-2">
               {navLinks.map((link) => (
                 <a
                   key={link.name}
                   href={link.href}
-                  className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
+                  className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-3 px-2 rounded-lg hover:bg-muted/50"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {link.name}
                 </a>
               ))}
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
+
+              <button
+                className="text-base font-medium text-primary hover:text-primary/80 transition-colors py-3 px-2 rounded-lg hover:bg-primary/5 text-left"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setOrderOpen(true);
+                }}
+              >
+                Schedule Pickup
+              </button>
+
+              <div className="flex flex-col gap-2 pt-3 mt-1 border-t border-border">
                 {isAuthenticated && user ? (
                   <>
-                    <div className="flex items-center gap-3 py-2">
+                    <div className="flex items-center gap-3 py-2 px-2">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.avatarUrl} alt={user.name} />
                         <AvatarFallback className="text-xs">
@@ -155,10 +169,10 @@ const Header = () => {
                 ) : (
                   <>
                     <Button variant="ghost" asChild>
-                      <Link to="/signin">Sign In</Link>
+                      <Link to="/auth/signin" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
                     </Button>
                     <Button variant="default" asChild>
-                      <Link to="/signup">Get Started</Link>
+                      <Link to="/auth/signup" onClick={() => setMobileMenuOpen(false)}>Get Started</Link>
                     </Button>
                   </>
                 )}
@@ -167,6 +181,8 @@ const Header = () => {
           </div>
         )}
       </div>
+
+      <PlaceOrderDialog open={orderOpen} onOpenChange={setOrderOpen} />
     </header>
   );
 };
