@@ -8,21 +8,39 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { UserPlus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { UserPlus, ToggleLeft, ToggleRight, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getUsers, updateUser, toggleUserActive } from '@/services/userService';
+import { getUsers, updateUser, toggleUserActive, softDeleteUser } from '@/services/userService';
 import { UserProfile } from '@/types';
 import { UserRole } from '@/types/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export const UserManagement = () => {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', role: 'customer', zone: '', password: '' });
   const [creating, setCreating] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { data: allResult, isLoading } = useQuery({
     queryKey: ['admin', 'users', search],
@@ -38,6 +56,45 @@ export const UserManagement = () => {
       }
     },
   });
+
+  const handleEditRole = async () => {
+    if (!editingUser || !editRole) return;
+    try {
+      const result = await updateUser(editingUser.id, { role: editRole });
+      if (result.success) {
+        toast.success('User role updated successfully');
+        setEditDialogOpen(false);
+        setEditingUser(null);
+        qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      } else {
+        toast.error('Failed to update user role');
+      }
+    } catch (error) {
+      toast.error('An error occurred while updating user role');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser || !user) return;
+    setDeleting(true);
+    try {
+      const result = await softDeleteUser(deletingUser.id, user.id);
+      if (result.success) {
+        toast.success(`User ${deletingUser.name} deleted successfully`, {
+          description: 'User data has been anonymized and marked as deleted',
+        });
+        setDeleteDialogOpen(false);
+        setDeletingUser(null);
+        qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      } else {
+        toast.error(result.message || 'Failed to delete user');
+      }
+    } catch (error) {
+      toast.error('An error occurred while deleting user');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const all = allResult?.data ?? [];
   const getByRole = (role?: string) =>
@@ -109,15 +166,42 @@ export const UserManagement = () => {
       key: 'id',
       header: 'Actions',
       render: (row) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={() => toggleMutation.mutate(row.id)}
-          title={row.isActive ? 'Deactivate' : 'Activate'}
-        >
-          {row.isActive ? <ToggleRight className="w-4 h-4 text-green-600" /> : <ToggleLeft className="w-4 h-4" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => {
+              setEditingUser(row);
+              setEditRole(row.role);
+              setEditDialogOpen(true);
+            }}
+            title="Edit Role"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => toggleMutation.mutate(row.id)}
+            title={row.isActive ? 'Deactivate' : 'Activate'}
+          >
+            {row.isActive ? <ToggleRight className="w-4 h-4 text-green-600" /> : <ToggleLeft className="w-4 h-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={() => {
+              setDeletingUser(row);
+              setDeleteDialogOpen(true);
+            }}
+            title="Delete User"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
       ),
     },
   ];
@@ -160,6 +244,70 @@ export const UserManagement = () => {
         </Tabs>
       )}
 
+      {/* Edit Role Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User Role</DialogTitle>
+            <DialogDescription>
+              Change the role for {editingUser?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Current Role</Label>
+              <p className="text-sm text-muted-foreground capitalize mt-1">
+                {editingUser?.role?.replace('_', ' ')}
+              </p>
+            </div>
+            <div>
+              <Label>New Role</Label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditRole}>Update Role</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deletingUser?.name}</strong>? This action cannot
+              be undone and will permanently remove all user data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleting ? 'Deleting...' : 'Delete User'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add New User</DialogTitle></DialogHeader>

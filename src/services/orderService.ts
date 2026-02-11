@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase';
 import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
 import { orderLogger } from '@/lib/logger';
+import { getHolidayDates } from './holidayService';
+import { ORDER_STATUS } from '@/constants/orderStatus';
 
 export interface OrderListFilters {
   status?: number;
@@ -77,31 +79,92 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
   };
 }
 
-// Calculate ETA based on zone
-export function calculateETA(zone: string): { label: string; date: string } {
+// Calculate ETA based on zone with business day logic
+// Rules:
+// - Kitengela/Athi River: Same day delivery (if ordered early) or next business day
+// - Greater Nairobi (Westlands, etc.): 2 business days (48 hours, skip weekends and holidays)
+// - Deliveries only Monday to Friday (excluding holidays)
+// - Example: Order Monday in Nairobi → Delivered Wednesday (if no holidays)
+export async function calculateETA(zone: string): Promise<{ label: string; date: string }> {
   const now = new Date();
-  let daysToAdd = 2; // default
-  let label = '2-3 Business Days';
-
   const z = zone.toLowerCase();
-  if (z.includes('kitengela')) {
-    daysToAdd = 1;
-    label = 'Same Day / Next Day';
-  } else if (z.includes('athi river') || z.includes('syokimau')) {
-    daysToAdd = 1;
-    label = 'Same Day / Next Day';
-  } else if (z.includes('nairobi')) {
-    daysToAdd = 2;
-    label = '1-2 Business Days';
+
+  let businessDaysToAdd = 0;
+  let label = '';
+
+  // Determine business days based on zone
+  if (z.includes('kitengela') || z.includes('athi river')) {
+    businessDaysToAdd = 0; // Same day / Next business day
+    label = 'Same Day / Next Business Day';
+  } else if (z.includes('syokimau')) {
+    businessDaysToAdd = 1; // 1 business day
+    label = '1 Business Day';
+  } else if (z.includes('nairobi') || z.includes('westlands') || z.includes('karen') ||
+             z.includes('ngong') || z.includes('langata')) {
+    businessDaysToAdd = 2; // 2 business days (48 hours)
+    label = '2 Business Days (48 hours)';
   } else {
-    daysToAdd = 3;
-    label = '2-3 Business Days';
+    // Other zones - 3 business days
+    businessDaysToAdd = 3;
+    label = '3 Business Days';
   }
 
+  // Fetch holidays within the next 30 days with error handling
+  const endDate = new Date(now);
+  endDate.setDate(endDate.getDate() + 30);
+  const holidays = await getHolidayDates(
+    now.toISOString().split('T')[0],
+    endDate.toISOString().split('T')[0]
+  ).catch(err => {
+    orderLogger.warn('Failed to fetch holidays for ETA calculation', err);
+    return []; // Continue without holidays if fetch fails
+  });
+  const holidaySet = new Set(holidays.map(h => h.toISOString().split('T')[0]));
+
+  // Helper function to check if a date is a holiday
+  const isHoliday = (date: Date): boolean => {
+    return holidaySet.has(date.toISOString().split('T')[0]);
+  };
+
+  // Helper function to check if a date is a business day (Mon-Fri, not holiday)
+  const isBusinessDay = (date: Date): boolean => {
+    return date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday(date);
+  };
+
+  // Calculate delivery date, adding only business days (Mon-Fri, excluding holidays)
   const eta = new Date(now);
-  eta.setDate(eta.getDate() + daysToAdd);
-  // Skip weekends
-  while (eta.getDay() === 0 || eta.getDay() === 6) {
+  let addedDays = 0;
+
+  while (addedDays < businessDaysToAdd) {
+    eta.setDate(eta.getDate() + 1);
+
+    // Skip weekends and holidays
+    if (isBusinessDay(eta)) {
+      addedDays++;
+    }
+  }
+
+  // If same day delivery but it's already late, weekend, or holiday, move to next business day
+  if (businessDaysToAdd === 0) {
+    const currentHour = now.getHours();
+    // If it's past 2 PM or it's not a business day, move to next business day
+    if (currentHour >= 14 || !isBusinessDay(eta)) {
+      let safety = 0;
+      while (!isBusinessDay(eta) && safety++ < 365) {
+        eta.setDate(eta.getDate() + 1);
+      }
+      // Move to next business day
+      eta.setDate(eta.getDate() + 1);
+      safety = 0;
+      while (!isBusinessDay(eta) && safety++ < 365) {
+        eta.setDate(eta.getDate() + 1);
+      }
+    }
+  }
+
+  // Final check: ensure delivery is on a business day (with safety limit)
+  let safety = 0;
+  while (!isBusinessDay(eta) && safety++ < 365) {
     eta.setDate(eta.getDate() + 1);
   }
 
@@ -194,10 +257,10 @@ export const createOrder = async (
 
     if (attempts >= 5) {
       orderLogger.warn('Failed to generate unique tracking code after 5 attempts');
-      return { success: false, error: 'Failed to generate unique tracking code' };
+      return { success: false, error: 'Unable to generate tracking code. Please try again in a few moments.' };
     }
 
-    const eta = calculateETA(payload.zone);
+    const eta = await calculateETA(payload.zone);
 
     const { data: inserted, error } = await retrySupabaseQuery(
       () => supabase
@@ -206,7 +269,7 @@ export const createOrder = async (
           tracking_code: trackingCode,
           customer_id: payload.customerId,
           customer_name: payload.customerName,
-          status: 1, // pending
+          status: ORDER_STATUS.PENDING,
           pickup_date: payload.pickupDate,
           estimated_delivery: eta.date,
           zone: payload.zone,
@@ -226,7 +289,10 @@ export const createOrder = async (
 
     if (error || !inserted) {
       orderLogger.error('Failed to create order', error || new Error('No data returned'));
-      return { success: false, error: error?.message ?? 'Failed to create order' };
+      return {
+        success: false,
+        error: error?.message ?? 'Failed to save order to database. Please check your connection and try again.',
+      };
     }
 
     // Insert order items with dimensions
@@ -251,7 +317,7 @@ export const createOrder = async (
         orderLogger.error('Failed to save order items, rolling back order', itemsError);
         // Rollback order if items failed
         await supabase.from('orders').delete().eq('id', inserted.id);
-        return { success: false, error: 'Failed to save order items' };
+        return { success: false, error: 'Failed to save order items. Please try submitting your order again.' };
       }
     }
 
@@ -306,6 +372,86 @@ export const trackOrder = async (trackingCode: string): Promise<TrackingResponse
   } catch (error) {
     orderLogger.error('Error tracking order', error instanceof Error ? error : new Error(String(error)), { trackingCode });
     return { success: false, error: 'Unable to track order at this time. Please try again later.' };
+  }
+};
+
+/**
+ * Update order items with actual measured dimensions
+ * Called by drivers after measuring items during pickup
+ */
+export const updateOrderItems = async (
+  orderId: string,
+  items: Array<{
+    name: string;
+    quantity: number;
+    itemType?: string;
+    lengthInches: number;
+    widthInches: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>,
+  newSubtotal: number,
+  newTotal: number,
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    orderLogger.info('Updating order items with measured dimensions', { orderId, itemCount: items.length });
+
+    // Delete existing items
+    const { error: deleteError } = await retrySupabaseQuery(
+      () => supabase.from('order_items').delete().eq('order_id', orderId),
+      { maxRetries: 2 }
+    );
+
+    if (deleteError) {
+      orderLogger.error('Failed to delete old order items', deleteError);
+      return { success: false, error: 'Database error while updating measurements. Please try again.' };
+    }
+
+    // Insert updated items
+    const itemsToInsert = items.map((item) => ({
+      order_id: orderId,
+      name: item.name,
+      quantity: item.quantity,
+      item_type: item.itemType,
+      length_inches: item.lengthInches,
+      width_inches: item.widthInches,
+      unit_price: item.unitPrice,
+      total_price: item.totalPrice,
+    }));
+
+    const { error: insertError } = await retrySupabaseQuery(
+      () => supabase.from('order_items').insert(itemsToInsert),
+      { maxRetries: 3 }
+    );
+
+    if (insertError) {
+      orderLogger.error('Failed to insert updated order items', insertError);
+      return { success: false, error: 'Could not save updated measurements to database. Please try again.' };
+    }
+
+    // Update order totals
+    const { error: updateError } = await retrySupabaseQuery(
+      () => supabase
+        .from('orders')
+        .update({
+          subtotal: newSubtotal,
+          total: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId),
+      { maxRetries: 2 }
+    );
+
+    if (updateError) {
+      orderLogger.error('Failed to update order totals', updateError);
+      return { success: false, error: 'Measurements saved but could not update order total. Please contact support.' };
+    }
+
+    orderLogger.info('Order items updated successfully', { orderId, newSubtotal, newTotal });
+    return { success: true };
+  } catch (error) {
+    orderLogger.error('Unexpected error updating order items', error instanceof Error ? error : new Error(String(error)));
+    return { success: false, error: 'An unexpected error occurred while saving measurements. Please try again.' };
   }
 };
 
@@ -484,12 +630,17 @@ export const assignDriverToOrder = async (
       driver_id: driverId,
       driver_name: driverName,
       driver_phone: driverPhone,
-      status: 2,
+      status: ORDER_STATUS.CONFIRMED,
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId);
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    return {
+      success: false,
+      error: `Failed to assign driver: ${error.message}. Please try again.`,
+    };
+  }
   return { success: true };
 };
 
@@ -506,7 +657,7 @@ export const cancelOrder = async (
 
   const { error } = await supabase
     .from('orders')
-    .update({ status: 0, updated_at: new Date().toISOString() })
+    .update({ status: ORDER_STATUS.CANCELLED, updated_at: new Date().toISOString() })
     .ilike('tracking_code', trackingCode);
 
   if (error) return { success: false, message: 'Failed to cancel order' };

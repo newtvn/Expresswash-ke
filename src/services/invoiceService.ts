@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { retrySupabaseQuery } from '@/lib/retryUtils';
 import {
   Invoice,
   InvoiceItem,
@@ -81,17 +82,17 @@ export const getInvoices = async (
   const start = (filters.page - 1) * filters.limit;
   query = query.range(start, start + filters.limit - 1).order('issued_at', { ascending: false });
 
-  const { data: invoices, count, error } = await query;
+  const { data: invoices, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
   if (error || !invoices) {
     return { data: [], total: 0, page: filters.page, limit: filters.limit, totalPages: 0 };
   }
 
   const invoiceIds = invoices.map((inv) => inv.id);
-  const { data: allItems } = await supabase
-    .from('invoice_items')
-    .select('*')
-    .in('invoice_id', invoiceIds);
+  const { data: allItems } = await retrySupabaseQuery(
+    () => supabase.from('invoice_items').select('*').in('invoice_id', invoiceIds),
+    { maxRetries: 2 }
+  );
 
   const itemsByInvoice = (allItems ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, item) => {
     const iid = item.invoice_id as string;
@@ -113,18 +114,17 @@ export const getInvoices = async (
 };
 
 export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null> => {
-  const { data: invoice } = await supabase
-    .from('invoices')
-    .select('*')
-    .eq('id', invoiceId)
-    .single();
+  const { data: invoice } = await retrySupabaseQuery(
+    () => supabase.from('invoices').select('*').eq('id', invoiceId).single(),
+    { maxRetries: 2 }
+  );
 
   if (!invoice) return null;
 
-  const { data: items } = await supabase
-    .from('invoice_items')
-    .select('*')
-    .eq('invoice_id', invoiceId);
+  const { data: items } = await retrySupabaseQuery(
+    () => supabase.from('invoice_items').select('*').eq('invoice_id', invoiceId),
+    { maxRetries: 2 }
+  );
 
   return mapInvoice(invoice, items ?? []);
 };
@@ -138,7 +138,7 @@ export const getPayments = async (
     query = query.eq('invoice_id', invoiceId);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error || !data) return [];
   return data.map(mapPayment);
 };
@@ -146,37 +146,43 @@ export const getPayments = async (
 export const createInvoice = async (
   data: Omit<Invoice, 'id' | 'invoiceNumber' | 'issuedAt'>,
 ): Promise<{ success: boolean; invoice?: Invoice }> => {
-  const { data: inserted, error } = await supabase
-    .from('invoices')
-    .insert({
-      order_id: data.orderId,
-      order_number: data.orderNumber,
-      customer_id: data.customerId,
-      customer_name: data.customerName,
-      customer_email: data.customerEmail,
-      subtotal: data.subtotal,
-      vat_rate: data.vatRate,
-      vat_amount: data.vatAmount,
-      discount: data.discount,
-      total: data.total,
-      status: data.status,
-      due_at: data.dueAt,
-      paid_at: data.paidAt ?? null,
-    })
-    .select()
-    .single();
+  const { data: inserted, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('invoices')
+      .insert({
+        order_id: data.orderId,
+        order_number: data.orderNumber,
+        customer_id: data.customerId,
+        customer_name: data.customerName,
+        customer_email: data.customerEmail,
+        subtotal: data.subtotal,
+        vat_rate: data.vatRate,
+        vat_amount: data.vatAmount,
+        discount: data.discount,
+        total: data.total,
+        status: data.status,
+        due_at: data.dueAt,
+        paid_at: data.paidAt ?? null,
+      })
+      .select()
+      .single(),
+    { maxRetries: 3 }
+  );
 
   if (error || !inserted) return { success: false };
 
   if (data.items.length > 0) {
-    await supabase.from('invoice_items').insert(
-      data.items.map((item) => ({
-        invoice_id: inserted.id,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        total: item.total,
-      })),
+    await retrySupabaseQuery(
+      () => supabase.from('invoice_items').insert(
+        data.items.map((item) => ({
+          invoice_id: inserted.id,
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          total: item.total,
+        })),
+      ),
+      { maxRetries: 3 }
     );
   }
 
@@ -197,10 +203,10 @@ export const updateInvoiceStatus = async (
     updateData.paid_at = new Date().toISOString();
   }
 
-  const { error } = await supabase
-    .from('invoices')
-    .update(updateData)
-    .eq('id', id);
+  const { error } = await retrySupabaseQuery(
+    () => supabase.from('invoices').update(updateData).eq('id', id),
+    { maxRetries: 3 }
+  );
 
   if (error) return { success: false };
 
@@ -211,21 +217,24 @@ export const updateInvoiceStatus = async (
 export const recordPayment = async (
   payment: Omit<Payment, 'id' | 'createdAt'>,
 ): Promise<{ success: boolean; payment?: Payment }> => {
-  const { data, error } = await supabase
-    .from('payments')
-    .insert({
-      invoice_id: payment.invoiceId,
-      invoice_number: payment.invoiceNumber,
-      amount: payment.amount,
-      method: payment.method,
-      reference: payment.reference,
-      mpesa_receipt_number: payment.mpesaReceiptNumber ?? null,
-      status: payment.status,
-      recorded_by: payment.recordedBy,
-      notes: payment.notes ?? null,
-    })
-    .select()
-    .single();
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('payments')
+      .insert({
+        invoice_id: payment.invoiceId,
+        invoice_number: payment.invoiceNumber,
+        amount: payment.amount,
+        method: payment.method,
+        reference: payment.reference,
+        mpesa_receipt_number: payment.mpesaReceiptNumber ?? null,
+        status: payment.status,
+        recorded_by: payment.recordedBy,
+        notes: payment.notes ?? null,
+      })
+      .select()
+      .single(),
+    { maxRetries: 3 }
+  );
 
   if (error || !data) return { success: false };
   return { success: true, payment: mapPayment(data) };

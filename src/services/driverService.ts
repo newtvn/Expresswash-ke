@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { retrySupabaseQuery } from '@/lib/retryUtils';
 
 // ── Driver types (local to this service) ──────────────────────────────
 
@@ -110,19 +111,18 @@ function mapRoute(row: Record<string, unknown>, stops: Record<string, unknown>[]
 // ── Public API ────────────────────────────────────────────────────────
 
 export const getDrivers = async (): Promise<Driver[]> => {
-  const { data: profiles, error: pErr } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'driver')
-    .order('name');
+  const { data: profiles, error: pErr } = await retrySupabaseQuery(
+    () => supabase.from('profiles').select('*').eq('role', 'driver').order('name'),
+    { maxRetries: 2 }
+  );
 
   if (pErr || !profiles) return [];
 
   const ids = profiles.map((p) => p.id as string);
-  const { data: driverRows } = await supabase
-    .from('drivers')
-    .select('*')
-    .in('id', ids);
+  const { data: driverRows } = await retrySupabaseQuery(
+    () => supabase.from('drivers').select('*').in('id', ids),
+    { maxRetries: 2 }
+  );
 
   const driverMap: Record<string, Record<string, unknown>> = {};
   (driverRows ?? []).forEach((d) => { driverMap[d.id as string] = d; });
@@ -131,9 +131,15 @@ export const getDrivers = async (): Promise<Driver[]> => {
 };
 
 export const getDriverById = async (driverId: string): Promise<Driver | null> => {
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', driverId).single();
+  const { data: profile } = await retrySupabaseQuery(
+    () => supabase.from('profiles').select('*').eq('id', driverId).single(),
+    { maxRetries: 2 }
+  );
   if (!profile) return null;
-  const { data: driverRow } = await supabase.from('drivers').select('*').eq('id', driverId).maybeSingle();
+  const { data: driverRow } = await retrySupabaseQuery(
+    () => supabase.from('drivers').select('*').eq('id', driverId).maybeSingle(),
+    { maxRetries: 2 }
+  );
   return mapDriver((driverRow ?? {}) as Record<string, unknown>, profile as Record<string, unknown>);
 };
 
@@ -151,14 +157,14 @@ export const getDriverRoutes = async (
     query = query.eq('date', date);
   }
 
-  const { data: routes, error } = await query;
+  const { data: routes, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error || !routes) return [];
 
   const routeIds = routes.map((r) => r.id);
-  const { data: allStops } = await supabase
-    .from('route_stops')
-    .select('*')
-    .in('route_id', routeIds);
+  const { data: allStops } = await retrySupabaseQuery(
+    () => supabase.from('route_stops').select('*').in('route_id', routeIds),
+    { maxRetries: 2 }
+  );
 
   const stopsByRoute = (allStops ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, s) => {
     const rid = s.route_id as string;
@@ -247,14 +253,14 @@ export const getAllRoutes = async (date?: string): Promise<DriverRoute[]> => {
     query = query.eq('date', date);
   }
 
-  const { data: routes, error } = await query;
+  const { data: routes, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error || !routes) return [];
 
   const routeIds = routes.map((r) => r.id);
-  const { data: allStops } = await supabase
-    .from('route_stops')
-    .select('*')
-    .in('route_id', routeIds);
+  const { data: allStops } = await retrySupabaseQuery(
+    () => supabase.from('route_stops').select('*').in('route_id', routeIds),
+    { maxRetries: 2 }
+  );
 
   const stopsByRoute = (allStops ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, s) => {
     const rid = s.route_id as string;

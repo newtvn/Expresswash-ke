@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Eye } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Eye, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { getOrders, bulkUpdateOrderStatus } from '@/services/orderService';
+import { getOrders, bulkUpdateOrderStatus, trackOrder } from '@/services/orderService';
 import { getDrivers } from '@/services/driverService';
 import { assignDriverToOrder } from '@/services/orderService';
 import { Order } from '@/types';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 
 const STATUS_OPTIONS = [
@@ -42,6 +43,10 @@ export const OrderManagement = () => {
   const [bulkStatus, setBulkStatus] = useState('');
   const [assignDialogOrder, setAssignDialogOrder] = useState<Order | null>(null);
   const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [trackDialogOpen, setTrackDialogOpen] = useState(false);
+  const [trackingCodeInput, setTrackingCodeInput] = useState('');
+  const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
+  const [trackLoading, setTrackLoading] = useState(false);
 
   const { data: result, isLoading } = useQuery({
     queryKey: ['admin', 'orders', statusFilter, search, page],
@@ -92,6 +97,41 @@ export const OrderManagement = () => {
   });
 
   const orders = result?.data ?? [];
+
+  const handleTrackOrder = async () => {
+    const code = trackingCodeInput.trim();
+
+    if (!code) {
+      toast.error('Please enter a tracking code');
+      return;
+    }
+
+    // Validate tracking code format (EW-YYYY-NNNNN)
+    const trackingCodeRegex = /^EW-\d{4}-\d{5}$/i;
+    if (!trackingCodeRegex.test(code)) {
+      toast.error('Invalid tracking code format', {
+        description: 'Tracking code should be in format: EW-YYYY-NNNNN (e.g., EW-2026-12345)',
+      });
+      return;
+    }
+
+    setTrackLoading(true);
+    setTrackedOrder(null);
+
+    try {
+      const result = await trackOrder(code);
+      if (result.success && result.order) {
+        setTrackedOrder(result.order);
+        toast.success('Order found!');
+      } else {
+        toast.error(result.error || 'Order not found');
+      }
+    } catch (error) {
+      toast.error('Failed to track order');
+    } finally {
+      setTrackLoading(false);
+    }
+  };
 
   const columns: Column<Order>[] = [
     {
@@ -167,6 +207,10 @@ export const OrderManagement = () => {
       <PageHeader title="Order Management" description="View and manage all customer orders" />
 
       <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => setTrackDialogOpen(true)} variant="outline" className="gap-2">
+          <Package className="w-4 h-4" />
+          Track Order
+        </Button>
         <SearchInput
           onSearch={useCallback((v: string) => { setSearch(v); setPage(1); }, [])}
           placeholder="Search orders..."
@@ -227,6 +271,95 @@ export const OrderManagement = () => {
           pageSize={15}
         />
       )}
+
+      {/* Track Order Dialog */}
+      <Dialog open={trackDialogOpen} onOpenChange={(open) => {
+        setTrackDialogOpen(open);
+        if (!open) {
+          setTrackingCodeInput('');
+          setTrackedOrder(null);
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Track Order</DialogTitle>
+            <DialogDescription>
+              Enter a tracking code to view order details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter tracking code (e.g., EW-2026-12345)"
+                value={trackingCodeInput}
+                onChange={(e) => setTrackingCodeInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTrackOrder();
+                }}
+              />
+              <Button onClick={handleTrackOrder} disabled={trackLoading}>
+                {trackLoading ? 'Searching...' : 'Track'}
+              </Button>
+            </div>
+
+            {trackedOrder && (
+              <div className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold">Order {trackedOrder.trackingCode}</h4>
+                  <StatusBadge status={String(trackedOrder.status)} />
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Customer:</span>
+                    <p className="font-medium">{trackedOrder.customerName}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Zone:</span>
+                    <p className="font-medium">{trackedOrder.zone}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Pickup Date:</span>
+                    <p className="font-medium">{new Date(trackedOrder.pickupDate).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Estimated Delivery:</span>
+                    <p className="font-medium">{new Date(trackedOrder.estimatedDelivery).toLocaleDateString()}</p>
+                  </div>
+                  {trackedOrder.driverName && (
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground">Driver:</span>
+                      <p className="font-medium">{trackedOrder.driverName} - {trackedOrder.driverPhone}</p>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="text-muted-foreground text-sm">Items:</span>
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    {trackedOrder.items.map((item, idx) => (
+                      <li key={idx} className="text-sm">
+                        {item.quantity}x {item.name} - KES {item.totalPrice?.toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <span className="font-semibold">Total:</span>
+                  <span className="text-lg font-bold">KES {trackedOrder.total?.toLocaleString()}</span>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    navigate(`/portal/orders/${trackedOrder.trackingCode}`);
+                    setTrackDialogOpen(false);
+                  }}
+                >
+                  View Full Details
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Assign Driver Dialog */}
       <Dialog open={!!assignDialogOrder} onOpenChange={() => setAssignDialogOrder(null)}>

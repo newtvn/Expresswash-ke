@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { retrySupabaseQuery } from '@/lib/retryUtils';
 import {
   IntakeItem,
   ProcessingItem,
@@ -74,10 +75,10 @@ function mapQualityCheck(row: Record<string, unknown>): QualityCheckResult {
 // ── Public API ────────────────────────────────────────────────────────
 
 export const getIntakeQueue = async (): Promise<IntakeItem[]> => {
-  const { data, error } = await supabase
-    .from('warehouse_intake')
-    .select('*')
-    .order('received_at', { ascending: false });
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.from('warehouse_intake').select('*').order('received_at', { ascending: false }),
+    { maxRetries: 2 }
+  );
 
   if (error || !data) return [];
   return data.map(mapIntake);
@@ -95,27 +96,26 @@ export const getProcessingItems = async (
     query = query.eq('stage', stage);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error || !data) return [];
   return data.map(mapProcessing);
 };
 
 export const getDispatchQueue = async (): Promise<DispatchItem[]> => {
-  const { data, error } = await supabase
-    .from('warehouse_dispatch')
-    .select('*')
-    .order('ready_since', { ascending: false });
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.from('warehouse_dispatch').select('*').order('ready_since', { ascending: false }),
+    { maxRetries: 2 }
+  );
 
   if (error || !data) return [];
   return data.map(mapDispatch);
 };
 
 export const getWarehouseStats = async (): Promise<WarehouseStats> => {
-  const { data, error } = await supabase
-    .from('warehouse_stats')
-    .select('*')
-    .limit(1)
-    .single();
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.from('warehouse_stats').select('*').limit(1).single(),
+    { maxRetries: 2 }
+  );
 
   if (error || !data) {
     return {
@@ -146,18 +146,20 @@ export const updateItemStage = async (
   itemId: string,
   newStage: ProcessingItem['stage'],
 ): Promise<{ success: boolean; item?: ProcessingItem }> => {
-  const { error } = await supabase
-    .from('warehouse_processing')
-    .update({ stage: newStage, updated_at: new Date().toISOString() })
-    .eq('id', itemId);
+  const { error } = await retrySupabaseQuery(
+    () => supabase
+      .from('warehouse_processing')
+      .update({ stage: newStage, updated_at: new Date().toISOString() })
+      .eq('id', itemId),
+    { maxRetries: 3 }
+  );
 
   if (error) return { success: false };
 
-  const { data } = await supabase
-    .from('warehouse_processing')
-    .select('*')
-    .eq('id', itemId)
-    .single();
+  const { data } = await retrySupabaseQuery(
+    () => supabase.from('warehouse_processing').select('*').eq('id', itemId).single(),
+    { maxRetries: 2 }
+  );
 
   return { success: true, item: data ? mapProcessing(data) : undefined };
 };
@@ -169,33 +171,38 @@ export const performQualityCheck = async (
   checkedBy: string,
   issues?: string[],
 ): Promise<{ success: boolean; result?: QualityCheckResult }> => {
-  const { data: item } = await supabase
-    .from('warehouse_processing')
-    .select('order_id')
-    .eq('id', itemId)
-    .single();
+  const { data: item } = await retrySupabaseQuery(
+    () => supabase.from('warehouse_processing').select('order_id').eq('id', itemId).single(),
+    { maxRetries: 2 }
+  );
 
-  const { data: result, error } = await supabase
-    .from('quality_checks')
-    .insert({
-      item_id: itemId,
-      order_id: item?.order_id ?? '',
-      passed,
-      notes,
-      checked_by: checkedBy,
-      checked_at: new Date().toISOString(),
-      issues: issues ?? null,
-    })
-    .select()
-    .single();
+  const { data: result, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('quality_checks')
+      .insert({
+        item_id: itemId,
+        order_id: item?.order_id ?? '',
+        passed,
+        notes,
+        checked_by: checkedBy,
+        checked_at: new Date().toISOString(),
+        issues: issues ?? null,
+      })
+      .select()
+      .single(),
+    { maxRetries: 3 }
+  );
 
   if (error || !result) return { success: false };
 
   if (passed) {
-    await supabase
-      .from('warehouse_processing')
-      .update({ stage: 'ready_for_dispatch', updated_at: new Date().toISOString() })
-      .eq('id', itemId);
+    await retrySupabaseQuery(
+      () => supabase
+        .from('warehouse_processing')
+        .update({ stage: 'ready_for_dispatch', updated_at: new Date().toISOString() })
+        .eq('id', itemId),
+      { maxRetries: 3 }
+    );
   }
 
   return { success: true, result: mapQualityCheck(result) };

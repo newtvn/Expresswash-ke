@@ -7,6 +7,7 @@ import BubbleBackground from './components/BubbleBackground';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
+import { SessionTimeoutWarning } from '@/components/SessionTimeout';
 import { UserRole } from '@/types';
 
 // Layouts
@@ -46,6 +47,8 @@ const Communications = lazy(() => import('@/pages/admin/Communications'));
 const SystemConfig = lazy(() => import('@/pages/admin/SystemConfig'));
 const AuditLogs = lazy(() => import('@/pages/admin/AuditLogs'));
 const SystemLogs = lazy(() => import('@/pages/admin/SystemLogs'));
+const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
+const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -94,6 +97,7 @@ const App = () => (
     <TooltipProvider>
       <BubbleBackground />
       <Sonner />
+      <SessionTimeoutWarning />
       <ErrorBoundary>
         <BrowserRouter>
           <LazyLoader>
@@ -143,6 +147,8 @@ const App = () => (
               <Route path="system-config" element={<SystemConfig />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="system-logs" element={<SystemLogs />} />
+              <Route path="pricing" element={<PricingManagement />} />
+              <Route path="holidays" element={<HolidayCalendar />} />
             </Route>
 
             {/* Customer Portal */}

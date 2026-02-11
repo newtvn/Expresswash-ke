@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -53,10 +53,10 @@ const ITEM_TYPES = [
 ];
 
 const ZONES = [
-  { value: 'Kitengela', label: 'Kitengela', delivery: 'Same Day / Next Day' },
-  { value: 'Athi River', label: 'Athi River', delivery: 'Same Day / Next Day' },
-  { value: 'Syokimau', label: 'Syokimau', delivery: 'Same Day / Next Day' },
-  { value: 'Nairobi', label: 'Greater Nairobi', delivery: '1-2 Business Days' },
+  { value: 'Kitengela', label: 'Kitengela', delivery: 'Same Day / Next Business Day' },
+  { value: 'Athi River', label: 'Athi River', delivery: 'Same Day / Next Business Day' },
+  { value: 'Syokimau', label: 'Syokimau', delivery: '1 Business Day' },
+  { value: 'Nairobi', label: 'Greater Nairobi (Westlands, Karen, etc.)', delivery: '2 Business Days (48hrs)' },
 ];
 
 interface ItemForm {
@@ -97,6 +97,32 @@ export const RequestPickup = () => {
   );
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ItemForm[]>([newItemForm()]);
+  const [eta, setEta] = useState<{ label: string; date: string } | null>(null);
+
+  // Fetch ETA when zone changes
+  useEffect(() => {
+    let cancelled = false;
+
+    if (zone) {
+      calculateETA(zone)
+        .then((result) => {
+          if (!cancelled) setEta(result);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setEta(null);
+            toast.error('Unable to calculate delivery time. Please try again.');
+            console.error('ETA calculation failed:', err);
+          }
+        });
+    } else {
+      setEta(null);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [zone]);
 
   const addItem = () => setItems([...items, newItemForm()]);
 
@@ -131,9 +157,9 @@ export const RequestPickup = () => {
   const deliveryFee = zone ? getDeliveryFee(zone) : 0;
   const vatAmount = Math.round((subtotal + deliveryFee) * PRICING.vatRate);
   const grandTotal = subtotal + deliveryFee + vatAmount;
-  const eta = zone ? calculateETA(zone) : null;
   const allValid = calculatedItems.every((i) => i.isValid) && zone !== '' && pickupAddress !== '';
   const hasItems = calculatedItems.some((i) => i.isValid);
+  const z = zone.toLowerCase();
 
   const handleSubmit = async () => {
     if (!user) {
@@ -182,7 +208,7 @@ export const RequestPickup = () => {
     if (result.success && result.order) {
       setOrderCreated({
         trackingCode: result.order.trackingCode,
-        eta: eta?.label ?? '2-3 Business Days',
+        eta: eta?.label ?? 'To be confirmed',
         total: grandTotal,
       });
       toast.success('Pickup request submitted!');
@@ -533,10 +559,16 @@ export const RequestPickup = () => {
                     </div>
                   )}
 
-                  {/* Price info */}
+                  {/* Price and delivery info */}
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <p>Pricing is based on item dimensions (per sq inch).</p>
-                    <p>Final price may vary after warehouse inspection.</p>
+                    <p>• Pricing is based on item dimensions (per sq inch)</p>
+                    <p>• Final price may vary after driver measures on pickup</p>
+                    <p>• Deliveries Monday-Friday only (weekends excluded)</p>
+                    {zone && (z.includes('kitengela') || z.includes('athi river')) && (
+                      <p className="text-primary font-medium">
+                        • Same day delivery available if ordered before 2 PM
+                      </p>
+                    )}
                   </div>
 
                   <Button

@@ -3,6 +3,7 @@ import { Sparkles, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
+import { PageErrorBoundary } from '@/components/ErrorBoundary';
 
 const tabItems = [
   { name: 'Intake', href: '/warehouse' },
@@ -71,7 +72,9 @@ const WarehouseLayout = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-6">
-        <Outlet />
+        <PageErrorBoundary fallbackTitle="Warehouse Page Error">
+          <Outlet />
+        </PageErrorBoundary>
       </main>
     </div>
   );
