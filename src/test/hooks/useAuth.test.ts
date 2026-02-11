@@ -4,6 +4,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { UserRole } from '@/types/auth';
 
+// Mock react-router
+vi.mock('react-router-dom', () => ({
+  useNavigate: vi.fn(() => vi.fn()),
+}));
+
 // Mock the auth store
 vi.mock('@/stores/authStore', () => ({
   useAuthStore: vi.fn(),
