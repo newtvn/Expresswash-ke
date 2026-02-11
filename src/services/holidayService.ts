@@ -88,7 +88,7 @@ export async function addHoliday(
     // Check if holiday already exists for this date
     const existing = await isHoliday(date);
     if (existing) {
-      return { success: false, message: 'A holiday already exists for this date' };
+      return { success: false, message: `A holiday is already configured for ${date}. Please choose a different date.` };
     }
 
     const { data, error } = await retrySupabaseQuery(
@@ -107,7 +107,10 @@ export async function addHoliday(
     );
 
     if (error || !data) {
-      return { success: false, message: error?.message ?? 'Failed to add holiday' };
+      return {
+        success: false,
+        message: error?.message ?? 'Failed to save holiday to database. Please check your connection and try again.',
+      };
     }
 
     return {
@@ -122,7 +125,10 @@ export async function addHoliday(
       },
     };
   } catch (error) {
-    return { success: false, message: 'An unexpected error occurred' };
+    return {
+      success: false,
+      message: 'An unexpected error occurred while adding holiday. Please try again.',
+    };
   }
 }
 
@@ -137,12 +143,15 @@ export async function deleteHoliday(holidayId: string): Promise<{ success: boole
     );
 
     if (error) {
-      return { success: false, message: error.message };
+      return { success: false, message: `Failed to delete holiday: ${error.message}` };
     }
 
     return { success: true };
   } catch (error) {
-    return { success: false, message: 'An unexpected error occurred' };
+    return {
+      success: false,
+      message: 'An unexpected error occurred while deleting holiday. Please try again.',
+    };
   }
 }
 

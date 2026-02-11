@@ -3,6 +3,7 @@ import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
 import { orderLogger } from '@/lib/logger';
 import { getHolidayDates } from './holidayService';
+import { ORDER_STATUS } from '@/constants/orderStatus';
 
 export interface OrderListFilters {
   status?: number;
@@ -256,7 +257,7 @@ export const createOrder = async (
 
     if (attempts >= 5) {
       orderLogger.warn('Failed to generate unique tracking code after 5 attempts');
-      return { success: false, error: 'Failed to generate unique tracking code' };
+      return { success: false, error: 'Unable to generate tracking code. Please try again in a few moments.' };
     }
 
     const eta = await calculateETA(payload.zone);
@@ -268,7 +269,7 @@ export const createOrder = async (
           tracking_code: trackingCode,
           customer_id: payload.customerId,
           customer_name: payload.customerName,
-          status: 1, // pending
+          status: ORDER_STATUS.PENDING,
           pickup_date: payload.pickupDate,
           estimated_delivery: eta.date,
           zone: payload.zone,
@@ -288,7 +289,10 @@ export const createOrder = async (
 
     if (error || !inserted) {
       orderLogger.error('Failed to create order', error || new Error('No data returned'));
-      return { success: false, error: error?.message ?? 'Failed to create order' };
+      return {
+        success: false,
+        error: error?.message ?? 'Failed to save order to database. Please check your connection and try again.',
+      };
     }
 
     // Insert order items with dimensions
@@ -313,7 +317,7 @@ export const createOrder = async (
         orderLogger.error('Failed to save order items, rolling back order', itemsError);
         // Rollback order if items failed
         await supabase.from('orders').delete().eq('id', inserted.id);
-        return { success: false, error: 'Failed to save order items' };
+        return { success: false, error: 'Failed to save order items. Please try submitting your order again.' };
       }
     }
 
@@ -400,7 +404,7 @@ export const updateOrderItems = async (
 
     if (deleteError) {
       orderLogger.error('Failed to delete old order items', deleteError);
-      return { success: false, error: 'Failed to update measurements' };
+      return { success: false, error: 'Database error while updating measurements. Please try again.' };
     }
 
     // Insert updated items
@@ -422,7 +426,7 @@ export const updateOrderItems = async (
 
     if (insertError) {
       orderLogger.error('Failed to insert updated order items', insertError);
-      return { success: false, error: 'Failed to save measurements' };
+      return { success: false, error: 'Could not save updated measurements to database. Please try again.' };
     }
 
     // Update order totals
@@ -440,14 +444,14 @@ export const updateOrderItems = async (
 
     if (updateError) {
       orderLogger.error('Failed to update order totals', updateError);
-      return { success: false, error: 'Failed to update order total' };
+      return { success: false, error: 'Measurements saved but could not update order total. Please contact support.' };
     }
 
     orderLogger.info('Order items updated successfully', { orderId, newSubtotal, newTotal });
     return { success: true };
   } catch (error) {
     orderLogger.error('Unexpected error updating order items', error instanceof Error ? error : new Error(String(error)));
-    return { success: false, error: 'An unexpected error occurred' };
+    return { success: false, error: 'An unexpected error occurred while saving measurements. Please try again.' };
   }
 };
 
@@ -626,12 +630,17 @@ export const assignDriverToOrder = async (
       driver_id: driverId,
       driver_name: driverName,
       driver_phone: driverPhone,
-      status: 2,
+      status: ORDER_STATUS.CONFIRMED,
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId);
 
-  if (error) return { success: false, error: error.message };
+  if (error) {
+    return {
+      success: false,
+      error: `Failed to assign driver: ${error.message}. Please try again.`,
+    };
+  }
   return { success: true };
 };
 
@@ -648,7 +657,7 @@ export const cancelOrder = async (
 
   const { error } = await supabase
     .from('orders')
-    .update({ status: 0, updated_at: new Date().toISOString() })
+    .update({ status: ORDER_STATUS.CANCELLED, updated_at: new Date().toISOString() })
     .ilike('tracking_code', trackingCode);
 
   if (error) return { success: false, message: 'Failed to cancel order' };

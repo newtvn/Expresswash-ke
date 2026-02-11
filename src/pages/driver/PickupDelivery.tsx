@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
 import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING } from '@/services/orderService';
+import { ORDER_STATUS } from '@/constants/orderStatus';
 
 interface MeasurementDialogData {
   stopId: string;
@@ -47,8 +48,11 @@ export const PickupDelivery = () => {
   const completeMutation = useMutation({
     mutationFn: async ({ stopId, orderId, type }: { stopId: string; orderId: string; type: 'pickup' | 'delivery' }) => {
       await completeRouteStop(stopId);
-      // Advance order status: pickup -> 5 (Picked Up), delivery -> 12 (Delivered)
-      await updateOrderStatus(orderId, type === 'pickup' ? 5 : 12);
+      // Advance order status: pickup -> Picked Up, delivery -> Delivered
+      await updateOrderStatus(
+        orderId,
+        type === 'pickup' ? ORDER_STATUS.PICKED_UP : ORDER_STATUS.DELIVERED
+      );
     },
     onSuccess: () => {
       toast.success('Stop completed and order updated!');
@@ -63,8 +67,16 @@ export const PickupDelivery = () => {
     try {
       // Fetch order details to get items
       const order = await getOrderByUUID(orderId);
-      if (!order || !order.items) {
-        toast.error('Unable to load order details');
+      if (!order) {
+        toast.error('Order not found', {
+          description: 'The order may have been cancelled or deleted',
+        });
+        return;
+      }
+      if (!order.items || order.items.length === 0) {
+        toast.error('No items found in order', {
+          description: 'Please contact support if this issue persists',
+        });
         return;
       }
 
@@ -84,7 +96,9 @@ export const PickupDelivery = () => {
         })),
       });
     } catch (error) {
-      toast.error('Failed to load order details');
+      toast.error('Failed to load order details', {
+        description: error instanceof Error ? error.message : 'Please check your connection and try again',
+      });
     }
   };
 
@@ -103,7 +117,9 @@ export const PickupDelivery = () => {
       });
 
       if (invalidItems.length > 0) {
-        toast.error('Please enter measurements for all items');
+        toast.error('Missing measurements', {
+          description: `Please measure all ${measurementDialog.items.length} items before completing pickup`,
+        });
         setSubmittingMeasurements(false);
         return;
       }
@@ -131,7 +147,7 @@ export const PickupDelivery = () => {
       // Fetch current order to get delivery fee
       const currentOrder = await getOrderByUUID(measurementDialog.orderId);
       if (!currentOrder) {
-        throw new Error('Order not found');
+        throw new Error('Order not found. It may have been cancelled or deleted.');
       }
 
       const deliveryFee = currentOrder.deliveryFee ?? 0;
@@ -147,7 +163,7 @@ export const PickupDelivery = () => {
       );
 
       if (!updateResult.success) {
-        throw new Error(updateResult.error ?? 'Failed to update measurements');
+        throw new Error(updateResult.error ?? 'Failed to save measurements to database. Please try again.');
       }
 
       // Complete the pickup
@@ -158,11 +174,14 @@ export const PickupDelivery = () => {
       });
 
       setMeasurementDialog(null);
-      toast.success('Measurements saved and pickup completed!', {
-        description: 'Price updated based on actual measurements',
+      toast.success('Pickup completed successfully!', {
+        description: `Order total updated to KES ${newTotal.toLocaleString()} based on actual measurements`,
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to save measurements');
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      toast.error('Failed to complete pickup', {
+        description: errorMessage,
+      });
     } finally {
       setSubmittingMeasurements(false);
     }

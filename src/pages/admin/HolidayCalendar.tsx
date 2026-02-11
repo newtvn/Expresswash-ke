@@ -12,6 +12,7 @@ import { Calendar as CalendarIcon, Plus, Trash2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { getHolidays, addHoliday, deleteHoliday, initializeKenyanHolidays } from '@/services/holidayService';
 import { useAuth } from '@/hooks/useAuth';
+import { validateHolidayName, validateDate, sanitizeString, MAX_INPUT_LENGTHS } from '@/utils/validation';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +37,40 @@ const HolidayCalendar = () => {
     date: '',
     isRecurring: false,
   });
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    date?: string;
+  }>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingHoliday, setDeletingHoliday] = useState<{ id: string; name: string } | null>(null);
+
+  // Validate holiday input
+  const validateHolidayInput = () => {
+    const errors: typeof validationErrors = {};
+
+    const nameValidation = validateHolidayName(newHoliday.name);
+    if (!nameValidation.valid) {
+      errors.name = nameValidation.error;
+    }
+
+    const dateValidation = validateDate(newHoliday.date, {
+      minYear: currentYear - 1,
+      maxYear: currentYear + 5,
+    });
+    if (!dateValidation.valid) {
+      errors.date = dateValidation.error;
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleAddHoliday = () => {
+    if (!validateHolidayInput()) {
+      return;
+    }
+    addMutation.mutate();
+  };
 
   const { data: holidays = [], isLoading } = useQuery({
     queryKey: ['holidays', selectedYear],
@@ -52,7 +85,8 @@ const HolidayCalendar = () => {
         toast.success('Holiday added successfully');
         setAddDialogOpen(false);
         setNewHoliday({ name: '', date: '', isRecurring: false });
-        qc.invalidateQueries({ queryKey: ['holidays'] });
+        setValidationErrors({});
+        qc.invalidateQueries({ queryKey: ['holidays', selectedYear] });
       } else {
         toast.error(result.message || 'Failed to add holiday');
       }
@@ -66,7 +100,7 @@ const HolidayCalendar = () => {
         toast.success('Holiday deleted');
         setDeleteDialogOpen(false);
         setDeletingHoliday(null);
-        qc.invalidateQueries({ queryKey: ['holidays'] });
+        qc.invalidateQueries({ queryKey: ['holidays', selectedYear] });
       } else {
         toast.error(result.message || 'Failed to delete holiday');
       }
@@ -77,7 +111,7 @@ const HolidayCalendar = () => {
     mutationFn: () => initializeKenyanHolidays(selectedYear, user!.id),
     onSuccess: (result) => {
       toast.success(`Added ${result.added} Kenyan public holidays`);
-      qc.invalidateQueries({ queryKey: ['holidays'] });
+      qc.invalidateQueries({ queryKey: ['holidays', selectedYear] });
     },
   });
 
@@ -222,17 +256,39 @@ const HolidayCalendar = () => {
               <Label>Holiday Name *</Label>
               <Input
                 value={newHoliday.name}
-                onChange={(e) => setNewHoliday({ ...newHoliday, name: e.target.value })}
+                onChange={(e) => {
+                  const sanitized = sanitizeString(e.target.value);
+                  setNewHoliday({ ...newHoliday, name: sanitized });
+                  if (validationErrors.name) {
+                    setValidationErrors({ ...validationErrors, name: undefined });
+                  }
+                }}
                 placeholder="e.g., Christmas Day"
+                maxLength={MAX_INPUT_LENGTHS.HOLIDAY_NAME}
+                className={validationErrors.name ? 'border-red-500' : ''}
               />
+              {validationErrors.name && (
+                <p className="text-sm text-red-600 mt-1">{validationErrors.name}</p>
+              )}
             </div>
             <div>
               <Label>Date *</Label>
               <Input
                 type="date"
                 value={newHoliday.date}
-                onChange={(e) => setNewHoliday({ ...newHoliday, date: e.target.value })}
+                onChange={(e) => {
+                  setNewHoliday({ ...newHoliday, date: e.target.value });
+                  if (validationErrors.date) {
+                    setValidationErrors({ ...validationErrors, date: undefined });
+                  }
+                }}
+                min={`${currentYear - 1}-01-01`}
+                max={`${currentYear + 5}-12-31`}
+                className={validationErrors.date ? 'border-red-500' : ''}
               />
+              {validationErrors.date && (
+                <p className="text-sm text-red-600 mt-1">{validationErrors.date}</p>
+              )}
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox
@@ -251,11 +307,17 @@ const HolidayCalendar = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAddDialogOpen(false);
+                setValidationErrors({});
+              }}
+            >
               Cancel
             </Button>
             <Button
-              onClick={() => addMutation.mutate()}
+              onClick={handleAddHoliday}
               disabled={!newHoliday.name || !newHoliday.date || addMutation.isPending}
             >
               {addMutation.isPending ? 'Adding...' : 'Add Holiday'}
