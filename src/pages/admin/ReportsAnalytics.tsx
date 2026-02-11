@@ -5,23 +5,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  getSalesReport,
+  getSalesData,
   getZonePerformance,
-  getDriverPerformance,
-  getCustomerDemographics,
-  getRevenueByItemType,
+  // getDriverPerformance,
+  // getCustomerDemographics,
+  // getRevenueByItemType,
 } from "@/services/reportService";
 import type {
-  SalesReportData,
-  ZonePerformance,
-  DriverPerformanceData,
-  CustomerDemographic,
-  RevenueByItemType,
+  SalesDataPoint,
+  // ZonePerformance,
+  // DriverPerformanceData,
+  // CustomerDemographic,
+  // RevenueByItemType,
 } from "@/types";
 
 // ── Column Definitions ───────────────────────────────────────────────
 
-const salesColumns: Column<SalesReportData>[] = [
+const salesColumns: Column<SalesDataPoint>[] = [
   { key: "date", header: "Date", sortable: true },
   { key: "orders", header: "Orders", sortable: true },
   {
@@ -30,15 +30,9 @@ const salesColumns: Column<SalesReportData>[] = [
     sortable: true,
     render: (row) => `KES ${row.revenue.toLocaleString()}`,
   },
-  {
-    key: "avgOrderValue",
-    header: "Avg Order Value",
-    sortable: true,
-    render: (row) => `KES ${row.avgOrderValue.toLocaleString()}`,
-  },
 ];
 
-const zoneColumns: Column<ZonePerformance>[] = [
+const zoneColumns: Column<any>[] = [
   { key: "zone", header: "Zone", sortable: true },
   { key: "orders", header: "Orders", sortable: true },
   {

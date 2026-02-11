@@ -38,6 +38,11 @@ export const queryKeys = {
     list: (filters: Record<string, unknown>) => [...queryKeys.invoices.all, 'list', filters] as const,
     detail: (id: string) => [...queryKeys.invoices.all, 'detail', id] as const,
   },
+  payments: {
+    all: ['payments'] as const,
+    list: () => [...queryKeys.payments.all, 'list'] as const,
+    detail: (id: string) => [...queryKeys.payments.all, 'detail', id] as const,
+  },
   loyalty: {
     all: ['loyalty'] as const,
     account: (customerId: string) => [...queryKeys.loyalty.all, 'account', customerId] as const,

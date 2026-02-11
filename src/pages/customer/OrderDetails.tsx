@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const /* mockOrderDetails */ []: Record<string, {
+const mockOrderDetails: Record<string, {
   id: string;
   status: string;
   date: string;

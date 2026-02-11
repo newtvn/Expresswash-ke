@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet, AlertCircle } from 'lucide-react';
 import { getPayments } from '@/services/invoiceService';
-import { QUERY_KEYS } from '@/config/queryKeys';
+import { queryKeys } from '@/config/queryKeys';
 
 type PaymentTableRow = {
   id: string;
@@ -52,7 +52,7 @@ const columns: Column<PaymentTableRow>[] = [
 
 export const PaymentHistory = () => {
   const { data: payments = [], isLoading } = useQuery({
-    queryKey: QUERY_KEYS.payments(),
+    queryKey: queryKeys.payments.list(),
     queryFn: () => getPayments(),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPlus, Truck, Star, MapPin, CheckCircle2 } from "lucide-react";
 import { getDrivers } from "@/services/driverService";
-import { QUERY_KEYS } from "@/config/queryKeys";
+import { queryKeys } from "@/config/queryKeys";
 
 type DriverTableRow = {
   id: string;
@@ -49,7 +49,7 @@ const driverColumns: Column<DriverTableRow>[] = [
  */
 export const DriverManagement = () => {
   const { data: drivers = [], isLoading } = useQuery({
-    queryKey: QUERY_KEYS.drivers,
+    queryKey: queryKeys.drivers.list(),
     queryFn: getDrivers,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
