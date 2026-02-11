@@ -177,7 +177,7 @@ export async function getPricingHistory(limit = 10): Promise<{
     const history = data.map((log) => ({
       id: log.id as string,
       userId: log.user_id as string,
-      userName: (log.profiles as any)?.name ?? 'Unknown',
+      userName: (log.profiles as { name?: string } | null)?.name ?? 'Unknown',
       timestamp: log.created_at as string,
       changes: log.details?.config as PricingConfig,
     }));

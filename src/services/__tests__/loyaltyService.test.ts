@@ -170,7 +170,7 @@ describe('loyaltyService - Points Calculations', () => {
 
     it('should track current vs lifetime points separately', () => {
       let currentPoints = 100;
-      let lifetimePoints = 200;
+      const lifetimePoints = 200;
 
       // Redeem 50 points
       currentPoints -= 50;
