@@ -77,6 +77,8 @@ CREATE TABLE orders (
   pickup_date TEXT,
   estimated_delivery TEXT,
   zone TEXT NOT NULL,
+  pickup_address TEXT,
+  notes TEXT,
   driver_id UUID REFERENCES profiles(id),
   driver_name TEXT,
   driver_phone TEXT,

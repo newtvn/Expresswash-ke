@@ -34,6 +34,7 @@ export interface DriverRoute {
 }
 
 export interface RouteStop {
+  id?: string;
   orderId: string;
   customerName: string;
   address: string;
@@ -64,22 +65,23 @@ function mapDriver(row: Record<string, unknown>, profile: Record<string, unknown
     ? { lat: row.current_lat as number, lng: row.current_lng as number, updatedAt: row.location_updated_at as string }
     : undefined;
 
+  // profiles table uses 'name' not 'full_name'
   return {
-    id: row.id as string,
-    name: (profile.full_name as string) ?? '',
+    id: (row.id as string) || (profile.id as string) || '',
+    name: (profile.name as string) ?? '',
     email: (profile.email as string) ?? '',
     phone: (profile.phone as string) ?? '',
-    zone: (row.zone as string) ?? '',
+    zone: (row.zone as string) ?? (profile.zone as string) ?? '',
     status: (row.status as DriverStatus) ?? 'offline',
     vehiclePlate: (row.vehicle_plate as string) ?? '',
     vehicleType: (row.vehicle_type as string) ?? '',
     licenseNumber: (row.license_number as string) ?? '',
-    isActive: (row.is_active as boolean) ?? true,
+    isActive: (profile.is_active as boolean) ?? true,
     isOnline: (row.is_online as boolean) ?? false,
     currentLocation: loc,
     totalDeliveries: (row.total_deliveries as number) ?? 0,
     rating: (row.rating as number) ?? 0,
-    joinedAt: (row.created_at as string) ?? '',
+    joinedAt: (row.joined_at as string) ?? (profile.created_at as string) ?? '',
   };
 }
 
@@ -93,6 +95,7 @@ function mapRoute(row: Record<string, unknown>, stops: Record<string, unknown>[]
     estimatedDuration: (row.estimated_duration as number) ?? 0,
     status: (row.status as DriverRoute['status']) ?? 'planned',
     stops: stops.map((s) => ({
+      id: (s.id as string) ?? undefined,
       orderId: s.order_id as string,
       customerName: s.customer_name as string,
       address: s.address as string,
@@ -107,30 +110,31 @@ function mapRoute(row: Record<string, unknown>, stops: Record<string, unknown>[]
 // ── Public API ────────────────────────────────────────────────────────
 
 export const getDrivers = async (): Promise<Driver[]> => {
-  const { data: drivers, error } = await supabase
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('role', 'driver')
+    .order('name');
+
+  if (pErr || !profiles) return [];
+
+  const ids = profiles.map((p) => p.id as string);
+  const { data: driverRows } = await supabase
     .from('drivers')
-    .select('*, profiles!drivers_id_fkey(full_name, email, phone)')
-    .order('created_at', { ascending: false });
+    .select('*')
+    .in('id', ids);
 
-  if (error || !drivers) return [];
+  const driverMap: Record<string, Record<string, unknown>> = {};
+  (driverRows ?? []).forEach((d) => { driverMap[d.id as string] = d; });
 
-  return drivers.map((d) => {
-    const profile = (d.profiles as Record<string, unknown>) ?? {};
-    return mapDriver(d, profile);
-  });
+  return profiles.map((p) => mapDriver(driverMap[p.id as string] ?? {}, p as Record<string, unknown>));
 };
 
 export const getDriverById = async (driverId: string): Promise<Driver | null> => {
-  const { data: driver } = await supabase
-    .from('drivers')
-    .select('*, profiles!drivers_id_fkey(full_name, email, phone)')
-    .eq('id', driverId)
-    .single();
-
-  if (!driver) return null;
-
-  const profile = (driver.profiles as Record<string, unknown>) ?? {};
-  return mapDriver(driver, profile);
+  const { data: profile } = await supabase.from('profiles').select('*').eq('id', driverId).single();
+  if (!profile) return null;
+  const { data: driverRow } = await supabase.from('drivers').select('*').eq('id', driverId).maybeSingle();
+  return mapDriver((driverRow ?? {}) as Record<string, unknown>, profile as Record<string, unknown>);
 };
 
 export const getDriverRoutes = async (
@@ -170,15 +174,29 @@ export const updateDriverStatus = async (
   id: string,
   status: DriverStatus,
 ): Promise<{ success: boolean; driver?: Driver }> => {
+  const isOnline = status !== 'offline';
   const { error } = await supabase
     .from('drivers')
-    .update({ status, updated_at: new Date().toISOString() })
+    .upsert({ id, status, is_online: isOnline })
     .eq('id', id);
 
   if (error) return { success: false };
 
   const driver = await getDriverById(id);
   return { success: true, driver: driver ?? undefined };
+};
+
+export const completeRouteStop = async (
+  stopId: string,
+): Promise<{ success: boolean }> => {
+  const { error } = await supabase
+    .from('route_stops')
+    .update({
+      status: 'completed',
+      completed_time: new Date().toISOString(),
+    })
+    .eq('id', stopId);
+  return { success: !error };
 };
 
 export const getDriverPerformance = async (

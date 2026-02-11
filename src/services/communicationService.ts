@@ -1,7 +1,5 @@
 import { supabase } from '@/lib/supabase';
 
-// ── Types (local to this service) ─────────────────────────────────────
-
 export interface NotificationTemplate {
   id: string;
   name: string;
@@ -14,18 +12,9 @@ export interface NotificationTemplate {
   updatedAt: string;
 }
 
-export interface NotificationPayload {
-  templateId: string;
-  recipientId?: string;
-  recipientPhone?: string;
-  recipientEmail?: string;
-  channel: 'sms' | 'email' | 'whatsapp' | 'push';
-  variables: Record<string, string>;
-}
-
 export interface NotificationHistoryEntry {
   id: string;
-  templateId: string;
+  templateId?: string;
   templateName: string;
   channel: 'sms' | 'email' | 'whatsapp' | 'push';
   recipientId: string;
@@ -39,13 +28,13 @@ export interface NotificationHistoryEntry {
   failureReason?: string;
 }
 
-export interface SendResult {
-  success: boolean;
-  messageId?: string;
-  message: string;
+export interface SendNotificationPayload {
+  templateId: string;
+  recipientId: string;
+  recipientName: string;
+  recipientContact: string;
+  variables: Record<string, string>;
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────
 
 function mapTemplate(row: Record<string, unknown>): NotificationTemplate {
   return {
@@ -55,7 +44,7 @@ function mapTemplate(row: Record<string, unknown>): NotificationTemplate {
     subject: (row.subject as string) ?? undefined,
     body: row.body as string,
     variables: (row.variables as string[]) ?? [],
-    isActive: (row.is_active as boolean) ?? true,
+    isActive: row.is_active as boolean,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -64,7 +53,7 @@ function mapTemplate(row: Record<string, unknown>): NotificationTemplate {
 function mapHistory(row: Record<string, unknown>): NotificationHistoryEntry {
   return {
     id: row.id as string,
-    templateId: row.template_id as string,
+    templateId: (row.template_id as string) ?? undefined,
     templateName: row.template_name as string,
     channel: row.channel as NotificationHistoryEntry['channel'],
     recipientId: row.recipient_id as string,
@@ -79,63 +68,68 @@ function mapHistory(row: Record<string, unknown>): NotificationHistoryEntry {
   };
 }
 
-// ── Public API ────────────────────────────────────────────────────────
-
 export const getTemplates = async (): Promise<NotificationTemplate[]> => {
   const { data, error } = await supabase
     .from('notification_templates')
     .select('*')
-    .order('created_at', { ascending: true });
-
+    .eq('is_active', true)
+    .order('name');
   if (error || !data) return [];
   return data.map(mapTemplate);
 };
 
+export const createTemplate = async (
+  template: Omit<NotificationTemplate, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<{ success: boolean; template?: NotificationTemplate }> => {
+  const { data, error } = await supabase
+    .from('notification_templates')
+    .insert({
+      name: template.name,
+      channel: template.channel,
+      subject: template.subject ?? null,
+      body: template.body,
+      variables: template.variables,
+      is_active: template.isActive,
+    })
+    .select()
+    .single();
+
+  if (error || !data) return { success: false };
+  return { success: true, template: mapTemplate(data) };
+};
+
 export const sendNotification = async (
-  payload: NotificationPayload,
-): Promise<SendResult> => {
-  const { data: template } = await supabase
+  payload: SendNotificationPayload,
+): Promise<{ success: boolean; historyId?: string; error?: string }> => {
+  const { data: template, error: tError } = await supabase
     .from('notification_templates')
     .select('*')
     .eq('id', payload.templateId)
     .single();
 
-  if (!template) {
-    return { success: false, message: 'Template not found' };
-  }
-  if (!template.is_active) {
-    return { success: false, message: 'Template is inactive' };
+  if (tError || !template) {
+    return { success: false, error: 'Template not found' };
   }
 
-  const variables = (template.variables as string[]) ?? [];
-  const missingVars = variables.filter((v: string) => !payload.variables[v]);
-  if (missingVars.length > 0) {
-    return { success: false, message: `Missing template variables: ${missingVars.join(', ')}` };
-  }
-
+  // Replace variables in body
   let body = template.body as string;
-  for (const [key, value] of Object.entries(payload.variables)) {
-    body = body.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-  }
+  let subject = (template.subject as string) ?? '';
+  Object.entries(payload.variables).forEach(([key, value]) => {
+    const placeholder = `{{${key}}}`;
+    body = body.replaceAll(placeholder, value);
+    subject = subject.replaceAll(placeholder, value);
+  });
 
-  let subject: string | undefined;
-  if (template.subject) {
-    subject = template.subject as string;
-    for (const [key, value] of Object.entries(payload.variables)) {
-      subject = subject.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
-    }
-  }
-
-  const { data: entry, error } = await supabase
+  const { data: history, error: hError } = await supabase
     .from('notification_history')
     .insert({
-      template_id: template.id,
+      template_id: payload.templateId,
       template_name: template.name,
-      channel: payload.channel,
-      recipient_id: payload.recipientId ?? '',
-      recipient_name: payload.variables.customerName ?? 'Unknown',
-      recipient_contact: payload.recipientPhone ?? payload.recipientEmail ?? '',
-      subject: subject ?? null,
+      channel: template.channel,
+      recipient_id: payload.recipientId,
+      recipient_name: payload.recipientName,
+      recipient_contact: payload.recipientContact,
+      subject: subject || null,
       body,
       status: 'sent',
       sent_at: new Date().toISOString(),
@@ -143,40 +137,25 @@ export const sendNotification = async (
     .select()
     .single();
 
-  if (error || !entry) {
-    return { success: false, message: 'Failed to record notification' };
+  if (hError || !history) {
+    return { success: false, error: 'Failed to record notification' };
   }
 
-  return { success: true, messageId: entry.id as string, message: `Notification sent via ${payload.channel}` };
+  return { success: true, historyId: history.id as string };
 };
 
 export const getNotificationHistory = async (
-  filters?: {
-    recipientId?: string;
-    channel?: 'sms' | 'email' | 'whatsapp' | 'push';
-    status?: 'sent' | 'delivered' | 'failed' | 'pending';
-    search?: string;
-  },
+  recipientId?: string,
+  channel?: string,
 ): Promise<NotificationHistoryEntry[]> => {
   let query = supabase
     .from('notification_history')
     .select('*')
-    .order('sent_at', { ascending: false });
+    .order('sent_at', { ascending: false })
+    .limit(100);
 
-  if (filters?.recipientId) {
-    query = query.eq('recipient_id', filters.recipientId);
-  }
-  if (filters?.channel) {
-    query = query.eq('channel', filters.channel);
-  }
-  if (filters?.status) {
-    query = query.eq('status', filters.status);
-  }
-  if (filters?.search) {
-    query = query.or(
-      `recipient_name.ilike.%${filters.search}%,template_name.ilike.%${filters.search}%,body.ilike.%${filters.search}%`,
-    );
-  }
+  if (recipientId) query = query.eq('recipient_id', recipientId);
+  if (channel) query = query.eq('channel', channel);
 
   const { data, error } = await query;
   if (error || !data) return [];

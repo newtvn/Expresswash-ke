@@ -21,6 +21,10 @@ export interface User {
   isActive?: boolean;
   createdAt: string;
   lastLoginAt?: string;
+  loyaltyPoints?: number;
+  loyaltyTier?: 'bronze' | 'silver' | 'gold' | 'platinum';
+  totalOrders?: number;
+  totalSpent?: number;
 }
 
 export interface JWTTokens {

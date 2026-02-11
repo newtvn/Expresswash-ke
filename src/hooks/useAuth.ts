@@ -2,12 +2,12 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { signIn as signInService, signUp as signUpService, signOut as signOutService } from '@/services/authService';
-import { SignInFormData, SignUpFormData } from '@/types';
+import { SignInFormData, SignUpFormData, User } from '@/types';
 import { getDefaultRouteForRole } from '@/config/permissions';
 
 export const useAuth = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, setAuth, clearAuth, setLoading, isLoading } = useAuthStore();
+  const { user, isAuthenticated, setAuth, clearAuth, setLoading, isLoading, updateUser: storeUpdateUser } = useAuthStore();
 
   const login = useCallback(async (formData: SignInFormData) => {
     setLoading(true);
@@ -50,6 +50,10 @@ export const useAuth = () => {
     navigate('/');
   }, [clearAuth, navigate]);
 
+  const updateUser = useCallback((updates: Partial<User>) => {
+    storeUpdateUser(updates);
+  }, [storeUpdateUser]);
+
   return {
     user,
     isAuthenticated,
@@ -57,5 +61,6 @@ export const useAuth = () => {
     login,
     register,
     logout,
+    updateUser,
   };
 };
