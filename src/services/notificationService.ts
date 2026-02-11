@@ -88,10 +88,13 @@ export async function createNotification(
     const template = TEMPLATES[type];
     let message = template.messageTemplate;
 
-    // Replace variables in template
+    // Replace variables in template (using replaceAll for multiple occurrences)
     Object.entries(variables).forEach(([key, value]) => {
-      message = message.replace(`{{${key}}}`, value);
+      message = message.replaceAll(`{{${key}}}`, value);
     });
+
+    // Remove any unreplaced template variables
+    message = message.replace(/\{\{.*?\}\}/g, '');
 
     const { data, error } = await retrySupabaseQuery(
       () => supabase

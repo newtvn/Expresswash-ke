@@ -108,10 +108,16 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
     label = '3 Business Days';
   }
 
-  // Fetch holidays within the next 30 days
+  // Fetch holidays within the next 30 days with error handling
   const endDate = new Date(now);
   endDate.setDate(endDate.getDate() + 30);
-  const holidays = await getHolidayDates(now.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+  const holidays = await getHolidayDates(
+    now.toISOString().split('T')[0],
+    endDate.toISOString().split('T')[0]
+  ).catch(err => {
+    orderLogger.warn('Failed to fetch holidays for ETA calculation', err);
+    return []; // Continue without holidays if fetch fails
+  });
   const holidaySet = new Set(holidays.map(h => h.toISOString().split('T')[0]));
 
   // Helper function to check if a date is a holiday
@@ -142,19 +148,22 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
     const currentHour = now.getHours();
     // If it's past 2 PM or it's not a business day, move to next business day
     if (currentHour >= 14 || !isBusinessDay(eta)) {
-      while (!isBusinessDay(eta)) {
+      let safety = 0;
+      while (!isBusinessDay(eta) && safety++ < 365) {
         eta.setDate(eta.getDate() + 1);
       }
       // Move to next business day
       eta.setDate(eta.getDate() + 1);
-      while (!isBusinessDay(eta)) {
+      safety = 0;
+      while (!isBusinessDay(eta) && safety++ < 365) {
         eta.setDate(eta.getDate() + 1);
       }
     }
   }
 
-  // Final check: ensure delivery is on a business day
-  while (!isBusinessDay(eta)) {
+  // Final check: ensure delivery is on a business day (with safety limit)
+  let safety = 0;
+  while (!isBusinessDay(eta) && safety++ < 365) {
     eta.setDate(eta.getDate() + 1);
   }
 
@@ -250,7 +259,7 @@ export const createOrder = async (
       return { success: false, error: 'Failed to generate unique tracking code' };
     }
 
-    const eta = calculateETA(payload.zone);
+    const eta = await calculateETA(payload.zone);
 
     const { data: inserted, error } = await retrySupabaseQuery(
       () => supabase
@@ -359,6 +368,86 @@ export const trackOrder = async (trackingCode: string): Promise<TrackingResponse
   } catch (error) {
     orderLogger.error('Error tracking order', error instanceof Error ? error : new Error(String(error)), { trackingCode });
     return { success: false, error: 'Unable to track order at this time. Please try again later.' };
+  }
+};
+
+/**
+ * Update order items with actual measured dimensions
+ * Called by drivers after measuring items during pickup
+ */
+export const updateOrderItems = async (
+  orderId: string,
+  items: Array<{
+    name: string;
+    quantity: number;
+    itemType?: string;
+    lengthInches: number;
+    widthInches: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>,
+  newSubtotal: number,
+  newTotal: number,
+): Promise<{ success: boolean; error?: string }> => {
+  try {
+    orderLogger.info('Updating order items with measured dimensions', { orderId, itemCount: items.length });
+
+    // Delete existing items
+    const { error: deleteError } = await retrySupabaseQuery(
+      () => supabase.from('order_items').delete().eq('order_id', orderId),
+      { maxRetries: 2 }
+    );
+
+    if (deleteError) {
+      orderLogger.error('Failed to delete old order items', deleteError);
+      return { success: false, error: 'Failed to update measurements' };
+    }
+
+    // Insert updated items
+    const itemsToInsert = items.map((item) => ({
+      order_id: orderId,
+      name: item.name,
+      quantity: item.quantity,
+      item_type: item.itemType,
+      length_inches: item.lengthInches,
+      width_inches: item.widthInches,
+      unit_price: item.unitPrice,
+      total_price: item.totalPrice,
+    }));
+
+    const { error: insertError } = await retrySupabaseQuery(
+      () => supabase.from('order_items').insert(itemsToInsert),
+      { maxRetries: 3 }
+    );
+
+    if (insertError) {
+      orderLogger.error('Failed to insert updated order items', insertError);
+      return { success: false, error: 'Failed to save measurements' };
+    }
+
+    // Update order totals
+    const { error: updateError } = await retrySupabaseQuery(
+      () => supabase
+        .from('orders')
+        .update({
+          subtotal: newSubtotal,
+          total: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId),
+      { maxRetries: 2 }
+    );
+
+    if (updateError) {
+      orderLogger.error('Failed to update order totals', updateError);
+      return { success: false, error: 'Failed to update order total' };
+    }
+
+    orderLogger.info('Order items updated successfully', { orderId, newSubtotal, newTotal });
+    return { success: true };
+  } catch (error) {
+    orderLogger.error('Unexpected error updating order items', error instanceof Error ? error : new Error(String(error)));
+    return { success: false, error: 'An unexpected error occurred' };
   }
 };
 

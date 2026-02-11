@@ -11,16 +11,15 @@ export interface Holiday {
 }
 
 // Kenyan public holidays (recurring annually)
+// Note: month values are 0-indexed (0=January, 11=December) to match JavaScript Date
 export const KENYAN_HOLIDAYS = [
-  { name: 'New Year\'s Day', month: 1, day: 1 },
-  { name: 'Good Friday', month: 0, day: 0 }, // Variable
-  { name: 'Easter Monday', month: 0, day: 0 }, // Variable
-  { name: 'Labour Day', month: 5, day: 1 },
-  { name: 'Madaraka Day', month: 6, day: 1 },
-  { name: 'Mashujaa Day', month: 10, day: 20 },
-  { name: 'Jamhuri Day', month: 12, day: 12 },
-  { name: 'Christmas Day', month: 12, day: 25 },
-  { name: 'Boxing Day', month: 12, day: 26 },
+  { name: 'New Year\'s Day', month: 0, day: 1 },      // January 1
+  { name: 'Labour Day', month: 4, day: 1 },            // May 1
+  { name: 'Madaraka Day', month: 5, day: 1 },          // June 1
+  { name: 'Mashujaa Day', month: 9, day: 20 },         // October 20
+  { name: 'Jamhuri Day', month: 11, day: 12 },         // December 12
+  { name: 'Christmas Day', month: 11, day: 25 },       // December 25
+  { name: 'Boxing Day', month: 11, day: 26 },          // December 26
 ];
 
 /**
@@ -178,10 +177,7 @@ export async function initializeKenyanHolidays(
   let added = 0;
 
   for (const holiday of KENYAN_HOLIDAYS) {
-    // Skip variable holidays (Easter)
-    if (holiday.month === 0) continue;
-
-    const date = new Date(year, holiday.month - 1, holiday.day).toISOString().split('T')[0];
+    const date = new Date(year, holiday.month, holiday.day).toISOString().split('T')[0];
 
     const result = await addHoliday(holiday.name, date, true, createdBy);
     if (result.success) added++;

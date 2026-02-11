@@ -101,11 +101,27 @@ export const RequestPickup = () => {
 
   // Fetch ETA when zone changes
   useEffect(() => {
+    let cancelled = false;
+
     if (zone) {
-      calculateETA(zone).then(setEta).catch(() => setEta(null));
+      calculateETA(zone)
+        .then((result) => {
+          if (!cancelled) setEta(result);
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setEta(null);
+            toast.error('Unable to calculate delivery time. Please try again.');
+            console.error('ETA calculation failed:', err);
+          }
+        });
     } else {
       setEta(null);
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [zone]);
 
   const addItem = () => setItems([...items, newItemForm()]);
@@ -192,7 +208,7 @@ export const RequestPickup = () => {
     if (result.success && result.order) {
       setOrderCreated({
         trackingCode: result.order.trackingCode,
-        eta: eta?.label ?? '2-3 Business Days',
+        eta: eta?.label ?? 'To be confirmed',
         total: grandTotal,
       });
       toast.success('Pickup request submitted!');

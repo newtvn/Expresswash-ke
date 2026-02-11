@@ -13,7 +13,7 @@ import { MapPin, Clock, CheckCircle, Package, Navigation, Phone, Ruler } from 'l
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
-import { updateOrderStatus, getOrderByUUID, calculateItemPrice } from '@/services/orderService';
+import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING } from '@/services/orderService';
 
 interface MeasurementDialogData {
   stopId: string;
@@ -95,14 +95,23 @@ export const PickupDelivery = () => {
     setSubmittingMeasurements(true);
 
     try {
-      // Calculate new pricing based on actual measurements
-      const updatedItems = measurementDialog.items.map((item) => {
+      // Validate all items have measurements
+      const invalidItems = measurementDialog.items.filter(item => {
         const measuredL = parseFloat(item.measuredLength) || 0;
         const measuredW = parseFloat(item.measuredWidth) || 0;
+        return measuredL === 0 || measuredW === 0;
+      });
 
-        if (measuredL === 0 || measuredW === 0) {
-          return null; // Skip invalid measurements
-        }
+      if (invalidItems.length > 0) {
+        toast.error('Please enter measurements for all items');
+        setSubmittingMeasurements(false);
+        return;
+      }
+
+      // Calculate new pricing based on actual measurements
+      const updatedItems = measurementDialog.items.map((item) => {
+        const measuredL = parseFloat(item.measuredLength);
+        const measuredW = parseFloat(item.measuredWidth);
 
         const pricing = calculateItemPrice(item.itemType, measuredL, measuredW, item.quantity);
         return {
@@ -111,20 +120,35 @@ export const PickupDelivery = () => {
           quantity: item.quantity,
           lengthInches: measuredL,
           widthInches: measuredW,
-          pricePerSqInch: pricing.pricePerSqInch,
           unitPrice: pricing.unitPrice,
           totalPrice: pricing.totalPrice,
         };
-      }).filter(Boolean);
+      });
 
-      if (updatedItems.length === 0) {
-        toast.error('Please enter valid measurements for at least one item');
-        setSubmittingMeasurements(false);
-        return;
+      // Calculate new subtotal and total
+      const newSubtotal = updatedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+      // Fetch current order to get delivery fee
+      const currentOrder = await getOrderByUUID(measurementDialog.orderId);
+      if (!currentOrder) {
+        throw new Error('Order not found');
       }
 
-      // Update order items with new measurements (placeholder - you'll need to implement this in orderService)
-      // await updateOrderItems(measurementDialog.orderId, updatedItems);
+      const deliveryFee = currentOrder.deliveryFee ?? 0;
+      const vat = Math.round((newSubtotal + deliveryFee) * PRICING.vatRate);
+      const newTotal = newSubtotal + deliveryFee + vat;
+
+      // Update order items with new measurements
+      const updateResult = await updateOrderItems(
+        measurementDialog.orderId,
+        updatedItems,
+        newSubtotal,
+        newTotal
+      );
+
+      if (!updateResult.success) {
+        throw new Error(updateResult.error ?? 'Failed to update measurements');
+      }
 
       // Complete the pickup
       await completeMutation.mutateAsync({
@@ -133,11 +157,12 @@ export const PickupDelivery = () => {
         type: 'pickup',
       });
 
+      setMeasurementDialog(null);
       toast.success('Measurements saved and pickup completed!', {
-        description: 'Price will be updated based on actual measurements',
+        description: 'Price updated based on actual measurements',
       });
     } catch (error) {
-      toast.error('Failed to save measurements');
+      toast.error(error instanceof Error ? error.message : 'Failed to save measurements');
     } finally {
       setSubmittingMeasurements(false);
     }
@@ -266,7 +291,16 @@ export const PickupDelivery = () => {
               let priceDiff = 0;
               let newPrice = 0;
               if (isValid) {
-                const originalPrice = item.originalLength * item.originalWidth * calculateItemPrice(item.itemType, 1, 1, 1).pricePerSqInch * item.quantity;
+                // Calculate original price correctly
+                const originalCalc = calculateItemPrice(
+                  item.itemType,
+                  item.originalLength,
+                  item.originalWidth,
+                  item.quantity
+                );
+                const originalPrice = originalCalc.totalPrice;
+
+                // Calculate new price
                 const newCalc = calculateItemPrice(item.itemType, measuredL, measuredW, item.quantity);
                 newPrice = newCalc.totalPrice;
                 priceDiff = newPrice - originalPrice;
