@@ -9,33 +9,33 @@ import {
 
 describe('orderService - Pricing Calculations', () => {
   describe('calculateETA', () => {
-    it('should return same/next day for Kitengela zone', () => {
-      const result = calculateETA('Kitengela');
-      expect(result.label).toBe('Same Day / Next Day');
+    it('should return same/next business day for Kitengela zone', async () => {
+      const result = await calculateETA('Kitengela');
+      expect(result.label).toBe('Same Day / Next Business Day');
     });
 
-    it('should return same/next day for Athi River zone', () => {
-      const result = calculateETA('Athi River');
-      expect(result.label).toBe('Same Day / Next Day');
+    it('should return same/next business day for Athi River zone', async () => {
+      const result = await calculateETA('Athi River');
+      expect(result.label).toBe('Same Day / Next Business Day');
     });
 
-    it('should return same/next day for Syokimau zone', () => {
-      const result = calculateETA('Syokimau');
-      expect(result.label).toBe('Same Day / Next Day');
+    it('should return 1 business day for Syokimau zone', async () => {
+      const result = await calculateETA('Syokimau');
+      expect(result.label).toBe('1 Business Day');
     });
 
-    it('should return 1-2 days for Nairobi zone', () => {
-      const result = calculateETA('Nairobi CBD');
-      expect(result.label).toBe('1-2 Business Days');
+    it('should return 2 business days for Nairobi zone', async () => {
+      const result = await calculateETA('Nairobi CBD');
+      expect(result.label).toBe('2 Business Days (48 hours)');
     });
 
-    it('should return 2-3 days for unknown zones', () => {
-      const result = calculateETA('Mombasa');
-      expect(result.label).toBe('2-3 Business Days');
+    it('should return 3 business days for unknown zones', async () => {
+      const result = await calculateETA('Mombasa');
+      expect(result.label).toBe('3 Business Days');
     });
 
-    it('should skip weekends when calculating ETA', () => {
-      const result = calculateETA('Kitengela');
+    it('should skip weekends when calculating ETA', async () => {
+      const result = await calculateETA('Kitengela');
       const etaDate = new Date(result.date);
       const dayOfWeek = etaDate.getDay();
       // Should not be Saturday (6) or Sunday (0)
@@ -43,10 +43,10 @@ describe('orderService - Pricing Calculations', () => {
       expect(dayOfWeek).not.toBe(6);
     });
 
-    it('should be case-insensitive for zone matching', () => {
-      const result1 = calculateETA('KITENGELA');
-      const result2 = calculateETA('kitengela');
-      const result3 = calculateETA('Kitengela');
+    it('should be case-insensitive for zone matching', async () => {
+      const result1 = await calculateETA('KITENGELA');
+      const result2 = await calculateETA('kitengela');
+      const result3 = await calculateETA('Kitengela');
       expect(result1.label).toBe(result2.label);
       expect(result2.label).toBe(result3.label);
     });

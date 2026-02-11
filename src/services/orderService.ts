@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
 import { orderLogger } from '@/lib/logger';
+import { getHolidayDates } from './holidayService';
 
 export interface OrderListFilters {
   status?: number;
@@ -80,10 +81,10 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
 // Calculate ETA based on zone with business day logic
 // Rules:
 // - Kitengela/Athi River: Same day delivery (if ordered early) or next business day
-// - Greater Nairobi (Westlands, etc.): 2 business days (48 hours, skip weekends)
-// - Deliveries only Monday to Friday
-// - Example: Order Monday in Nairobi → Delivered Wednesday
-export function calculateETA(zone: string): { label: string; date: string } {
+// - Greater Nairobi (Westlands, etc.): 2 business days (48 hours, skip weekends and holidays)
+// - Deliveries only Monday to Friday (excluding holidays)
+// - Example: Order Monday in Nairobi → Delivered Wednesday (if no holidays)
+export async function calculateETA(zone: string): Promise<{ label: string; date: string }> {
   const now = new Date();
   const z = zone.toLowerCase();
 
@@ -107,37 +108,53 @@ export function calculateETA(zone: string): { label: string; date: string } {
     label = '3 Business Days';
   }
 
-  // Calculate delivery date, adding only business days (Mon-Fri)
+  // Fetch holidays within the next 30 days
+  const endDate = new Date(now);
+  endDate.setDate(endDate.getDate() + 30);
+  const holidays = await getHolidayDates(now.toISOString().split('T')[0], endDate.toISOString().split('T')[0]);
+  const holidaySet = new Set(holidays.map(h => h.toISOString().split('T')[0]));
+
+  // Helper function to check if a date is a holiday
+  const isHoliday = (date: Date): boolean => {
+    return holidaySet.has(date.toISOString().split('T')[0]);
+  };
+
+  // Helper function to check if a date is a business day (Mon-Fri, not holiday)
+  const isBusinessDay = (date: Date): boolean => {
+    return date.getDay() !== 0 && date.getDay() !== 6 && !isHoliday(date);
+  };
+
+  // Calculate delivery date, adding only business days (Mon-Fri, excluding holidays)
   const eta = new Date(now);
   let addedDays = 0;
 
   while (addedDays < businessDaysToAdd) {
     eta.setDate(eta.getDate() + 1);
 
-    // Skip weekends (Saturday = 6, Sunday = 0)
-    if (eta.getDay() !== 0 && eta.getDay() !== 6) {
+    // Skip weekends and holidays
+    if (isBusinessDay(eta)) {
       addedDays++;
     }
   }
 
-  // If same day delivery but it's already late or weekend, move to next business day
+  // If same day delivery but it's already late, weekend, or holiday, move to next business day
   if (businessDaysToAdd === 0) {
     const currentHour = now.getHours();
-    // If it's past 2 PM or it's a weekend, move to next business day
-    if (currentHour >= 14 || eta.getDay() === 0 || eta.getDay() === 6) {
-      while (eta.getDay() === 0 || eta.getDay() === 6) {
+    // If it's past 2 PM or it's not a business day, move to next business day
+    if (currentHour >= 14 || !isBusinessDay(eta)) {
+      while (!isBusinessDay(eta)) {
         eta.setDate(eta.getDate() + 1);
       }
       // Move to next business day
       eta.setDate(eta.getDate() + 1);
-      while (eta.getDay() === 0 || eta.getDay() === 6) {
+      while (!isBusinessDay(eta)) {
         eta.setDate(eta.getDate() + 1);
       }
     }
   }
 
-  // Final check: ensure delivery is not on weekend
-  while (eta.getDay() === 0 || eta.getDay() === 6) {
+  // Final check: ensure delivery is on a business day
+  while (!isBusinessDay(eta)) {
     eta.setDate(eta.getDate() + 1);
   }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,6 +97,16 @@ export const RequestPickup = () => {
   );
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ItemForm[]>([newItemForm()]);
+  const [eta, setEta] = useState<{ label: string; date: string } | null>(null);
+
+  // Fetch ETA when zone changes
+  useEffect(() => {
+    if (zone) {
+      calculateETA(zone).then(setEta).catch(() => setEta(null));
+    } else {
+      setEta(null);
+    }
+  }, [zone]);
 
   const addItem = () => setItems([...items, newItemForm()]);
 
@@ -131,7 +141,6 @@ export const RequestPickup = () => {
   const deliveryFee = zone ? getDeliveryFee(zone) : 0;
   const vatAmount = Math.round((subtotal + deliveryFee) * PRICING.vatRate);
   const grandTotal = subtotal + deliveryFee + vatAmount;
-  const eta = zone ? calculateETA(zone) : null;
   const allValid = calculatedItems.every((i) => i.isValid) && zone !== '' && pickupAddress !== '';
   const hasItems = calculatedItems.some((i) => i.isValid);
   const z = zone.toLowerCase();
