@@ -1,401 +1,271 @@
-import { useState, useEffect, useCallback } from 'react';
-import { PageHeader, DataTable, StatusBadge, SearchInput, ExportButton, DateRangePicker } from '@/components/shared';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PageHeader, DataTable, StatusBadge, SearchInput, ExportButton } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Plus, RefreshCw, AlertCircle } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { toast } from 'sonner';
-import { getOrders, updateOrderStatus } from '@/services/orderService';
-import type { Order } from '@/types';
+import { getOrders, bulkUpdateOrderStatus } from '@/services/orderService';
+import { getDrivers } from '@/services/driverService';
+import { assignDriverToOrder } from '@/services/orderService';
+import { Order } from '@/types';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 
-/** Numeric status codes mapped to human-readable string labels */
-const STATUS_MAP: Record<number, string> = {
-  0: 'cancelled',
-  1: 'pending',
-  2: 'driver_assigned',
-  3: 'picked_up',
-  4: 'at_warehouse',
-  5: 'processing',
-  6: 'quality_check',
-  7: 'ready_for_delivery',
-  8: 'out_for_delivery',
-  9: 'delivered',
-};
+const STATUS_OPTIONS = [
+  { value: '1', label: 'Pending' },
+  { value: '2', label: 'Driver Assigned' },
+  { value: '3', label: 'Quote Accepted' },
+  { value: '4', label: 'Pickup Scheduled' },
+  { value: '5', label: 'Picked Up' },
+  { value: '6', label: 'In Washing' },
+  { value: '7', label: 'Drying' },
+  { value: '8', label: 'Quality Check' },
+  { value: '9', label: 'Ready for Dispatch' },
+  { value: '10', label: 'Dispatched' },
+  { value: '11', label: 'Out for Delivery' },
+  { value: '12', label: 'Delivered' },
+];
 
-/** Reverse lookup: string label back to numeric status */
-const STATUS_REVERSE: Record<string, number> = Object.fromEntries(
-  Object.entries(STATUS_MAP).map(([k, v]) => [v, Number(k)]),
-);
-
-/** Format a status number into the string label for StatusBadge */
-function statusLabel(status: number): string {
-  return STATUS_MAP[status] ?? 'unknown';
-}
-
-/** Format Order items array into a short summary string */
-function formatItems(items: Order['items']): string {
-  if (!items || items.length === 0) return '--';
-  return items.map((i) => `${i.quantity} ${i.name}`).join(', ');
-}
-
-/** Row shape that DataTable receives (flat record with string keys) */
-interface OrderRow extends Record<string, unknown> {
-  trackingCode: string;
-  customerName: string;
-  items: string;
-  statusNum: number;
-  status: string;
-  total: number;
-  zone: string;
-  pickupDate: string;
-  estimatedDelivery: string;
-  driverName: string;
-}
-
-function toRow(order: Order): OrderRow {
-  return {
-    trackingCode: order.trackingCode,
-    customerName: order.customerName,
-    items: formatItems(order.items),
-    statusNum: order.status,
-    status: statusLabel(order.status),
-    total: order.total ?? 0,
-    zone: order.zone ?? '--',
-    pickupDate: order.pickupDate ?? '--',
-    estimatedDelivery: order.estimatedDelivery ?? '--',
-    driverName: order.driverName ?? '--',
-  };
-}
-
-/** Loading skeleton that mimics the table layout */
-function TableSkeleton() {
-  return (
-    <div className="space-y-4">
-      {/* Header skeleton */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <div className="bg-muted/50 p-3 flex gap-4">
-          {[40, 120, 120, 160, 100, 100, 100, 100].map((w, i) => (
-            <Skeleton key={i} className="h-4" style={{ width: w }} />
-          ))}
-        </div>
-        {/* Row skeletons */}
-        {Array.from({ length: 8 }).map((_, rowIdx) => (
-          <div key={rowIdx} className="p-3 flex gap-4 border-t border-border">
-            <Skeleton className="h-4 w-4 rounded" />
-            <Skeleton className="h-4 w-[110px]" />
-            <Skeleton className="h-4 w-[110px]" />
-            <Skeleton className="h-4 w-[150px]" />
-            <Skeleton className="h-5 w-[90px] rounded-full" />
-            <Skeleton className="h-4 w-[80px]" />
-            <Skeleton className="h-4 w-[90px]" />
-            <Skeleton className="h-4 w-[100px]" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Admin Order Management Page
- * Fetches real data from Supabase via orderService.
- * SearchInput + status filter + DateRangePicker.
- * Bulk status update. ExportButton for CSV. Driver column.
- */
 export const OrderManagement = () => {
-  // Filter state
+  const navigate = useNavigate();
+  const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [dateRange, setDateRange] = useState({ start: '', end: '' });
-
-  // Bulk selection
+  const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState('');
+  const [assignDialogOrder, setAssignDialogOrder] = useState<Order | null>(null);
+  const [selectedDriverId, setSelectedDriverId] = useState('');
 
-  // Data state
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalOrders, setTotalOrders] = useState(0);
-  const [page, setPage] = useState(1);
-  const [updatingBulk, setUpdatingBulk] = useState(false);
-  const limit = 50;
-
-  /** Fetch orders from Supabase */
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const statusNum =
-        statusFilter !== 'all' ? STATUS_REVERSE[statusFilter] : undefined;
-
-      const result = await getOrders({
-        status: statusNum,
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['admin', 'orders', statusFilter, search, page],
+    queryFn: () =>
+      getOrders({
+        status: statusFilter !== 'all' ? Number(statusFilter) : undefined,
         search: search || undefined,
         page,
-        limit,
-      });
+        limit: 15,
+      }),
+    keepPreviousData: true,
+  } as Parameters<typeof useQuery>[0]);
 
-      setOrders(result.data);
-      setTotalOrders(result.total);
-    } catch (err) {
-      console.error('Failed to fetch orders:', err);
-      setError('Failed to load orders. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, search, page]);
-
-  // Fetch when filters / page change
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [statusFilter, search]);
-
-  const handleSearch = useCallback((value: string) => {
-    setSearch(value);
-  }, []);
-
-  // Convert orders to flat rows for DataTable
-  const rows: OrderRow[] = orders.map(toRow);
-
-  // Client-side date range filtering (pickup date)
-  const filteredRows = rows.filter((row) => {
-    if (dateRange.start && row.pickupDate < dateRange.start) return false;
-    if (dateRange.end && row.pickupDate > dateRange.end) return false;
-    return true;
+  const { data: drivers = [] } = useQuery({
+    queryKey: ['drivers', 'list'],
+    queryFn: getDrivers,
   });
 
-  const toggleSelect = (trackingCode: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(trackingCode)) next.delete(trackingCode);
-      else next.add(trackingCode);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredRows.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredRows.map((o) => o.trackingCode)));
-    }
-  };
-
-  const handleBulkUpdate = async () => {
-    if (selectedIds.size === 0 || !bulkStatus) return;
-    const newStatusNum = STATUS_REVERSE[bulkStatus];
-    if (newStatusNum === undefined) return;
-
-    setUpdatingBulk(true);
-    let successCount = 0;
-    let failCount = 0;
-
-    const promises = Array.from(selectedIds).map(async (trackingCode) => {
-      try {
-        const result = await updateOrderStatus(trackingCode, newStatusNum);
-        if (result.success) {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      } catch {
-        failCount++;
+  const bulkMutation = useMutation({
+    mutationFn: ({ ids, status }: { ids: string[]; status: number }) =>
+      bulkUpdateOrderStatus(ids, status),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(`Updated ${data.updated} orders`);
+        setSelectedIds(new Set());
+        setBulkStatus('');
+        qc.invalidateQueries({ queryKey: ['admin', 'orders'] });
       }
-    });
+    },
+  });
 
-    await Promise.all(promises);
+  const assignMutation = useMutation({
+    mutationFn: ({ orderId, driverId }: { orderId: string; driverId: string }) => {
+      const driver = drivers.find((d) => d.id === driverId);
+      if (!driver) throw new Error('Driver not found');
+      return assignDriverToOrder(orderId, driverId, driver.name, driver.phone);
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Driver assigned successfully');
+        setAssignDialogOrder(null);
+        setSelectedDriverId('');
+        qc.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      } else {
+        toast.error(data.error ?? 'Failed to assign driver');
+      }
+    },
+  });
 
-    if (successCount > 0) {
-      toast.success(
-        `Updated ${successCount} order${successCount > 1 ? 's' : ''} to ${bulkStatus.replace(/_/g, ' ')}`,
-      );
-    }
-    if (failCount > 0) {
-      toast.error(`Failed to update ${failCount} order${failCount > 1 ? 's' : ''}`);
-    }
+  const orders = result?.data ?? [];
 
-    setSelectedIds(new Set());
-    setBulkStatus('');
-    setUpdatingBulk(false);
-    fetchOrders();
-  };
-
-  const orderColumns: Column<OrderRow>[] = [
+  const columns: Column<Order>[] = [
     {
-      key: 'trackingCode',
+      key: 'id',
       header: '',
       className: 'w-10',
       render: (row) => (
         <Checkbox
-          checked={selectedIds.has(row.trackingCode)}
-          onCheckedChange={() => toggleSelect(row.trackingCode)}
+          checked={selectedIds.has(row.id ?? '')}
+          onCheckedChange={() => {
+            setSelectedIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(row.id ?? '')) next.delete(row.id ?? '');
+              else next.add(row.id ?? '');
+              return next;
+            });
+          }}
         />
       ),
     },
     { key: 'trackingCode', header: 'Order ID', sortable: true },
     { key: 'customerName', header: 'Customer', sortable: true },
-    { key: 'items', header: 'Items' },
+    {
+      key: 'items',
+      header: 'Items',
+      render: (row) => (
+        <span className="text-sm">{row.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}</span>
+      ),
+    },
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <StatusBadge status={row.status} />,
-    },
-    {
-      key: 'total',
-      header: 'Total (KES)',
-      sortable: true,
-      render: (row) => (
-        <span className="font-medium">
-          {row.total > 0 ? `KES ${row.total.toLocaleString()}` : '--'}
-        </span>
-      ),
+      render: (row) => <StatusBadge status={String(row.status)} />,
     },
     { key: 'zone', header: 'Zone', sortable: true },
-    { key: 'pickupDate', header: 'Pickup Date', sortable: true },
-    { key: 'driverName', header: 'Driver' },
+    {
+      key: 'driverName',
+      header: 'Driver',
+      render: (row) => (
+        <span className="text-sm text-muted-foreground">{row.driverName ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'id',
+      header: 'Actions',
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => navigate(`/portal/orders/${row.trackingCode}`)}
+          >
+            <Eye className="w-4 h-4" />
+          </Button>
+          {!row.driverName && row.status === 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setAssignDialogOrder(row)}
+            >
+              Assign Driver
+            </Button>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Order Management" description="View and manage all customer orders">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchOrders}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Order
-          </Button>
-        </div>
-      </PageHeader>
+      <PageHeader title="Order Management" description="View and manage all customer orders" />
 
-      {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput
-          onSearch={handleSearch}
-          placeholder="Search by tracking code, customer, zone..."
-          className="w-72"
+          onSearch={useCallback((v: string) => { setSearch(v); setPage(1); }, [])}
+          placeholder="Search orders..."
+          className="w-64"
         />
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
+          <SelectTrigger className="w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="driver_assigned">Driver Assigned</SelectItem>
-            <SelectItem value="picked_up">Picked Up</SelectItem>
-            <SelectItem value="at_warehouse">At Warehouse</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="quality_check">Quality Check</SelectItem>
-            <SelectItem value="ready_for_delivery">Ready for Delivery</SelectItem>
-            <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
+            {STATUS_OPTIONS.map((s) => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
-
-        <DateRangePicker
-          startDate={dateRange.start}
-          endDate={dateRange.end}
-          onRangeChange={(start, end) => setDateRange({ start, end })}
-        />
-
-        <ExportButton data={filteredRows} filename="orders-export" />
-
-        {!loading && (
-          <span className="text-sm text-muted-foreground ml-auto">
-            {totalOrders} total order{totalOrders !== 1 ? 's' : ''}
-          </span>
-        )}
+        <ExportButton data={orders} filename="orders-export" />
       </div>
 
-      {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-          <Checkbox
-            checked={selectedIds.size === filteredRows.length}
-            onCheckedChange={toggleSelectAll}
-          />
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <Select value={bulkStatus} onValueChange={setBulkStatus}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-44">
               <SelectValue placeholder="Change status to..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="driver_assigned">Driver Assigned</SelectItem>
-              <SelectItem value="picked_up">Picked Up</SelectItem>
-              <SelectItem value="at_warehouse">At Warehouse</SelectItem>
-              <SelectItem value="processing">Processing</SelectItem>
-              <SelectItem value="quality_check">Quality Check</SelectItem>
-              <SelectItem value="ready_for_delivery">Ready for Delivery</SelectItem>
-              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-              <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              {STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button
             size="sm"
-            onClick={handleBulkUpdate}
-            disabled={!bulkStatus || updatingBulk}
+            disabled={!bulkStatus || bulkMutation.isPending}
+            onClick={() =>
+              bulkMutation.mutate({
+                ids: Array.from(selectedIds),
+                status: Number(bulkStatus),
+              })
+            }
           >
-            {updatingBulk ? 'Updating...' : 'Update'}
+            Update
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            Clear
-          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>Clear</Button>
         </div>
       )}
 
-      {/* Error State */}
-      {error && (
-        <div className="flex items-center gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span className="text-sm">{error}</span>
-          <Button variant="outline" size="sm" onClick={fetchOrders} className="ml-auto">
-            Retry
-          </Button>
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
         </div>
-      )}
-
-      {/* Orders Table */}
-      {loading ? (
-        <TableSkeleton />
       ) : (
         <DataTable
-          data={filteredRows}
-          columns={orderColumns}
+          data={orders}
+          columns={columns}
           searchable={false}
-          onRowClick={(row) => alert(`View order: ${row.trackingCode}`)}
-          emptyMessage="No orders found. Adjust your filters or create a new order."
+          pageSize={15}
         />
       )}
+
+      {/* Assign Driver Dialog */}
+      <Dialog open={!!assignDialogOrder} onOpenChange={() => setAssignDialogOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Driver to {assignDialogOrder?.trackingCode}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a driver..." />
+              </SelectTrigger>
+              <SelectContent>
+                {drivers.filter((d) => d.isOnline || d.status === 'available').map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name} — {d.zone} ({d.status})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOrder(null)}>Cancel</Button>
+            <Button
+              disabled={!selectedDriverId || assignMutation.isPending}
+              onClick={() => {
+                if (assignDialogOrder?.id) {
+                  assignMutation.mutate({
+                    orderId: assignDialogOrder.id,
+                    driverId: selectedDriverId,
+                  });
+                }
+              }}
+            >
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

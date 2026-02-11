@@ -1,0 +1,261 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { Plus, Trash2, Loader2, CheckCircle } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { createOrder } from '@/services/orderService';
+
+interface PlaceOrderDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const ITEM_TYPES = [
+  'Carpet (Small)', 'Carpet (Medium)', 'Carpet (Large)', 'Persian Rug', 'Office Rug',
+  'Sofa (2-Seater)', 'Sofa (3-Seater)', 'Sofa (L-Shaped)', 'Mattress (Single)',
+  'Mattress (Double)', 'Mattress (King)', 'Curtain Pair', 'Duvet/Blanket',
+  'Chair', 'Car Seat Covers', 'Pillow', 'Other',
+];
+
+const ZONES = ['Kitengela', 'Athi River', 'Syokimau', 'Mlolongo'];
+
+export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [trackingCode, setTrackingCode] = useState('');
+
+  const [form, setForm] = useState({
+    zone: user?.zone ?? '',
+    pickupDate: '',
+    pickupAddress: '',
+    notes: '',
+    items: [{ name: '', quantity: 1 }] as { name: string; quantity: number }[],
+  });
+
+  const addItem = () => setForm({ ...form, items: [...form.items, { name: '', quantity: 1 }] });
+  const removeItem = (i: number) => setForm({ ...form, items: form.items.filter((_, idx) => idx !== i) });
+  const updateItem = (i: number, field: 'name' | 'quantity', value: string | number) =>
+    setForm({ ...form, items: form.items.map((item, idx) => idx === i ? { ...item, [field]: value } : item) });
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      createOrder({
+        customerId: user!.id,
+        customerName: user!.name,
+        zone: form.zone,
+        pickupDate: form.pickupDate,
+        pickupAddress: form.pickupAddress,
+        notes: form.notes || undefined,
+        items: form.items.filter((i) => i.name.trim() !== ''),
+      }),
+    onSuccess: (data) => {
+      if (data.success && data.order) {
+        setTrackingCode(data.order.trackingCode);
+        setStep(3);
+        qc.invalidateQueries({ queryKey: ['customer', 'orders', user?.id] });
+        toast.success(`Order ${data.order.trackingCode} placed successfully!`);
+      } else {
+        toast.error(data.error ?? 'Failed to place order');
+      }
+    },
+  });
+
+  const canProceedStep1 =
+    form.zone && form.pickupDate && form.pickupAddress &&
+    form.items.some((i) => i.name.trim() !== '');
+
+  const handleClose = () => {
+    onOpenChange(false);
+    setTimeout(() => {
+      setStep(1);
+      setTrackingCode('');
+      setForm({ zone: user?.zone ?? '', pickupDate: '', pickupAddress: '', notes: '', items: [{ name: '', quantity: 1 }] });
+    }, 300);
+  };
+
+  const minDate = new Date();
+  minDate.setDate(minDate.getDate() + 1);
+  const minDateStr = minDate.toISOString().split('T')[0];
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {step === 1 ? 'What needs cleaning?' : step === 2 ? 'Pickup Details' : 'Order Placed!'}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Step indicator */}
+        {step < 3 && (
+          <div className="flex gap-2 mb-2">
+            {[1, 2].map((s) => (
+              <div key={s} className={`h-1.5 flex-1 rounded-full ${step >= s ? 'bg-primary' : 'bg-muted'}`} />
+            ))}
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Items to Clean *</Label>
+              {form.items.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <Select value={item.name} onValueChange={(v) => updateItem(i, 'name', v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select item type..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ITEM_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-20">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={item.quantity}
+                      onChange={(e) => updateItem(i, 'quantity', Math.max(1, Number(e.target.value)))}
+                      className="text-center"
+                    />
+                  </div>
+                  {form.items.length > 1 && (
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive" onClick={() => removeItem(i)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              <Button variant="outline" size="sm" onClick={addItem} className="w-full">
+                <Plus className="h-4 w-4 mr-2" /> Add Another Item
+              </Button>
+            </div>
+
+            <div>
+              <Label htmlFor="order-notes">Special Instructions (optional)</Label>
+              <Textarea
+                id="order-notes"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="e.g. Heavy stains, delicate fabric, etc."
+                rows={2}
+              />
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-4">
+            <div>
+              <Label>Items Summary</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {form.items.filter((i) => i.name).map((item, i) => (
+                  <Badge key={i} variant="secondary">{item.quantity}x {item.name}</Badge>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="order-zone">Service Zone *</Label>
+              <Select value={form.zone} onValueChange={(v) => setForm({ ...form, zone: v })}>
+                <SelectTrigger id="order-zone"><SelectValue placeholder="Select your zone..." /></SelectTrigger>
+                <SelectContent>
+                  {ZONES.map((z) => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="order-pickup-date">Preferred Pickup Date *</Label>
+              <Input
+                id="order-pickup-date"
+                type="date"
+                min={minDateStr}
+                value={form.pickupDate}
+                onChange={(e) => setForm({ ...form, pickupDate: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="order-address">Pickup Address *</Label>
+              <Input
+                id="order-address"
+                value={form.pickupAddress}
+                onChange={(e) => setForm({ ...form, pickupAddress: e.target.value })}
+                placeholder="e.g. 45 Namanga Road, Kitengela"
+              />
+            </div>
+
+            <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">What happens next?</p>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Admin reviews your request</li>
+                <li>A driver is assigned and contacts you</li>
+                <li>Driver picks up your items</li>
+                <li>Items cleaned at our warehouse (2–3 days)</li>
+                <li>Items delivered back to you</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="py-6 text-center space-y-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <div>
+              <p className="text-lg font-semibold">Order Placed Successfully!</p>
+              <p className="text-muted-foreground text-sm mt-1">Your tracking code is:</p>
+              <p className="text-2xl font-bold text-primary mt-1">{trackingCode}</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              A driver will be assigned shortly. You can track your order at any time using the code above.
+            </p>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          {step === 1 && (
+            <>
+              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+              <Button disabled={!canProceedStep1} onClick={() => setStep(2)}>Next: Pickup Details →</Button>
+            </>
+          )}
+          {step === 2 && (
+            <>
+              <Button variant="outline" onClick={() => setStep(1)}>← Back</Button>
+              <Button
+                disabled={!form.zone || !form.pickupDate || !form.pickupAddress || mutation.isPending}
+                onClick={() => mutation.mutate()}
+              >
+                {mutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Placing...</> : 'Place Order'}
+              </Button>
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <Button variant="outline" onClick={handleClose}>Close</Button>
+              <Button onClick={() => { handleClose(); navigate(`/portal/orders/${trackingCode}`); }}>
+                Track Order
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

@@ -1,80 +1,84 @@
-import { useState, useEffect } from 'react';
-import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
-import type { Column } from '@/components/shared';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { PageHeader, StatusBadge } from '@/components/shared';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Download, FileText, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { getInvoices } from '@/services/invoiceService';
-import type { Invoice } from '@/types';
 
 export const Invoices = () => {
   const { user } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    if (!user?.id) return;
-    setLoading(true);
-    getInvoices({ customerId: user.id, page: 1, limit: 50 })
-      .then((res) => setInvoices(res.data))
-      .finally(() => setLoading(false));
-  }, [user?.id]);
+  const { data: result, isLoading } = useQuery({
+    queryKey: ['customer', 'invoices', user?.id, statusFilter],
+    queryFn: () =>
+      getInvoices({
+        customerId: user?.id,
+        status: statusFilter !== 'all' ? (statusFilter as 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled') : undefined,
+        page: 1,
+        limit: 50,
+      }),
+    enabled: !!user?.id,
+  });
 
-  const pending = invoices.filter((i) => ['sent', 'draft', 'partially_paid'].includes(i.status));
-  const paid = invoices.filter((i) => i.status === 'paid');
-  const overdue = invoices.filter((i) => i.status === 'overdue');
-
-  const columns: Column<Invoice>[] = [
-    { key: 'invoiceNumber', header: 'Invoice #', sortable: true },
-    {
-      key: 'total',
-      header: 'Amount (KES)',
-      sortable: true,
-      render: (row) => <span className="font-medium">KES {row.total.toLocaleString()}</span>,
-    },
-    { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-    { key: 'issuedAt', header: 'Issued', sortable: true },
-    { key: 'dueAt', header: 'Due Date', sortable: true },
-  ];
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader title="Invoices" description="View your invoices and payment status" />
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const invoices = result?.data ?? [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Invoices" description="View your invoices and payment status" />
+      <PageHeader title="Invoices" description="View and download your invoices" />
 
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All ({invoices.length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({pending.length})</TabsTrigger>
-          <TabsTrigger value="paid">Paid ({paid.length})</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue ({overdue.length})</TabsTrigger>
-        </TabsList>
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-44"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All</SelectItem>
+          <SelectItem value="paid">Paid</SelectItem>
+          <SelectItem value="sent">Pending</SelectItem>
+          <SelectItem value="overdue">Overdue</SelectItem>
+          <SelectItem value="cancelled">Cancelled</SelectItem>
+        </SelectContent>
+      </Select>
 
-        <TabsContent value="all">
-          <DataTable data={invoices} columns={columns} searchPlaceholder="Search invoices..." />
-        </TabsContent>
-        <TabsContent value="pending">
-          <DataTable data={pending} columns={columns} searchPlaceholder="Search pending..." />
-        </TabsContent>
-        <TabsContent value="paid">
-          <DataTable data={paid} columns={columns} searchPlaceholder="Search paid..." />
-        </TabsContent>
-        <TabsContent value="overdue">
-          <DataTable data={overdue} columns={columns} searchPlaceholder="Search overdue..." />
-        </TabsContent>
-      </Tabs>
+      {isLoading ? (
+        <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
+      ) : invoices.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground">
+          <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p>No invoices found</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {invoices.map((inv) => (
+            <Card key={inv.id}>
+              <CardContent className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{inv.invoiceNumber}</span>
+                    <StatusBadge status={inv.status} />
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                    <span>Order: {inv.orderNumber}</span>
+                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />Due: {inv.dueAt?.split('T')[0]}</span>
+                    <span className="font-medium text-foreground">KES {inv.total.toLocaleString()}</span>
+                  </div>
+                </div>
+                {inv.pdfUrl ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={inv.pdfUrl} target="_blank" rel="noreferrer">
+                      <Download className="h-4 w-4 mr-1" /> Download
+                    </a>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled><Download className="h-4 w-4 mr-1" /> PDF</Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
