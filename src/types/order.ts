@@ -1,6 +1,7 @@
-/**
- * Order tracking types and interfaces
- */
+export interface OrderItem {
+  name: string;
+  quantity: number;
+}
 
 export interface OrderStage {
   id: number;
@@ -9,13 +10,10 @@ export interface OrderStage {
   description: string;
 }
 
-export interface OrderItem {
-  name: string;
-  quantity: number;
-}
-
 export interface Order {
+  id?: string;
   trackingCode: string;
+  customerId?: string;
   customerName: string;
   status: number;
   items: OrderItem[];
@@ -24,6 +22,11 @@ export interface Order {
   zone: string;
   driverName?: string;
   driverPhone?: string;
+  driverId?: string;
+  pickupAddress?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TrackingResponse {

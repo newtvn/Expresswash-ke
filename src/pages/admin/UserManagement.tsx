@@ -1,118 +1,123 @@
 import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, SearchInput } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { UserPlus, Eye, Pencil, ToggleLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { UserPlus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
+import { getUsers, updateUser, toggleUserActive } from '@/services/userService';
+import { UserProfile } from '@/types';
+import { UserRole } from '@/types/auth';
+import { supabase } from '@/lib/supabase';
 
-const mockUsers = [
-  { id: 'u-101', name: 'Grace Wanjiku', email: 'grace@email.com', phone: '+254711000001', role: 'customer', status: 'active', joined: '2024-03-15' },
-  { id: 'u-102', name: 'Peter Kamau', email: 'peter@email.com', phone: '+254711000002', role: 'customer', status: 'active', joined: '2024-04-20' },
-  { id: 'u-103', name: 'Mary Njeri', email: 'mary@email.com', phone: '+254711000003', role: 'customer', status: 'active', joined: '2024-05-10' },
-  { id: 'u-104', name: 'John Odera', email: 'john@email.com', phone: '+254711000004', role: 'customer', status: 'inactive', joined: '2024-02-01' },
-  { id: 'u-105', name: 'Sarah Wambui', email: 'sarah@email.com', phone: '+254711000005', role: 'customer', status: 'active', joined: '2024-06-25' },
-  { id: 'u-106', name: 'David Maina', email: 'david@email.com', phone: '+254711000006', role: 'customer', status: 'active', joined: '2024-07-12' },
-  { id: 'u-107', name: 'Faith Akinyi', email: 'faith@email.com', phone: '+254711000007', role: 'customer', status: 'suspended', joined: '2024-01-30' },
-  { id: 'd-1', name: 'Joseph Mwangi', email: 'joseph@expresswash.co.ke', phone: '+254712345678', role: 'driver', status: 'active', joined: '2024-02-01' },
-  { id: 'd-2', name: 'Brian Ochieng', email: 'brian.o@expresswash.co.ke', phone: '+254712345679', role: 'driver', status: 'active', joined: '2024-03-15' },
-  { id: 'd-3', name: 'Daniel Kiprop', email: 'daniel@expresswash.co.ke', phone: '+254712345680', role: 'driver', status: 'active', joined: '2024-04-10' },
-  { id: 'd-4', name: 'Michael Karanja', email: 'michael@expresswash.co.ke', phone: '+254712345681', role: 'driver', status: 'inactive', joined: '2024-01-20' },
-  { id: 's-1', name: 'Jane Njeri', email: 'jane@expresswash.co.ke', phone: '+254700000004', role: 'warehouse_staff', status: 'active', joined: '2024-02-15' },
-  { id: 's-2', name: 'Admin User', email: 'admin@expresswash.co.ke', phone: '+254700000001', role: 'admin', status: 'active', joined: '2024-01-01' },
-  { id: 's-3', name: 'Super Admin', email: 'super@expresswash.co.ke', phone: '+254700000000', role: 'super_admin', status: 'active', joined: '2024-01-01' },
-];
-
-const roleLabels: Record<string, string> = {
-  customer: 'Customer',
-  driver: 'Driver',
-  warehouse_staff: 'Staff',
-  admin: 'Admin',
-  super_admin: 'Super Admin',
-};
-
-/**
- * Admin User Management Page
- * Tabs: All Users, Customers, Drivers, Staff.
- * SearchInput for filtering. Actions: View, Edit, Toggle Active.
- */
 export const UserManagement = () => {
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', role: 'customer', zone: '', password: '' });
+  const [creating, setCreating] = useState(false);
 
-  const handleSearch = useCallback((value: string) => {
-    setSearch(value);
-  }, []);
+  const { data: allResult, isLoading } = useQuery({
+    queryKey: ['admin', 'users', search],
+    queryFn: () => getUsers({ page: 1, limit: 200, search: search || undefined }),
+  });
 
-  const getFilteredUsers = (roleFilter?: string) => {
-    let filtered = mockUsers;
-    if (roleFilter) {
-      filtered = filtered.filter((u) => u.role === roleFilter);
+  const toggleMutation = useMutation({
+    mutationFn: (id: string) => toggleUserActive(id),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(`User ${data.isActive ? 'activated' : 'deactivated'}`);
+        qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      }
+    },
+  });
+
+  const all = allResult?.data ?? [];
+  const getByRole = (role?: string) =>
+    role ? all.filter((u) => u.role === role) : all;
+
+  const handleCreateUser = async () => {
+    if (!newUser.email || !newUser.password || !newUser.name) {
+      toast.error('Name, email and password are required');
+      return;
     }
-    if (search) {
-      const lower = search.toLowerCase();
-      filtered = filtered.filter(
-        (u) =>
-          u.name.toLowerCase().includes(lower) ||
-          u.email.toLowerCase().includes(lower) ||
-          u.phone.includes(lower)
-      );
+    setCreating(true);
+    try {
+      const { error } = await supabase.auth.admin.createUser({
+        email: newUser.email,
+        password: newUser.password,
+        user_metadata: {
+          name: newUser.name,
+          phone: newUser.phone,
+          role: newUser.role,
+          zone: newUser.zone,
+        },
+        email_confirm: true,
+      });
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(`User ${newUser.name} created successfully`);
+        setAddDialogOpen(false);
+        setNewUser({ name: '', email: '', phone: '', role: 'customer', zone: '', password: '' });
+        qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      }
+    } finally {
+      setCreating(false);
     }
-    return filtered;
   };
 
-  const userColumns: Column<(typeof mockUsers)[0]>[] = [
+  const columns: Column<UserProfile>[] = [
     { key: 'name', header: 'Name', sortable: true },
     { key: 'email', header: 'Email', sortable: true },
     { key: 'phone', header: 'Phone' },
     {
       key: 'role',
       header: 'Role',
-      sortable: true,
-      render: (row) => (
-        <StatusBadge status={row.role} />
-      ),
+      render: (row) => <StatusBadge status={row.role} />,
     },
+    { key: 'zone', header: 'Zone' },
     {
-      key: 'status',
+      key: 'isActive',
       header: 'Status',
       render: (row) => (
         <Badge
           variant="outline"
           className={
-            row.status === 'active'
+            row.isActive
               ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-              : row.status === 'inactive'
-              ? 'bg-gray-100 text-gray-600 border-gray-200'
-              : 'bg-red-100 text-red-800 border-red-200'
+              : 'bg-gray-100 text-gray-600 border-gray-200'
           }
         >
-          {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
+          {row.isActive ? 'Active' : 'Inactive'}
         </Badge>
       ),
     },
-    { key: 'joined', header: 'Joined', sortable: true },
+    {
+      key: 'createdAt',
+      header: 'Joined',
+      render: (row) => <span className="text-sm">{row.createdAt?.split('T')[0]}</span>,
+    },
     {
       key: 'id',
       header: 'Actions',
-      render: () => (
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Eye className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <ToggleLeft className="w-4 h-4" />
-          </Button>
-        </div>
+      render: (row) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => toggleMutation.mutate(row.id)}
+          title={row.isActive ? 'Deactivate' : 'Activate'}
+        >
+          {row.isActive ? <ToggleRight className="w-4 h-4 text-green-600" /> : <ToggleLeft className="w-4 h-4" />}
+        </Button>
       ),
     },
   ];
@@ -127,63 +132,71 @@ export const UserManagement = () => {
       </PageHeader>
 
       <SearchInput
-        onSearch={handleSearch}
+        onSearch={useCallback((v: string) => setSearch(v), [])}
         placeholder="Search by name, email, or phone..."
         className="max-w-sm"
       />
 
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Users ({getFilteredUsers().length})</TabsTrigger>
-          <TabsTrigger value="customers">Customers ({getFilteredUsers('customer').length})</TabsTrigger>
-          <TabsTrigger value="drivers">Drivers ({getFilteredUsers('driver').length})</TabsTrigger>
-          <TabsTrigger value="staff">Staff ({getFilteredUsers('warehouse_staff').length + getFilteredUsers('admin').length + getFilteredUsers('super_admin').length})</TabsTrigger>
-        </TabsList>
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+      ) : (
+        <Tabs defaultValue="all" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="all">All ({all.length})</TabsTrigger>
+            <TabsTrigger value="customers">Customers ({getByRole('customer').length})</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers ({getByRole('driver').length})</TabsTrigger>
+            <TabsTrigger value="staff">Staff ({getByRole('warehouse_staff').length + getByRole('admin').length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} /></TabsContent>
+          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} /></TabsContent>
+          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} /></TabsContent>
+          <TabsContent value="staff">
+            <DataTable
+              data={[...getByRole('warehouse_staff'), ...getByRole('admin'), ...getByRole('super_admin')]}
+              columns={columns}
+              searchable={false}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
 
-        <TabsContent value="all">
-          <DataTable
-            data={getFilteredUsers()}
-            columns={userColumns}
-            searchable={false}
-            searchPlaceholder="Search users..."
-          />
-        </TabsContent>
-
-        <TabsContent value="customers">
-          <DataTable
-            data={getFilteredUsers('customer')}
-            columns={userColumns}
-            searchable={false}
-          />
-        </TabsContent>
-
-        <TabsContent value="drivers">
-          <DataTable
-            data={getFilteredUsers('driver')}
-            columns={userColumns}
-            searchable={false}
-          />
-        </TabsContent>
-
-        <TabsContent value="staff">
-          <DataTable
-            data={[...getFilteredUsers('warehouse_staff'), ...getFilteredUsers('admin'), ...getFilteredUsers('super_admin')]}
-            columns={userColumns}
-            searchable={false}
-          />
-        </TabsContent>
-      </Tabs>
-
-      {/* Add User Dialog (placeholder) */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground text-sm py-8 text-center">
-            User creation form coming soon.
-          </p>
-          <Button onClick={() => setAddDialogOpen(false)}>Close</Button>
+          <DialogHeader><DialogTitle>Add New User</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div><Label>Full Name *</Label><Input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} placeholder="John Doe" /></div>
+            <div><Label>Email *</Label><Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} placeholder="john@example.com" /></div>
+            <div><Label>Password *</Label><Input type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} placeholder="Minimum 6 characters" /></div>
+            <div><Label>Phone</Label><Input value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} placeholder="+254 7XX XXX XXX" /></div>
+            <div>
+              <Label>Role</Label>
+              <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="customer">Customer</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="warehouse_staff">Warehouse Staff</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Zone</Label>
+              <Select value={newUser.zone} onValueChange={(v) => setNewUser({ ...newUser, zone: v })}>
+                <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Kitengela">Kitengela</SelectItem>
+                  <SelectItem value="Athi River">Athi River</SelectItem>
+                  <SelectItem value="Syokimau">Syokimau</SelectItem>
+                  <SelectItem value="Mlolongo">Mlolongo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateUser} disabled={creating}>{creating ? 'Creating...' : 'Create User'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

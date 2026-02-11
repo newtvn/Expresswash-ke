@@ -1,158 +1,187 @@
-import { useState } from "react";
-import { PageHeader, DataTable, StatusBadge } from "@/components/shared";
-import type { Column } from "@/components/shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PageHeader } from '@/components/shared';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import { Send, Bell, History, CheckCircle, XCircle } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Send, Bell, MessageSquare, FileText } from "lucide-react";
+  getTemplates,
+  sendNotification,
+  getNotificationHistory,
+  NotificationHistoryEntry,
+} from '@/services/communicationService';
 
-const notificationTemplates = [
-  { id: "TPL-001", name: "Order Confirmation", type: "SMS", trigger: "Order Created", status: "active", lastUsed: "2024-12-15" },
-  { id: "TPL-002", name: "Pickup Reminder", type: "SMS", trigger: "1hr Before Pickup", status: "active", lastUsed: "2024-12-15" },
-  { id: "TPL-003", name: "Cleaning Complete", type: "SMS + Email", trigger: "Quality Check Pass", status: "active", lastUsed: "2024-12-14" },
-  { id: "TPL-004", name: "Out for Delivery", type: "SMS", trigger: "Driver Dispatched", status: "active", lastUsed: "2024-12-14" },
-  { id: "TPL-005", name: "Delivery Confirmation", type: "SMS + Email", trigger: "Delivered", status: "active", lastUsed: "2024-12-14" },
-  { id: "TPL-006", name: "Invoice Ready", type: "Email", trigger: "Invoice Generated", status: "active", lastUsed: "2024-12-13" },
-  { id: "TPL-007", name: "Payment Reminder", type: "SMS", trigger: "Invoice Overdue", status: "active", lastUsed: "2024-12-12" },
-  { id: "TPL-008", name: "Review Request", type: "Email", trigger: "3 Days After Delivery", status: "inactive", lastUsed: "2024-12-10" },
-];
-
-const notificationHistory = [
-  { id: "NOT-9001", recipient: "Grace Wanjiku", type: "SMS", template: "Order Confirmation", status: "completed", sentAt: "2024-12-15 14:30" },
-  { id: "NOT-9002", recipient: "Peter Kamau", type: "SMS", template: "Pickup Reminder", status: "completed", sentAt: "2024-12-15 09:00" },
-  { id: "NOT-9003", recipient: "Mary Njeri", type: "Email", template: "Cleaning Complete", status: "completed", sentAt: "2024-12-14 16:45" },
-  { id: "NOT-9004", recipient: "John Odera", type: "SMS", template: "Payment Reminder", status: "failed", sentAt: "2024-12-14 10:00" },
-  { id: "NOT-9005", recipient: "Sarah Wambui", type: "SMS", template: "Out for Delivery", status: "completed", sentAt: "2024-12-14 08:15" },
-  { id: "NOT-9006", recipient: "David Maina", type: "Email", template: "Invoice Ready", status: "completed", sentAt: "2024-12-13 12:00" },
-];
-
-const templateColumns: Column<(typeof notificationTemplates)[0]>[] = [
-  { key: "name", header: "Template Name", sortable: true },
-  { key: "type", header: "Channel" },
-  { key: "trigger", header: "Trigger" },
-  { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
-  { key: "lastUsed", header: "Last Used", sortable: true },
-];
-
-const historyColumns: Column<(typeof notificationHistory)[0]>[] = [
-  { key: "id", header: "ID" },
-  { key: "recipient", header: "Recipient", sortable: true },
-  { key: "type", header: "Channel" },
-  { key: "template", header: "Template" },
-  { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
-  { key: "sentAt", header: "Sent At", sortable: true },
-];
-
-/**
- * Admin Communications Page
- * Templates, send notification form, and notification history.
- */
 export const Communications = () => {
-  const [channel, setChannel] = useState("sms");
+  const qc = useQueryClient();
+  const [sendForm, setSendForm] = useState({
+    templateId: '',
+    recipientId: '',
+    recipientName: '',
+    recipientContact: '',
+    variables: {} as Record<string, string>,
+  });
+
+  const { data: templates = [], isLoading: templatesLoading } = useQuery({
+    queryKey: ['comm', 'templates'],
+    queryFn: getTemplates,
+  });
+
+  const { data: history = [], isLoading: historyLoading } = useQuery({
+    queryKey: ['comm', 'history'],
+    queryFn: () => getNotificationHistory(),
+  });
+
+  const selectedTemplate = templates.find((t) => t.id === sendForm.templateId);
+
+  const sendMutation = useMutation({
+    mutationFn: () =>
+      sendNotification({
+        templateId: sendForm.templateId,
+        recipientId: sendForm.recipientId,
+        recipientName: sendForm.recipientName,
+        recipientContact: sendForm.recipientContact,
+        variables: sendForm.variables,
+      }),
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success('Notification sent successfully');
+        setSendForm({ templateId: '', recipientId: '', recipientName: '', recipientContact: '', variables: {} });
+        qc.invalidateQueries({ queryKey: ['comm', 'history'] });
+      } else {
+        toast.error(data.error ?? 'Failed to send notification');
+      }
+    },
+  });
+
+  const statusColor = (status: NotificationHistoryEntry['status']) => {
+    if (status === 'delivered') return 'bg-green-100 text-green-800';
+    if (status === 'sent') return 'bg-blue-100 text-blue-800';
+    if (status === 'failed') return 'bg-red-100 text-red-800';
+    return 'bg-gray-100 text-gray-600';
+  };
 
   return (
     <div className="space-y-6">
       <PageHeader title="Communications" description="Manage notification templates and send messages" />
 
-      <Tabs defaultValue="templates" className="space-y-4">
+      <Tabs defaultValue="templates">
         <TabsList>
-          <TabsTrigger value="templates" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Templates
-          </TabsTrigger>
-          <TabsTrigger value="send" className="flex items-center gap-2">
-            <Send className="w-4 h-4" />
-            Send Notification
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            History
-          </TabsTrigger>
+          <TabsTrigger value="templates"><Bell className="w-4 h-4 mr-2" />Templates</TabsTrigger>
+          <TabsTrigger value="send"><Send className="w-4 h-4 mr-2" />Send Notification</TabsTrigger>
+          <TabsTrigger value="history"><History className="w-4 h-4 mr-2" />History</TabsTrigger>
         </TabsList>
 
-        {/* Templates Tab */}
-        <TabsContent value="templates">
-          <DataTable
-            data={notificationTemplates}
-            columns={templateColumns}
-            searchPlaceholder="Search templates..."
-          />
+        <TabsContent value="templates" className="mt-4">
+          {templatesLoading ? (
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {templates.map((t) => (
+                <Card key={t.id}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-semibold">{t.name}</CardTitle>
+                      <Badge variant="outline" className="text-xs capitalize">{t.channel}</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                    {t.variables.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {t.variables.map((v) => (
+                          <Badge key={v} variant="secondary" className="text-xs">{`{{${v}}}`}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
-        {/* Send Notification Tab */}
-        <TabsContent value="send">
-          <Card className="bg-card border-border/50 max-w-2xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-primary" />
-                Send Notification
-              </CardTitle>
-            </CardHeader>
+        <TabsContent value="send" className="mt-4">
+          <Card className="max-w-xl">
+            <CardHeader><CardTitle>Send Notification</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Channel</Label>
-                <Select value={channel} onValueChange={setChannel}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+              <div>
+                <Label>Template</Label>
+                <Select value={sendForm.templateId} onValueChange={(v) => setSendForm({ ...sendForm, templateId: v, variables: {} })}>
+                  <SelectTrigger><SelectValue placeholder="Select template..." /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="sms">SMS</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="push">Push Notification</SelectItem>
+                    {templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name} ({t.channel})</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Recipients</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select audience" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Customers</SelectItem>
-                    <SelectItem value="active">Active Customers</SelectItem>
-                    <SelectItem value="zone-kitengela">Kitengela Zone</SelectItem>
-                    <SelectItem value="zone-athi">Athi River Zone</SelectItem>
-                    <SelectItem value="zone-nairobi">Nairobi Zone</SelectItem>
-                    <SelectItem value="loyalty-gold">Gold & Platinum</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {channel === "email" && (
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Input placeholder="Notification subject line" />
+              <div><Label>Recipient Name</Label><Input value={sendForm.recipientName} onChange={(e) => setSendForm({ ...sendForm, recipientName: e.target.value })} placeholder="Customer name" /></div>
+              <div><Label>Recipient Contact</Label><Input value={sendForm.recipientContact} onChange={(e) => setSendForm({ ...sendForm, recipientContact: e.target.value })} placeholder="+254 7XX or email" /></div>
+              <div><Label>Recipient ID (user UUID)</Label><Input value={sendForm.recipientId} onChange={(e) => setSendForm({ ...sendForm, recipientId: e.target.value })} placeholder="UUID" /></div>
+
+              {selectedTemplate && selectedTemplate.variables.length > 0 && (
+                <div className="space-y-3 border-t pt-3">
+                  <p className="text-sm font-medium">Template Variables</p>
+                  {selectedTemplate.variables.map((v) => (
+                    <div key={v}>
+                      <Label>{v}</Label>
+                      <Input
+                        value={sendForm.variables[v] ?? ''}
+                        onChange={(e) => setSendForm({ ...sendForm, variables: { ...sendForm.variables, [v]: e.target.value } })}
+                        placeholder={`Value for {{${v}}}`}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
-              <div className="space-y-2">
-                <Label>Message</Label>
-                <Textarea placeholder="Type your message..." rows={4} />
-              </div>
-              <Button>
+
+              <Button
+                className="w-full"
+                disabled={!sendForm.templateId || !sendForm.recipientContact || sendMutation.isPending}
+                onClick={() => sendMutation.mutate()}
+              >
                 <Send className="w-4 h-4 mr-2" />
-                Send Notification
+                {sendMutation.isPending ? 'Sending...' : 'Send Notification'}
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* History Tab */}
-        <TabsContent value="history">
-          <DataTable
-            data={notificationHistory}
-            columns={historyColumns}
-            searchPlaceholder="Search notifications..."
-          />
+        <TabsContent value="history" className="mt-4">
+          {historyLoading ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+          ) : (
+            <div className="space-y-2">
+              {history.map((h) => (
+                <Card key={h.id}>
+                  <CardContent className="py-3 flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium">{h.recipientName}</span>
+                        <Badge variant="outline" className="text-xs">{h.channel}</Badge>
+                        <Badge className={`text-xs ${statusColor(h.status)}`}>{h.status}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{h.body}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{new Date(h.sentAt).toLocaleString()}</p>
+                    </div>
+                    {h.status === 'delivered' ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                    ) : h.status === 'failed' ? (
+                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                    ) : null}
+                  </CardContent>
+                </Card>
+              ))}
+              {history.length === 0 && <p className="text-center text-muted-foreground py-12">No notifications sent yet</p>}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
