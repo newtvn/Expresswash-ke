@@ -11,6 +11,7 @@ import {
   Clock,
   Send,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { COMPANY_INFO } from "@/config/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -163,7 +164,10 @@ const Contact = () => {
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
-                        "Sending..."
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Sending...
+                        </>
                       ) : (
                         <>
                           <Send className="w-4 h-4" />
