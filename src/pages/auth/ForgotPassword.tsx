@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +9,7 @@ import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { AuthLayout } from '@/components/auth';
 import { ROUTES } from '@/config/routes';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabase';
 import {
   Form,
   FormControl,
@@ -29,6 +30,7 @@ type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
  * Simple email form that shows success toast.
  */
 export const ForgotPassword = () => {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -40,14 +42,26 @@ export const ForgotPassword = () => {
   const onSubmit = async (values: ForgotPasswordFormValues) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      setSubmitted(true);
-      toast.success('Reset link sent to your email', {
-        description: `We sent a password reset link to ${values.email}`,
+      // Send OTP via Supabase (uses email_otp for password recovery)
+      const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
+        redirectTo: `${window.location.origin}${ROUTES.OTP_VERIFICATION}`,
       });
-    } catch {
-      toast.error('Failed to send reset email. Please try again.');
+
+      if (error) {
+        toast.error(error.message || 'Failed to send reset code');
+        return;
+      }
+
+      // Store email in sessionStorage for OTP verification
+      sessionStorage.setItem('reset_email', values.email);
+
+      setSubmitted(true);
+      toast.success('Verification code sent', {
+        description: `We sent a 6-digit code to ${values.email}`,
+      });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast.error('Failed to send reset code. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -66,7 +66,8 @@ export const Profile = () => {
   };
 
   const handleChangePassword = async () => {
-    if (!passwords.newPassword || !passwords.confirm) {
+    // Validate all fields are filled
+    if (!passwords.current || !passwords.newPassword || !passwords.confirm) {
       toast.error('Please fill in all password fields');
       return;
     }
@@ -78,8 +79,31 @@ export const Profile = () => {
       toast.error('Password must be at least 6 characters');
       return;
     }
+    // Prevent using same password
+    if (passwords.current === passwords.newPassword) {
+      toast.error('New password must be different from current password');
+      return;
+    }
+
     setChangingPassword(true);
     try {
+      // SECURITY: Verify current password by re-authenticating
+      if (!user?.email) {
+        toast.error('User email not found');
+        return;
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: passwords.current,
+      });
+
+      if (signInError) {
+        toast.error('Current password is incorrect');
+        return;
+      }
+
+      // Current password verified, now update to new password
       const { error } = await supabase.auth.updateUser({ password: passwords.newPassword });
       if (error) {
         toast.error(error.message);
@@ -87,6 +111,8 @@ export const Profile = () => {
         toast.success('Password changed successfully');
         setPasswords({ current: '', newPassword: '', confirm: '' });
       }
+    } catch (error) {
+      toast.error('Failed to change password. Please try again.');
     } finally {
       setChangingPassword(false);
     }
@@ -153,6 +179,15 @@ export const Profile = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <Label>Current Password</Label>
+                <Input
+                  type="password"
+                  value={passwords.current}
+                  onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                  placeholder="Enter current password"
+                />
+              </div>
               <div>
                 <Label>New Password</Label>
                 <Input type="password" value={passwords.newPassword} onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })} placeholder="Min 6 characters" />
