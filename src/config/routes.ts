@@ -19,6 +19,7 @@ export const ROUTES = {
 
   // Customer Portal
   CUSTOMER_DASHBOARD: '/portal/dashboard',
+  CUSTOMER_REQUEST_PICKUP: '/portal/request-pickup',
   CUSTOMER_ORDERS: '/portal/orders',
   CUSTOMER_ORDER_DETAILS: '/portal/orders/:id',
   CUSTOMER_FAVORITES: '/portal/favorites',

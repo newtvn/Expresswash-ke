@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Truck,
   Package,
   Heart,
   MapPin,
@@ -37,6 +38,7 @@ import { useAuthStore } from '@/stores/authStore';
 
 const navItems = [
   { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
+  { title: 'Request Pickup', href: '/portal/request-pickup', icon: Truck },
   { title: 'My Orders', href: '/portal/orders', icon: Package },
   { title: 'Favorites', href: '/portal/favorites', icon: Heart },
   { title: 'Addresses', href: '/portal/addresses', icon: MapPin },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,18 +6,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { User, Lock, Bell, Save } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { User, Lock, Bell, Save, Loader2 } from 'lucide-react';
 
 export const Profile = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({
-    name: 'Grace Wanjiku',
-    email: 'grace.wanjiku@email.com',
-    phone: '+254 712 345 678',
-    zone: 'Kitengela',
+    name: '',
+    email: '',
+    phone: '',
+    zone: '',
   });
 
   const [passwords, setPasswords] = useState({
@@ -25,6 +31,7 @@ export const Profile = () => {
     newPassword: '',
     confirm: '',
   });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const [notifications, setNotifications] = useState({
     sms: true,
@@ -32,23 +39,93 @@ export const Profile = () => {
     push: false,
   });
 
-  const handleSaveProfile = () => {
-    toast({ title: 'Profile Updated', description: 'Your profile has been saved successfully.' });
+  // Load profile from Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+    supabase
+      .from('profiles')
+      .select('name, email, phone, zone')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setProfile({
+            name: data.name ?? '',
+            email: data.email ?? '',
+            phone: data.phone ?? '',
+            zone: data.zone ?? '',
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [user?.id]);
+
+  const handleSaveProfile = async () => {
+    if (!user?.id) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        name: profile.name,
+        phone: profile.phone,
+        zone: profile.zone,
+      })
+      .eq('id', user.id);
+
+    setSaving(false);
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to update profile.', variant: 'destructive' });
+    } else {
+      toast({ title: 'Profile Updated', description: 'Your profile has been saved successfully.' });
+    }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!passwords.current || !passwords.newPassword || !passwords.confirm) return;
     if (passwords.newPassword !== passwords.confirm) {
       toast({ title: 'Error', description: 'New passwords do not match.', variant: 'destructive' });
       return;
     }
-    toast({ title: 'Password Changed', description: 'Your password has been updated successfully.' });
-    setPasswords({ current: '', newPassword: '', confirm: '' });
+    if (passwords.newPassword.length < 6) {
+      toast({ title: 'Error', description: 'Password must be at least 6 characters.', variant: 'destructive' });
+      return;
+    }
+
+    setChangingPassword(true);
+    const { error } = await supabase.auth.updateUser({
+      password: passwords.newPassword,
+    });
+    setChangingPassword(false);
+
+    if (error) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Password Changed', description: 'Your password has been updated successfully.' });
+      setPasswords({ current: '', newPassword: '', confirm: '' });
+    }
   };
 
   const handleSaveNotifications = () => {
     toast({ title: 'Preferences Saved', description: 'Notification preferences updated.' });
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Profile Settings" description="Manage your account information and preferences" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -100,8 +177,12 @@ export const Profile = () => {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleSaveProfile}>
-              <Save className="mr-2 h-4 w-4" />
+            <Button onClick={handleSaveProfile} disabled={saving}>
+              {saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
               Save Profile
             </Button>
           </CardContent>
@@ -144,7 +225,8 @@ export const Profile = () => {
                   onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
                 />
               </div>
-              <Button variant="outline" onClick={handleChangePassword}>
+              <Button variant="outline" onClick={handleChangePassword} disabled={changingPassword}>
+                {changingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update Password
               </Button>
             </CardContent>

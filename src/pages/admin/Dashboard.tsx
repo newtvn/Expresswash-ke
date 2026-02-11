@@ -1,52 +1,149 @@
-import { PageHeader, KPICard, DataTable, StatusBadge } from '@/components/shared';
-import type { Column } from '@/components/shared';
+import { useState, useEffect } from 'react';
+import { PageHeader, KPICard } from '@/components/shared';
 import { SalesChart, OrderStatusPieChart } from '@/components/reports';
 import { RecentOrdersTable } from '@/components/admin';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   ShoppingCart,
   Users,
   DollarSign,
   Star,
 } from 'lucide-react';
+import { getKPIs, getSalesReport } from '@/services/reportService';
+import { getOrders } from '@/services/orderService';
+import type { KPIData, SalesReportData, Order } from '@/types';
+import type { LucideIcon } from 'lucide-react';
 
-const kpis = [
-  { label: 'Total Revenue', value: 2450000, change: 12.5, changeDirection: 'up' as const, icon: DollarSign, format: 'currency' as const },
-  { label: 'Active Orders', value: 187, change: 8.2, changeDirection: 'up' as const, icon: ShoppingCart, format: 'number' as const },
-  { label: 'Total Customers', value: 1243, change: 5.1, changeDirection: 'up' as const, icon: Users, format: 'number' as const },
-  { label: 'Avg Rating', value: '4.7', change: 0.3, changeDirection: 'up' as const, format: 'number' as const, icon: Star },
-];
+// Map KPI labels to icons
+const kpiIconMap: Record<string, LucideIcon> = {
+  'Total Revenue': DollarSign,
+  'Active Orders': ShoppingCart,
+  'Total Customers': Users,
+  'Avg Rating': Star,
+};
 
-const mockSalesData = [
-  { date: 'Jan', orders: 120, revenue: 340000, avgOrderValue: 2833 },
-  { date: 'Feb', orders: 145, revenue: 410000, avgOrderValue: 2827 },
-  { date: 'Mar', orders: 165, revenue: 480000, avgOrderValue: 2909 },
-  { date: 'Apr', orders: 138, revenue: 390000, avgOrderValue: 2826 },
-  { date: 'May', orders: 178, revenue: 520000, avgOrderValue: 2921 },
-  { date: 'Jun', orders: 195, revenue: 570000, avgOrderValue: 2923 },
-];
+// Status labels for the order status breakdown
+const statusLabels: Record<number, string> = {
+  0: 'Cancelled',
+  1: 'Pending',
+  2: 'Driver Assigned',
+  3: 'Picked Up',
+  4: 'At Warehouse',
+  5: 'Processing',
+  6: 'Quality Check',
+  7: 'Ready for Delivery',
+  8: 'Out for Delivery',
+  9: 'Delivered',
+};
 
-const mockOrderStatusData = [
-  { status: 'Pending', count: 24 },
-  { status: 'In Washing', count: 38 },
-  { status: 'Drying', count: 22 },
-  { status: 'Delivered', count: 85 },
-  { status: 'Dispatched', count: 18 },
-];
+// Colors for the pie chart slices
+const statusColors: Record<number, string> = {
+  0: '#ef4444',
+  1: '#f59e0b',
+  2: '#3b82f6',
+  3: '#8b5cf6',
+  4: '#06b6d4',
+  5: '#0d9488',
+  6: '#14b8a6',
+  7: '#10b981',
+  8: '#0891b2',
+  9: '#22c55e',
+};
 
-const mockRecentOrders = [
-  { trackingCode: 'EW-2024-001', customerName: 'Grace Wanjiku', items: [{ name: 'Carpet 5x8', quantity: 2 }], status: 6, pickupDate: '2024-12-20', estimatedDelivery: '2024-12-23', zone: 'Kitengela', amount: 4500 },
-  { trackingCode: 'EW-2024-002', customerName: 'John Kamau', items: [{ name: 'Sofa Set', quantity: 1 }, { name: 'Curtains', quantity: 3 }], status: 9, pickupDate: '2024-12-19', estimatedDelivery: '2024-12-22', zone: 'Syokimau', amount: 8200 },
-  { trackingCode: 'EW-2024-003', customerName: 'Mary Njeri', items: [{ name: 'Carpet 6x9', quantity: 1 }], status: 12, pickupDate: '2024-12-18', estimatedDelivery: '2024-12-21', zone: 'Athi River', amount: 3500 },
-  { trackingCode: 'EW-2024-004', customerName: 'Peter Ochieng', items: [{ name: 'Duvet', quantity: 2 }], status: 3, pickupDate: '2024-12-20', estimatedDelivery: '2024-12-24', zone: 'Kitengela', amount: 2800 },
-  { trackingCode: 'EW-2024-005', customerName: 'Alice Wambui', items: [{ name: 'Car Seat Covers', quantity: 4 }], status: 1, pickupDate: '2024-12-21', estimatedDelivery: '2024-12-25', zone: 'Syokimau', amount: 6000 },
-];
+/**
+ * Derive order status distribution from an array of orders.
+ */
+function deriveOrderStatusData(orders: Order[]) {
+  const counts: Record<number, number> = {};
+  for (const order of orders) {
+    counts[order.status] = (counts[order.status] || 0) + 1;
+  }
+  return Object.entries(counts).map(([statusKey, count]) => {
+    const status = Number(statusKey);
+    return {
+      status: statusLabels[status] ?? `Status ${status}`,
+      count,
+      color: statusColors[status] ?? '#94a3b8',
+    };
+  });
+}
 
 /**
  * Admin Dashboard
  * KPI cards, SalesChart, OrderStatusPieChart, and RecentOrdersTable.
+ * All data is fetched from Supabase via service functions.
  */
 export const Dashboard = () => {
+  const [kpis, setKpis] = useState<KPIData[]>([]);
+  const [salesData, setSalesData] = useState<SalesReportData[]>([]);
+  const [recentOrders, setRecentOrders] = useState<(Order & { amount?: number })[]>([]);
+  const [orderStatusData, setOrderStatusData] = useState<
+    { status: string; count: number; color: string }[]
+  >([]);
+
+  const [kpisLoading, setKpisLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
+  // Fetch KPIs
+  useEffect(() => {
+    let cancelled = false;
+    const fetchKPIs = async () => {
+      try {
+        const data = await getKPIs();
+        if (!cancelled) setKpis(data);
+      } catch {
+        // silently handle errors; KPI cards will show empty
+      } finally {
+        if (!cancelled) setKpisLoading(false);
+      }
+    };
+    fetchKPIs();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch sales report
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSales = async () => {
+      try {
+        const data = await getSalesReport();
+        if (!cancelled) setSalesData(data);
+      } catch {
+        // silently handle errors; chart will show empty state
+      } finally {
+        if (!cancelled) setSalesLoading(false);
+      }
+    };
+    fetchSales();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch recent orders (also used to derive order status distribution)
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOrders = async () => {
+      try {
+        const response = await getOrders({ page: 1, limit: 5 });
+        if (!cancelled) {
+          const ordersWithAmount = response.data.map((order) => ({
+            ...order,
+            amount: order.total,
+          }));
+          setRecentOrders(ordersWithAmount);
+          setOrderStatusData(deriveOrderStatusData(response.data));
+        }
+      } catch {
+        // silently handle errors; table will show empty state
+      } finally {
+        if (!cancelled) setOrdersLoading(false);
+      }
+    };
+    fetchOrders();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -56,19 +153,73 @@ export const Dashboard = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((kpi) => (
-          <KPICard key={kpi.label} {...kpi} />
-        ))}
+        {kpisLoading
+          ? Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i} className="bg-card border-border/50">
+                <CardContent className="p-6 space-y-3">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-8 w-32" />
+                  <Skeleton className="h-4 w-20" />
+                </CardContent>
+              </Card>
+            ))
+          : kpis.map((kpi) => (
+              <KPICard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                change={kpi.change}
+                changeDirection={kpi.changeDirection}
+                format={kpi.format}
+                icon={kpiIconMap[kpi.label]}
+              />
+            ))}
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart data={mockSalesData} />
-        <OrderStatusPieChart data={mockOrderStatusData} />
+        {salesLoading ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Sales Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[350px] w-full" />
+            </CardContent>
+          </Card>
+        ) : (
+          <SalesChart data={salesData} />
+        )}
+
+        {ordersLoading ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Order Status Distribution</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[380px] w-full" />
+            </CardContent>
+          </Card>
+        ) : (
+          <OrderStatusPieChart data={orderStatusData} />
+        )}
       </div>
 
       {/* Recent Orders */}
-      <RecentOrdersTable orders={mockRecentOrders} />
+      {ordersLoading ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent Orders</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : (
+        <RecentOrdersTable orders={recentOrders} />
+      )}
     </div>
   );
 };

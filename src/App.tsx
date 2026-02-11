@@ -49,6 +49,7 @@ const SystemLogs = lazy(() => import('@/pages/admin/SystemLogs'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
+const RequestPickup = lazy(() => import('@/pages/customer/RequestPickup'));
 const OrderHistory = lazy(() => import('@/pages/customer/OrderHistory'));
 const OrderDetails = lazy(() => import('@/pages/customer/OrderDetails'));
 const FavoriteItems = lazy(() => import('@/pages/customer/FavoriteItems'));
@@ -155,6 +156,7 @@ const App = () => (
             >
               <Route index element={<Navigate to="/portal/dashboard" replace />} />
               <Route path="dashboard" element={<CustomerDashboard />} />
+              <Route path="request-pickup" element={<RequestPickup />} />
               <Route path="orders" element={<OrderHistory />} />
               <Route path="orders/:id" element={<OrderDetails />} />
               <Route path="favorites" element={<FavoriteItems />} />

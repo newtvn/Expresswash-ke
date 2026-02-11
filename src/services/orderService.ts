@@ -1,25 +1,68 @@
 import { supabase } from '@/lib/supabase';
-import { Order, TrackingResponse, PaginatedResponse } from '@/types';
+import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
 
 export interface OrderListFilters {
   status?: number;
   zone?: string;
   search?: string;
+  customerId?: string;
   page: number;
   limit: number;
 }
 
+export interface PickupRequestItem {
+  name: string;
+  itemType: string;
+  quantity: number;
+  lengthInches: number;
+  widthInches: number;
+  pricePerSqInch: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+export interface CreateOrderPayload {
+  customerId: string;
+  customerName: string;
+  zone: string;
+  pickupAddress: string;
+  pickupDate: string;
+  items: PickupRequestItem[];
+  subtotal: number;
+  deliveryFee: number;
+  vat: number;
+  total: number;
+  notes?: string;
+}
+
 function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]): Order {
   return {
+    id: row.id as string,
     trackingCode: row.tracking_code as string,
+    customerId: row.customer_id as string,
     customerName: row.customer_name as string,
     status: row.status as number,
-    items: items.map((i) => ({ name: i.name as string, quantity: i.quantity as number })),
+    items: items.map((i) => ({
+      name: i.name as string,
+      quantity: i.quantity as number,
+      itemType: (i.item_type as string) ?? undefined,
+      lengthInches: (i.length_inches as number) ?? undefined,
+      widthInches: (i.width_inches as number) ?? undefined,
+      unitPrice: (i.unit_price as number) ?? undefined,
+      totalPrice: (i.total_price as number) ?? undefined,
+    })),
     pickupDate: row.pickup_date as string,
     estimatedDelivery: row.estimated_delivery as string,
     zone: row.zone as string,
+    pickupAddress: (row.pickup_address as string) ?? undefined,
+    subtotal: (row.subtotal as number) ?? undefined,
+    deliveryFee: (row.delivery_fee as number) ?? undefined,
+    vat: (row.vat as number) ?? undefined,
+    total: (row.total as number) ?? undefined,
+    notes: (row.notes as string) ?? undefined,
     driverName: (row.driver_name as string) ?? undefined,
     driverPhone: (row.driver_phone as string) ?? undefined,
+    createdAt: (row.created_at as string) ?? undefined,
   };
 }
 
@@ -49,6 +92,9 @@ export const getOrders = async (
 
   if (filters.status !== undefined) {
     query = query.eq('status', filters.status);
+  }
+  if (filters.customerId) {
+    query = query.eq('customer_id', filters.customerId);
   }
   if (filters.zone) {
     query = query.ilike('zone', filters.zone);
@@ -151,4 +197,152 @@ export const cancelOrder = async (
 
   if (error) return { success: false, message: 'Failed to cancel order' };
   return { success: true, message: 'Order cancelled successfully' };
+};
+
+// Generate a unique tracking code
+function generateTrackingCode(): string {
+  const year = new Date().getFullYear();
+  const random = Math.floor(10000 + Math.random() * 90000);
+  return `EW-${year}-${random}`;
+}
+
+// Calculate ETA based on zone
+export function calculateETA(zone: string): { label: string; date: string } {
+  const now = new Date();
+  let daysToAdd = 2; // default
+  let label = '2-3 Business Days';
+
+  const z = zone.toLowerCase();
+  if (z.includes('kitengela')) {
+    daysToAdd = 1;
+    label = 'Same Day / Next Day';
+  } else if (z.includes('athi river') || z.includes('syokimau')) {
+    daysToAdd = 1;
+    label = 'Same Day / Next Day';
+  } else if (z.includes('nairobi')) {
+    daysToAdd = 2;
+    label = '1-2 Business Days';
+  } else {
+    daysToAdd = 3;
+    label = '2-3 Business Days';
+  }
+
+  const eta = new Date(now);
+  eta.setDate(eta.getDate() + daysToAdd);
+  // Skip weekends
+  while (eta.getDay() === 0 || eta.getDay() === 6) {
+    eta.setDate(eta.getDate() + 1);
+  }
+
+  return { label, date: eta.toISOString().split('T')[0] };
+}
+
+// Pricing constants
+export const PRICING = {
+  pricePerSqInch: {
+    carpet: 0.35,
+    rug: 0.40,
+    curtain: 0.30,
+    sofa: 0.50,
+    mattress: 0.25,
+    chair: 0.45,
+    pillow: 0.20,
+    other: 0.35,
+  } as Record<string, number>,
+  deliveryFees: {
+    kitengela: 300,
+    'athi river': 300,
+    syokimau: 350,
+    nairobi: 500,
+    other: 600,
+  } as Record<string, number>,
+  vatRate: 0.16,
+  minimumOrder: 500,
+};
+
+export function getDeliveryFee(zone: string): number {
+  const z = zone.toLowerCase();
+  for (const [key, fee] of Object.entries(PRICING.deliveryFees)) {
+    if (z.includes(key)) return fee;
+  }
+  return PRICING.deliveryFees.other;
+}
+
+export function getPricePerSqInch(itemType: string): number {
+  const t = itemType.toLowerCase();
+  return PRICING.pricePerSqInch[t] ?? PRICING.pricePerSqInch.other;
+}
+
+export function calculateItemPrice(
+  itemType: string,
+  lengthInches: number,
+  widthInches: number,
+  quantity: number,
+): { sqInches: number; pricePerSqInch: number; unitPrice: number; totalPrice: number } {
+  const sqInches = lengthInches * widthInches;
+  const pricePerSqInch = getPricePerSqInch(itemType);
+  const unitPrice = Math.round(sqInches * pricePerSqInch);
+  const totalPrice = unitPrice * quantity;
+  return { sqInches, pricePerSqInch, unitPrice, totalPrice };
+}
+
+export const createOrder = async (
+  payload: CreateOrderPayload,
+): Promise<{ success: boolean; order?: Order; error?: string }> => {
+  const trackingCode = generateTrackingCode();
+  const eta = calculateETA(payload.zone);
+
+  const { data: inserted, error } = await supabase
+    .from('orders')
+    .insert({
+      tracking_code: trackingCode,
+      customer_id: payload.customerId,
+      customer_name: payload.customerName,
+      status: 1, // pending
+      pickup_date: payload.pickupDate,
+      estimated_delivery: eta.date,
+      zone: payload.zone,
+      pickup_address: payload.pickupAddress,
+      subtotal: payload.subtotal,
+      delivery_fee: payload.deliveryFee,
+      vat: payload.vat,
+      total: payload.total,
+      notes: payload.notes ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !inserted) {
+    return { success: false, error: error?.message ?? 'Failed to create order' };
+  }
+
+  // Insert order items with dimensions
+  if (payload.items.length > 0) {
+    const { error: itemsError } = await supabase.from('order_items').insert(
+      payload.items.map((item) => ({
+        order_id: inserted.id,
+        name: item.name,
+        quantity: item.quantity,
+        item_type: item.itemType,
+        length_inches: item.lengthInches,
+        width_inches: item.widthInches,
+        unit_price: item.unitPrice,
+        total_price: item.totalPrice,
+      })),
+    );
+
+    if (itemsError) {
+      return { success: false, error: 'Order created but items failed to save' };
+    }
+  }
+
+  const order = await getOrderById(trackingCode);
+  return { success: true, order: order ?? undefined };
+};
+
+export const getOrdersByCustomer = async (
+  customerId: string,
+  filters: Omit<OrderListFilters, 'customerId'> = { page: 1, limit: 20 },
+): Promise<PaginatedResponse<Order>> => {
+  return getOrders({ ...filters, customerId });
 };
