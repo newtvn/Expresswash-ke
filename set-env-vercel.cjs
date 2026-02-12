@@ -110,7 +110,7 @@ async function main() {
     await setEnvVar(
       project.id,
       'VITE_SUPABASE_URL',
-      'https://airzodpllaouvntzqki.supabase.co'
+      'https://airzodpllaoeuvntzqki.supabase.co'
     );
     console.log('✅ VITE_SUPABASE_URL set successfully');
 

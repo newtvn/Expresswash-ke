@@ -28,7 +28,7 @@ curl -X POST "https://api.vercel.com/v10/projects/${PROJECT_NAME}/env" \
   -H "Content-Type: application/json" \
   -d '{
     "key": "VITE_SUPABASE_URL",
-    "value": "https://airzodpllaouvntzqki.supabase.co",
+    "value": "https://airzodpllaoeuvntzqki.supabase.co",
     "type": "plain",
     "target": ["production", "preview", "development"]
   }'
