@@ -1,9 +1,7 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Sparkles, LogOut } from 'lucide-react';
+import { Outlet, NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@/components/ui/button';
-import { PageErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { LayoutHeader } from '@/components/layout/LayoutHeader';
 
 const tabItems = [
   { name: 'Intake', href: '/warehouse' },
@@ -13,40 +11,11 @@ const tabItems = [
 ];
 
 const WarehouseLayout = () => {
-  const { user, clearAuth } = useAuthStore();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    clearAuth();
-    navigate('/auth/signin');
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-background">
-        <div className="flex h-14 items-center justify-between px-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">
-              Express<span className="text-primary">Wash</span>
-            </span>
-            <span className="text-sm text-muted-foreground ml-2 hidden sm:inline">
-              Warehouse
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              {user?.name}
-            </span>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-4 w-4" />
-              <span className="sr-only">Logout</span>
-            </Button>
-          </div>
-        </div>
+        <LayoutHeader subtitle="Warehouse" />
 
         {/* Horizontal Tabs */}
         <div className="flex items-center gap-0 px-6 border-t">
@@ -72,9 +41,9 @@ const WarehouseLayout = () => {
 
       {/* Main Content */}
       <main className="flex-1 p-6">
-        <PageErrorBoundary fallbackTitle="Warehouse Page Error">
+        <ErrorBoundary fullPage={true} showHomeButton={true} fallbackTitle="Warehouse Page Error">
           <Outlet />
-        </PageErrorBoundary>
+        </ErrorBoundary>
       </main>
     </div>
   );

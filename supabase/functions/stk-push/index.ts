@@ -24,12 +24,14 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { logger } from '../_shared/logger.ts';
+import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from '../_shared/rateLimiter.ts';
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 
-const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://api.co-opbank.co.ke';
+const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://api.creditbank.co.ke';
 const BANK_CONSUMER_KEY = Deno.env.get('BANK_CONSUMER_KEY');
 const BANK_CONSUMER_SECRET = Deno.env.get('BANK_CONSUMER_SECRET');
 const CALLBACK_BASE_URL = Deno.env.get('CALLBACK_BASE_URL');
@@ -77,17 +79,17 @@ function isValidPhoneNumber(phone: string): boolean {
 }
 
 /**
- * Get access token from Co-op Bank API
+ * Get access token from Credit Bank API
  * Uses caching to avoid unnecessary API calls
  */
 async function getAccessToken(): Promise<string> {
   // Return cached token if still valid
   if (cachedToken && Date.now() < tokenExpiry) {
-    console.log('Using cached access token');
+    logger.debug('Using cached access token');
     return cachedToken;
   }
 
-  console.log('Requesting new access token');
+  logger.debug('Requesting new access token');
 
   if (!BANK_CONSUMER_KEY || !BANK_CONSUMER_SECRET) {
     throw new Error('Bank API credentials not configured');
@@ -109,7 +111,7 @@ async function getAccessToken(): Promise<string> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Token request failed:', response.status, errorText);
+    logger.error('Token request failed', { status: response.status, error: errorText });
     throw new Error(`Failed to get access token: ${response.statusText}`);
   }
 
@@ -119,37 +121,41 @@ async function getAccessToken(): Promise<string> {
   cachedToken = data.access_token;
   tokenExpiry = Date.now() + ((data.expires_in - 60) * 1000);
 
-  console.log('Access token obtained, expires in', data.expires_in, 'seconds');
+  logger.info('Access token obtained', { expiresIn: data.expires_in });
 
   return cachedToken;
 }
 
 /**
- * Initiate STK Push with Co-op Bank API
+ * Initiate STK Push with Credit Bank API
+ * Endpoint: POST /safaricom-stkpush
  */
 async function initiateSTKPush(
   phoneNumber: string,
   amount: number,
-  accountReference: string,
-  transactionDesc: string,
+  reference: string,
+  narration: string,
 ): Promise<any> {
   const accessToken = await getAccessToken();
 
   const requestBody = {
     phoneNumber: phoneNumber,
-    amount: amount.toFixed(2),
-    accountReference: accountReference,
-    transactionDesc: transactionDesc,
+    amount: amount.toString(),
+    reference: reference,
+    countryCode: 'KE',
+    narration: narration,
     callbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
+    errorCallbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
   };
 
-  console.log('Initiating STK Push:', {
-    phoneNumber,
-    amount: requestBody.amount,
-    accountReference,
+  // Log with PII masked
+  logger.info('Initiating STK Push', {
+    phoneNumber,  // Will be masked automatically
+    amount: requestBody.amount,  // Will be masked automatically
+    reference,
   });
 
-  const response = await fetch(`${BANK_API_URL}/v1/payment/stk-push`, {
+  const response = await fetch(`${BANK_API_URL}/safaricom-stkpush`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -160,12 +166,12 @@ async function initiateSTKPush(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('STK Push failed:', response.status, errorText);
+    logger.error('STK Push failed', { status: response.status, error: errorText });
     throw new Error(`STK Push request failed: ${response.statusText}`);
   }
 
   const data = await response.json();
-  console.log('STK Push response:', data);
+  logger.info('STK Push response received', { hasData: !!data });
 
   return data;
 }
@@ -180,11 +186,18 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Rate limiting: 3 payment requests per minute per IP
+  const rateLimitResult = checkRateLimit(req, RATE_LIMITS.PAYMENT);
+  if (!rateLimitResult.allowed) {
+    logger.warn('Rate limit exceeded for STK Push');
+    return createRateLimitResponse(rateLimitResult, corsHeaders);
+  }
+
   try {
     // Parse request body
     const { phoneNumber, amount, orderId, description } = await req.json();
 
-    console.log('STK Push request received:', { phoneNumber, amount, orderId });
+    logger.info('STK Push request received', { phoneNumber, amount, orderId });
 
     // Validate inputs
     if (!phoneNumber || !amount || !orderId) {
@@ -280,7 +293,7 @@ serve(async (req) => {
       formattedPhone,
       amount,
       orderId,
-      description || `ExpressWash Order #${order.tracking_code}`,
+      description || `ExpressWash Order ${order.tracking_code}`,
     );
 
     // Save payment record to database
@@ -299,7 +312,7 @@ serve(async (req) => {
       });
 
     if (paymentError) {
-      console.error('Failed to save payment record:', paymentError);
+      logger.error('Failed to save payment record', { error: paymentError.message });
       // Continue anyway - payment was initiated
     }
 
@@ -318,12 +331,12 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('STK Push error:', error);
+    logger.error('STK Push error', { error: error instanceof Error ? error.message : 'Unknown error' });
 
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'An unexpected error occurred',
+        error: error instanceof Error ? error.message : 'An unexpected error occurred',
       }),
       {
         status: 500,

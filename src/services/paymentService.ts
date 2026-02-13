@@ -28,7 +28,7 @@ import type {
 // CONFIGURATION
 // ============================================================
 
-const BANK_API_BASE_URL = import.meta.env.VITE_BANK_API_URL || 'https://api.co-opbank.co.ke';
+const BANK_API_BASE_URL = import.meta.env.VITE_BANK_API_URL || 'https://api.creditbank.co.ke';
 const BANK_CONSUMER_KEY = import.meta.env.VITE_BANK_CONSUMER_KEY;
 const BANK_CONSUMER_SECRET = import.meta.env.VITE_BANK_CONSUMER_SECRET;
 const BANK_ACCOUNT_NUMBER = import.meta.env.VITE_BANK_ACCOUNT_NUMBER;
@@ -66,14 +66,12 @@ async function getBankAccessToken(): Promise<string | null> {
     });
 
     if (!response.ok) {
-      console.error('Failed to get access token:', response.statusText);
       return null;
     }
 
     const data = await response.json();
     return data.access_token;
   } catch (error) {
-    console.error('Error getting access token:', error);
     return null;
   }
 }
@@ -153,9 +151,9 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       };
     }
 
-    // Call bank STK Push API
-    // Endpoint format based on common Co-op Bank API structure
-    const response = await fetch(`${BANK_API_BASE_URL}/v1/payment/stk-push`, {
+    // Call Credit Bank STK Push API
+    // NOTE: For production, use Supabase Edge Function instead (see supabase/functions/stk-push)
+    const response = await fetch(`${BANK_API_BASE_URL}/safaricom-stkpush`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -163,10 +161,12 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       },
       body: JSON.stringify({
         phoneNumber: phoneNumber,
-        amount: request.amount.toFixed(2),
-        accountReference: request.accountReference,
-        transactionDesc: request.transactionDesc,
+        amount: request.amount.toString(),
+        reference: request.accountReference,
+        countryCode: 'KE',
+        narration: request.transactionDesc,
         callbackUrl: request.callbackUrl || PAYMENT_CALLBACK_URL,
+        errorCallbackUrl: request.callbackUrl || PAYMENT_CALLBACK_URL,
       }),
     });
 
@@ -200,7 +200,6 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       customerMessage: data.customerMessage || 'Please check your phone and enter your M-Pesa PIN',
     };
   } catch (error) {
-    console.error('STK Push error:', error);
     return {
       success: false,
       errorMessage: 'An unexpected error occurred. Please try again.',
@@ -275,7 +274,6 @@ export async function queryPaymentStatus(request: PaymentQueryRequest): Promise<
       mpesaReceiptNumber: data.mpesaReceiptNumber,
     };
   } catch (error) {
-    console.error('Payment query error:', error);
     return {
       success: false,
       status: 'failed',
@@ -335,7 +333,6 @@ export async function generateQRCode(request: QRCodeRequest): Promise<QRCodeResp
       referenceNumber: data.referenceNumber,
     };
   } catch (error) {
-    console.error('QR Code generation error:', error);
     return {
       success: false,
       errorMessage: 'Failed to generate QR code',

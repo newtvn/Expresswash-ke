@@ -70,7 +70,6 @@ export async function getHolidays(year?: number): Promise<Holiday[]> {
       createdAt: row.created_at as string,
     }));
   } catch (error) {
-    console.error('Failed to fetch holidays:', error);
     return [];
   }
 }

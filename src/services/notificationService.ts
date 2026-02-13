@@ -133,7 +133,6 @@ export async function createNotification(
       },
     };
   } catch (error) {
-    console.error('Failed to create notification:', error);
     return { success: false };
   }
 }
@@ -197,7 +196,6 @@ export async function getUserNotifications(
       createdAt: row.created_at as string,
     }));
   } catch (error) {
-    console.error('Failed to fetch notifications:', error);
     return [];
   }
 }

@@ -11,9 +11,9 @@ const AdminLayout = () => {
       <SidebarInset>
         <AdminTopBar />
         <div className="flex-1 p-6">
-          <PageErrorBoundary fallbackTitle="Admin Page Error">
+          <ErrorBoundary fullPage={true} showHomeButton={true} fallbackTitle="Admin Page Error">
             <Outlet />
-          </PageErrorBoundary>
+          </ErrorBoundary>
         </div>
       </SidebarInset>
     </SidebarProvider>

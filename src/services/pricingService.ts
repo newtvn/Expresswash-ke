@@ -137,7 +137,6 @@ export async function updatePricingConfig(
       created_at: new Date().toISOString(),
     }).catch(() => {
       // Non-critical, log silently
-      console.warn('Failed to create audit log for pricing update');
     });
 
     return { success: true, message: 'Pricing configuration updated successfully' };

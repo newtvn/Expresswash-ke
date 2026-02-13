@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
@@ -50,22 +50,22 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const clearTimeouts = () => {
+  const clearTimeouts = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current);
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-  };
+  }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     clearTimeouts();
     clearAuth();
     setShowWarning(false);
     navigate('/auth/signin');
     toast.info('You have been logged out due to inactivity');
     options.onTimeout?.();
-  };
+  }, [clearTimeouts, clearAuth, navigate, options]);
 
-  const resetTimer = () => {
+  const resetTimer = useCallback(() => {
     clearTimeouts();
     setShowWarning(false);
     setRemainingTime(timeoutMinutes * 60);
@@ -99,7 +99,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
           duration: warningMinutes * 60 * 1000,
           action: {
             label: 'Stay Logged In',
-            onClick: resetTimer,
+            onClick: () => resetTimer(), // Wrap in arrow function to avoid stale closure
           },
         }
       );
@@ -107,12 +107,12 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
 
     // Set logout timeout
     timeoutRef.current = setTimeout(handleLogout, timeoutMs);
-  };
+  }, [clearTimeouts, timeoutMinutes, warningMinutes, isAuthenticated, handleLogout, options]);
 
-  const dismissWarning = () => {
+  const dismissWarning = useCallback(() => {
     setShowWarning(false);
     resetTimer();
-  };
+  }, [resetTimer]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -123,6 +123,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     // Events that count as user activity
     const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
+    // Stable handler wrapped in useCallback
     const handleActivity = () => {
       resetTimer();
     };
@@ -141,7 +142,7 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
         window.removeEventListener(event, handleActivity);
       });
     };
-  }, [isAuthenticated, timeoutMinutes]);
+  }, [isAuthenticated, resetTimer, clearTimeouts]);
 
   return {
     showWarning,
