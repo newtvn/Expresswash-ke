@@ -3,6 +3,8 @@
  * Provides validation functions for user inputs across the application
  */
 
+import DOMPurify from 'isomorphic-dompurify';
+
 const MAX_LENGTHS = {
   HOLIDAY_NAME: 100,
   ITEM_NAME: 200,
@@ -14,11 +16,34 @@ const MAX_LENGTHS = {
 
 /**
  * Sanitize string input to prevent XSS
+ * Uses DOMPurify for industry-standard HTML sanitization
  */
 export function sanitizeString(input: string): string {
-  return input
-    .replace(/[<>]/g, '') // Remove angle brackets
-    .trim();
+  if (!input) return '';
+
+  // Remove all HTML tags and potentially malicious content
+  const clean = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [], // No HTML attributes allowed
+    KEEP_CONTENT: true, // Keep text content
+  });
+
+  return clean.trim();
+}
+
+/**
+ * Sanitize HTML content (for rich text fields)
+ * Allows safe HTML tags only
+ */
+export function sanitizeHTML(input: string): string {
+  if (!input) return '';
+
+  // Allow only safe HTML tags
+  return DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: ['p', 'br', 'b', 'i', 'u', 'strong', 'em', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: [], // No attributes to prevent event handlers
+    KEEP_CONTENT: true,
+  });
 }
 
 /**

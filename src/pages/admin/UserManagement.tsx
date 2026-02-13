@@ -41,10 +41,13 @@ export const UserManagement = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [page, setPage] = useState(1);
+  const USERS_PER_PAGE = 20;
 
   const { data: allResult, isLoading } = useQuery({
-    queryKey: ['admin', 'users', search],
-    queryFn: () => getUsers({ page: 1, limit: 200, search: search || undefined }),
+    queryKey: ['admin', 'users', { search, page }],
+    queryFn: () => getUsers({ page, limit: USERS_PER_PAGE, search: search || undefined }),
+    keepPreviousData: true, // Smooth pagination UX
   });
 
   const toggleMutation = useMutation({
@@ -216,7 +219,10 @@ export const UserManagement = () => {
       </PageHeader>
 
       <SearchInput
-        onSearch={useCallback((v: string) => setSearch(v), [])}
+        onSearch={useCallback((v: string) => {
+          setSearch(v);
+          setPage(1); // Reset to page 1 on new search
+        }, [])}
         placeholder="Search by name, email, or phone..."
         className="max-w-sm"
       />
@@ -242,6 +248,36 @@ export const UserManagement = () => {
             />
           </TabsContent>
         </Tabs>
+      )}
+
+      {/* Pagination Controls */}
+      {!isLoading && allResult && (
+        <div className="flex items-center justify-between border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {((page - 1) * USERS_PER_PAGE) + 1} to {Math.min(page * USERS_PER_PAGE, allResult.total)} of {allResult.total} users
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-2 px-3">
+              <span className="text-sm">Page {page} of {Math.ceil(allResult.total / USERS_PER_PAGE)}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={page >= Math.ceil(allResult.total / USERS_PER_PAGE)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Edit Role Dialog */}

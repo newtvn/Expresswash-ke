@@ -25,6 +25,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { logger } from '../_shared/logger.ts';
 
 // ============================================================
 // CONFIGURATION
@@ -160,27 +161,28 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Payment callback received');
+    logger.info('Payment callback received');
 
     // Validate callback (optional security check)
     if (!validateCallback(req)) {
-      console.warn('Callback validation failed');
+      logger.warn('Callback validation failed');
       // Still process to avoid payment issues, but log warning
     }
 
     // Parse callback data
     const callback = await req.json();
-    console.log('Callback data:', {
+    // Log with PII automatically masked
+    logger.info('Callback data received', {
       checkoutRequestId: callback.checkoutRequestId,
       resultCode: callback.resultCode,
       resultDesc: callback.resultDesc,
-      amount: callback.amount,
-      mpesaReceiptNumber: callback.mpesaReceiptNumber,
+      amount: callback.amount,  // Will be masked
+      mpesaReceiptNumber: callback.mpesaReceiptNumber,  // Will be masked
     });
 
     // Validate required fields
     if (!callback.checkoutRequestId || callback.resultCode === undefined) {
-      console.error('Invalid callback data:', callback);
+      logger.error('Invalid callback data received');
       return new Response(
         JSON.stringify({
           success: false,
@@ -198,130 +200,60 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get payment record
-    const { data: payment, error: paymentError } = await supabase
+    // Use stored procedure for idempotent, atomic payment processing
+    // This prevents replay attacks and ensures data consistency
+    const { data: result, error: processError } = await supabase
+      .rpc('process_payment_callback', {
+        p_checkout_request_id: callback.checkoutRequestId,
+        p_merchant_request_id: callback.merchantRequestId,
+        p_result_code: callback.resultCode,
+        p_result_desc: callback.resultDesc,
+        p_amount: callback.amount,
+        p_mpesa_receipt_number: callback.mpesaReceiptNumber || null,
+      });
+
+    if (processError) {
+      logger.error('Error processing payment callback', { error: processError.message });
+      // Still return 200 to acknowledge callback
+      return new Response(
+        JSON.stringify({ success: true, note: 'Error logged for investigation' }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    logger.info('Payment callback processed successfully', { success: result?.success });
+
+    // If payment was already processed (idempotent), just return success
+    if (result.idempotent) {
+      return new Response(
+        JSON.stringify({ success: true, note: 'Payment already processed' }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Get payment and order details for notifications
+    const { data: payment } = await supabase
       .from('payments')
-      .select('id, order_id, status')
+      .select('id, order_id')
       .eq('checkout_request_id', callback.checkoutRequestId)
       .single();
 
-    if (paymentError || !payment) {
-      console.error('Payment not found for checkout request:', callback.checkoutRequestId);
-
-      // Return success anyway to acknowledge callback
-      return new Response(
-        JSON.stringify({ success: true, note: 'Payment record not found' }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+    if (payment) {
+      // Send notification to customer
+      const status = callback.resultCode === 0 ? 'completed' : 'failed';
+      await sendPaymentNotification(
+        supabase,
+        payment.order_id,
+        status,
+        callback.mpesaReceiptNumber || null
       );
     }
-
-    // Check if already processed (prevent duplicate processing)
-    if (payment.status === 'completed' || payment.status === 'failed') {
-      console.log('Payment already processed, status:', payment.status);
-
-      return new Response(
-        JSON.stringify({ success: true, note: 'Already processed' }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Determine payment status
-    const status = getPaymentStatus(callback.resultCode);
-    console.log('Updating payment status to:', status);
-
-    // Update payment record
-    const updateData: any = {
-      status: status,
-      result_code: callback.resultCode,
-      result_desc: callback.resultDesc,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (status === 'completed') {
-      updateData.transaction_id = callback.mpesaReceiptNumber;
-      updateData.completed_at = new Date().toISOString();
-
-      // Store additional metadata
-      updateData.metadata = {
-        transactionDate: callback.transactionDate,
-        phoneNumber: callback.phoneNumber,
-        amountPaid: callback.amount,
-      };
-    } else {
-      updateData.failure_reason = callback.resultDesc;
-    }
-
-    const { error: updateError } = await supabase
-      .from('payments')
-      .update(updateData)
-      .eq('id', payment.id);
-
-    if (updateError) {
-      console.error('Failed to update payment:', updateError);
-      throw updateError;
-    }
-
-    console.log('Payment updated successfully');
-
-    // Update order status (handled by database trigger, but we can also do it here)
-    if (status === 'completed') {
-      const { error: orderError } = await supabase
-        .from('orders')
-        .update({
-          payment_status: 'paid',
-          payment_method: 'mpesa',
-          // Move to next stage if still pending
-          status: 2, // driver_assigned
-        })
-        .eq('id', payment.order_id)
-        .eq('status', 1); // Only if currently pending
-
-      if (orderError) {
-        console.error('Failed to update order:', orderError);
-        // Don't throw - payment update succeeded
-      } else {
-        console.log('Order status updated to paid');
-      }
-
-      // Log to audit trail
-      await supabase
-        .from('audit_logs')
-        .insert({
-          action: 'payment_completed',
-          resource_type: 'payment',
-          resource_id: payment.id,
-          details: {
-            orderId: payment.order_id,
-            amount: callback.amount,
-            transactionId: callback.mpesaReceiptNumber,
-          },
-          created_at: new Date().toISOString(),
-        })
-        .catch((err) => console.error('Failed to create audit log:', err));
-
-    } else if (status === 'failed') {
-      // Update order payment status
-      await supabase
-        .from('orders')
-        .update({ payment_status: 'failed' })
-        .eq('id', payment.order_id);
-
-      console.log('Order marked as payment failed');
-    }
-
-    // Send notification to customer
-    await sendPaymentNotification(
-      supabase,
-      payment.order_id,
-      status,
-      callback.mpesaReceiptNumber || null
-    );
 
     // Always return success to bank (to acknowledge callback)
     return new Response(
@@ -333,7 +265,9 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Callback processing error:', error);
+    logger.error('Callback processing error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
 
     // IMPORTANT: Still return 200 to bank to avoid retries
     // Log error for investigation but don't fail the callback
