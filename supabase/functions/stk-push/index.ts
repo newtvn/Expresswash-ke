@@ -29,7 +29,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // CONFIGURATION
 // ============================================================
 
-const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://api.co-opbank.co.ke';
+const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://api.creditbank.co.ke';
 const BANK_CONSUMER_KEY = Deno.env.get('BANK_CONSUMER_KEY');
 const BANK_CONSUMER_SECRET = Deno.env.get('BANK_CONSUMER_SECRET');
 const CALLBACK_BASE_URL = Deno.env.get('CALLBACK_BASE_URL');
@@ -77,7 +77,7 @@ function isValidPhoneNumber(phone: string): boolean {
 }
 
 /**
- * Get access token from Co-op Bank API
+ * Get access token from Credit Bank API
  * Uses caching to avoid unnecessary API calls
  */
 async function getAccessToken(): Promise<string> {
@@ -125,31 +125,34 @@ async function getAccessToken(): Promise<string> {
 }
 
 /**
- * Initiate STK Push with Co-op Bank API
+ * Initiate STK Push with Credit Bank API
+ * Endpoint: POST /safaricom-stkpush
  */
 async function initiateSTKPush(
   phoneNumber: string,
   amount: number,
-  accountReference: string,
-  transactionDesc: string,
+  reference: string,
+  narration: string,
 ): Promise<any> {
   const accessToken = await getAccessToken();
 
   const requestBody = {
     phoneNumber: phoneNumber,
-    amount: amount.toFixed(2),
-    accountReference: accountReference,
-    transactionDesc: transactionDesc,
+    amount: amount.toString(),
+    reference: reference,
+    countryCode: 'KE',
+    narration: narration,
     callbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
+    errorCallbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
   };
 
   console.log('Initiating STK Push:', {
     phoneNumber,
     amount: requestBody.amount,
-    accountReference,
+    reference,
   });
 
-  const response = await fetch(`${BANK_API_URL}/v1/payment/stk-push`, {
+  const response = await fetch(`${BANK_API_URL}/safaricom-stkpush`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -280,7 +283,7 @@ serve(async (req) => {
       formattedPhone,
       amount,
       orderId,
-      description || `ExpressWash Order #${order.tracking_code}`,
+      description || `ExpressWash Order ${order.tracking_code}`,
     );
 
     // Save payment record to database

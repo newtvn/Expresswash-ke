@@ -28,7 +28,7 @@ import type {
 // CONFIGURATION
 // ============================================================
 
-const BANK_API_BASE_URL = import.meta.env.VITE_BANK_API_URL || 'https://api.co-opbank.co.ke';
+const BANK_API_BASE_URL = import.meta.env.VITE_BANK_API_URL || 'https://api.creditbank.co.ke';
 const BANK_CONSUMER_KEY = import.meta.env.VITE_BANK_CONSUMER_KEY;
 const BANK_CONSUMER_SECRET = import.meta.env.VITE_BANK_CONSUMER_SECRET;
 const BANK_ACCOUNT_NUMBER = import.meta.env.VITE_BANK_ACCOUNT_NUMBER;
@@ -153,9 +153,9 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       };
     }
 
-    // Call bank STK Push API
-    // Endpoint format based on common Co-op Bank API structure
-    const response = await fetch(`${BANK_API_BASE_URL}/v1/payment/stk-push`, {
+    // Call Credit Bank STK Push API
+    // NOTE: For production, use Supabase Edge Function instead (see supabase/functions/stk-push)
+    const response = await fetch(`${BANK_API_BASE_URL}/safaricom-stkpush`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -163,10 +163,12 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       },
       body: JSON.stringify({
         phoneNumber: phoneNumber,
-        amount: request.amount.toFixed(2),
-        accountReference: request.accountReference,
-        transactionDesc: request.transactionDesc,
+        amount: request.amount.toString(),
+        reference: request.accountReference,
+        countryCode: 'KE',
+        narration: request.transactionDesc,
         callbackUrl: request.callbackUrl || PAYMENT_CALLBACK_URL,
+        errorCallbackUrl: request.callbackUrl || PAYMENT_CALLBACK_URL,
       }),
     });
 
