@@ -1,1 +1,1 @@
-export { PageErrorBoundary } from './PageErrorBoundary';
+export { ErrorBoundary } from "../shared/ErrorBoundary";

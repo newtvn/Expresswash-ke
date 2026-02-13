@@ -7,9 +7,9 @@ const PublicLayout = () => (
   <div className="min-h-screen flex flex-col">
     <Header />
     <main className="flex-1">
-      <PageErrorBoundary fallbackTitle="Page Error">
+      <ErrorBoundary fullPage={true} showHomeButton={true} fallbackTitle="Page Error">
         <Outlet />
-      </PageErrorBoundary>
+      </ErrorBoundary>
     </main>
     <Footer />
   </div>

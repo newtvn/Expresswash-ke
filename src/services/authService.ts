@@ -119,7 +119,11 @@ export const verifyOTP = async (email: string, otp: string): Promise<{ success: 
   return { success: !error };
 };
 
-export const resetPassword = async (_email: string, _otp: string, newPassword: string): Promise<{ success: boolean }> => {
+/**
+ * Reset user password (requires authenticated session)
+ * Email and OTP are verified via session, not parameters
+ */
+export const resetPassword = async (newPassword: string): Promise<{ success: boolean }> => {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   return { success: !error };
 };

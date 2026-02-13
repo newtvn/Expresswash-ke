@@ -170,7 +170,6 @@ export const softDeleteUser = async (
     const { error: authError } = await supabase.auth.admin.deleteUser(userId);
 
     if (authError) {
-      console.warn('Failed to delete auth user, but soft delete succeeded:', authError);
       // Continue anyway - soft delete is more important than auth deletion
     }
 
@@ -190,7 +189,6 @@ export const softDeleteUser = async (
 
     return { success: true, message: 'User deleted successfully' };
   } catch (error) {
-    console.error('Error during soft delete:', error);
     return { success: false, message: 'An unexpected error occurred' };
   }
 };
@@ -241,7 +239,6 @@ export const hardDeleteUser = async (
 
     return { success: true, message: 'User permanently deleted' };
   } catch (error) {
-    console.error('Error during hard delete:', error);
     return { success: false, message: 'An unexpected error occurred' };
   }
 };

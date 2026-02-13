@@ -458,7 +458,8 @@ export const updateOrderItems = async (
 export const getOrders = async (
   filters: OrderListFilters = { page: 1, limit: 10 },
 ): Promise<PaginatedResponse<Order>> => {
-  let query = supabase.from('orders').select('*', { count: 'exact' });
+  // Use Supabase join to fetch orders with items in single query
+  let query = supabase.from('orders').select('*, order_items(*)', { count: 'exact' });
 
   if (filters.status !== undefined) {
     query = query.eq('status', filters.status);
@@ -478,26 +479,17 @@ export const getOrders = async (
   const start = (filters.page - 1) * filters.limit;
   query = query.range(start, start + filters.limit - 1).order('created_at', { ascending: false });
 
-  const { data: orders, count, error } = await query;
+  const { data: ordersWithItems, count, error } = await query;
 
-  if (error || !orders) {
+  if (error || !ordersWithItems) {
     return { data: [], total: 0, page: filters.page, limit: filters.limit, totalPages: 0 };
   }
 
-  const orderIds = orders.map((o) => o.id);
-  const { data: allItems } = await supabase
-    .from('order_items')
-    .select('*')
-    .in('order_id', orderIds);
-
-  const itemsByOrder = (allItems ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, item) => {
-    const oid = item.order_id as string;
-    if (!acc[oid]) acc[oid] = [];
-    acc[oid].push(item);
-    return acc;
-  }, {});
-
-  const data = orders.map((o) => mapOrder(o, itemsByOrder[o.id] ?? []));
+  // Map orders with their embedded items
+  const data = ordersWithItems.map((orderData) => {
+    const { order_items, ...order } = orderData as Record<string, unknown> & { order_items: Record<string, unknown>[] };
+    return mapOrder(order, order_items ?? []);
+  });
   const total = count ?? 0;
 
   return {
@@ -515,9 +507,11 @@ export const getCustomerOrders = async (
 ): Promise<PaginatedResponse<Order>> => {
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 10;
+
+  // Use Supabase join to fetch orders with items in single query
   let query = supabase
     .from('orders')
-    .select('*', { count: 'exact' })
+    .select('*, order_items(*)', { count: 'exact' })
     .eq('customer_id', customerId);
 
   if (filters.status !== undefined) query = query.eq('status', filters.status);
@@ -528,25 +522,17 @@ export const getCustomerOrders = async (
   const start = (page - 1) * limit;
   query = query.range(start, start + limit - 1).order('created_at', { ascending: false });
 
-  const { data: orders, count, error } = await query;
-  if (error || !orders) {
+  const { data: ordersWithItems, count, error } = await query;
+  if (error || !ordersWithItems) {
     return { data: [], total: 0, page, limit, totalPages: 0 };
   }
 
-  const orderIds = orders.map((o) => o.id);
-  const { data: allItems } = await supabase
-    .from('order_items')
-    .select('*')
-    .in('order_id', orderIds);
-
-  const itemsByOrder = (allItems ?? []).reduce<Record<string, Record<string, unknown>[]>>(
-    (acc, item) => {
-      const oid = item.order_id as string;
-      if (!acc[oid]) acc[oid] = [];
-      acc[oid].push(item);
-      return acc;
-    },
-    {},
+  // Map orders with their embedded items
+  const data = ordersWithItems.map((orderData) => {
+    const { order_items, ...order } = orderData as Record<string, unknown> & { order_items: Record<string, unknown>[] };
+    return mapOrder(order, order_items ?? []);
+  });
+  const total = count ?? 0;
   );
 
   return {
