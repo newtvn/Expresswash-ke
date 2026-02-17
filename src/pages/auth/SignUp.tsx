@@ -199,6 +199,7 @@ export const SignUp = () => {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Min 6 characters"
                       className="pl-10 pr-10 h-11"
+                      autoComplete="new-password"
                       {...field}
                     />
                     <button
@@ -228,6 +229,7 @@ export const SignUp = () => {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Re-enter your password"
                       className="pl-10 h-11"
+                      autoComplete="new-password"
                       {...field}
                     />
                   </div>

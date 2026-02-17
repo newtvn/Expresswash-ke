@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, useEffect } from 'react';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
 import { SessionTimeoutWarning } from '@/components/SessionTimeout';
 import { UserRole } from '@/types';
+import { useAuthStore } from '@/stores/authStore';
 
 // Layouts
 const PublicLayout = lazy(() => import('@/layouts/PublicLayout'));
@@ -92,14 +93,18 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const App = () => {
+  const initSession = useAuthStore((s) => s.initSession);
+  useEffect(() => { initSession(); }, [initSession]);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <BubbleBackground />
       <Sonner />
-      <SessionTimeoutWarning />
       <ErrorBoundary>
         <BrowserRouter>
+          <SessionTimeoutWarning />
           <LazyLoader>
             <Routes>
             {/* Public Routes */}
@@ -218,6 +223,7 @@ const App = () => (
       </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;

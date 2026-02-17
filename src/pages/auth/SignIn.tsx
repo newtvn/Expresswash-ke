@@ -114,6 +114,7 @@ export const SignIn = () => {
                       type={showPassword ? 'text' : 'password'}
                       placeholder="Enter your password"
                       className="pl-10 pr-10 h-11"
+                      autoComplete="current-password"
                       {...field}
                     />
                     <button

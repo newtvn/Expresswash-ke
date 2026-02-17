@@ -70,7 +70,7 @@ export const getLoyaltyAccount = async (
   customerId: string,
 ): Promise<LoyaltyAccount | null> => {
   const { data } = await retrySupabaseQuery(
-    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).single(),
+    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).maybeSingle(),
     { maxRetries: 2 }
   );
 
@@ -108,7 +108,7 @@ export const redeemReward = async (
   rewardId: string,
 ): Promise<{ success: boolean; message: string; remainingPoints?: number }> => {
   const { data: account } = await retrySupabaseQuery(
-    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).single(),
+    () => supabase.from('loyalty_accounts').select('*').eq('customer_id', customerId).maybeSingle(),
     { maxRetries: 2 }
   );
 
@@ -177,7 +177,7 @@ export const createReferral = async (
   email: string,
 ): Promise<{ success: boolean; referral?: Referral; message: string }> => {
   const { data: account } = await retrySupabaseQuery(
-    () => supabase.from('loyalty_accounts').select('customer_name').eq('customer_id', referrerId).single(),
+    () => supabase.from('loyalty_accounts').select('customer_name').eq('customer_id', referrerId).maybeSingle(),
     { maxRetries: 2 }
   );
 

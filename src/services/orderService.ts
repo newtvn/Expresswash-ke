@@ -533,14 +533,13 @@ export const getCustomerOrders = async (
     return mapOrder(order, order_items ?? []);
   });
   const total = count ?? 0;
-  );
 
   return {
-    data: orders.map((o) => mapOrder(o, itemsByOrder[o.id] ?? [])),
-    total: count ?? 0,
+    data,
+    total,
     page,
     limit,
-    totalPages: Math.ceil((count ?? 0) / limit),
+    totalPages: Math.ceil(total / limit),
   };
 };
 
