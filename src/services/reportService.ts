@@ -23,98 +23,71 @@ export interface OrderStatusCount {
 }
 
 export const getDashboardKPIs = async (): Promise<DashboardKPIs> => {
-  const [ordersResult, customersResult, revenueResult] = await Promise.all([
-    supabase.from('orders').select('status', { count: 'exact' }),
-    supabase.from('profiles').select('id', { count: 'exact' }).eq('role', 'customer'),
-    supabase.from('payments').select('amount').eq('status', 'completed'),
-  ]);
+  // Use database function for server-side aggregation (much faster!)
+  const { data, error } = await supabase.rpc('get_dashboard_kpis').single();
 
-  const orders = ordersResult.data ?? [];
-  const activeOrders = orders.filter((o) => {
-    const s = o.status as number;
-    return s >= 1 && s <= 11;
-  }).length;
-
-  const totalRevenue = (revenueResult.data ?? []).reduce(
-    (sum, p) => sum + (p.amount as number),
-    0,
-  );
+  if (error || !data) {
+    // Fallback to default values if function fails
+    return {
+      totalRevenue: 0,
+      totalRevenueChange: 0,
+      activeOrders: 0,
+      activeOrdersChange: 0,
+      totalCustomers: 0,
+      totalCustomersChange: 0,
+      avgRating: 4.7,
+    };
+  }
 
   return {
-    totalRevenue,
-    totalRevenueChange: 0,
-    activeOrders,
-    activeOrdersChange: 0,
-    totalCustomers: customersResult.count ?? 0,
-    totalCustomersChange: 0,
-    avgRating: 4.7,
+    totalRevenue: Number(data.total_revenue) || 0,
+    totalRevenueChange: 0, // TODO: Implement historical comparison
+    activeOrders: Number(data.active_orders) || 0,
+    activeOrdersChange: 0, // TODO: Implement historical comparison
+    totalCustomers: Number(data.total_customers) || 0,
+    totalCustomersChange: 0, // TODO: Implement historical comparison
+    avgRating: 4.7, // TODO: Fetch from reviews table
   };
 };
 
 export const getOrderStatusCounts = async (): Promise<OrderStatusCount[]> => {
-  const { data, error } = await supabase.from('orders').select('status');
+  // Use database function for server-side aggregation with status names
+  const { data, error } = await supabase.rpc('get_order_status_counts');
+
   if (error || !data) return [];
 
-  const statusNames: Record<number, string> = {
-    0: 'Cancelled',
-    1: 'Pending',
-    2: 'Driver Assigned',
-    3: 'Quote Accepted',
-    4: 'Pickup Scheduled',
-    5: 'Picked Up',
-    6: 'In Washing',
-    7: 'Drying',
-    8: 'Quality Check',
-    9: 'Ready',
-    10: 'Dispatched',
-    11: 'Out for Delivery',
-    12: 'Delivered',
-  };
-
-  const counts: Record<number, number> = {};
-  data.forEach((o) => {
-    const s = o.status as number;
-    counts[s] = (counts[s] ?? 0) + 1;
-  });
-
-  return Object.entries(counts).map(([status, count]) => ({
-    status: statusNames[Number(status)] ?? `Status ${status}`,
-    count,
+  return data.map((row) => ({
+    status: row.status_name,
+    count: Number(row.count),
   }));
 };
 
 export const getSalesData = async (days = 30): Promise<SalesDataPoint[]> => {
-  const { data, error } = await supabase.from('report_sales').select('*').order('date');
-  if (error || !data || data.length === 0) {
-    // Generate from orders if no report data
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('created_at, status')
-      .gte('created_at', since)
-      .order('created_at');
+  // First check for materialized report data
+  const { data: reportData, error: reportError } = await supabase
+    .from('report_sales')
+    .select('*')
+    .order('date');
 
-    if (!orders || orders.length === 0) return [];
-
-    const byDay: Record<string, number> = {};
-    orders.forEach((o) => {
-      const day = (o.created_at as string).split('T')[0];
-      byDay[day] = (byDay[day] ?? 0) + 1;
-    });
-
-    return Object.entries(byDay).map(([date, count]) => ({
-      date,
-      orders: count,
-      revenue: count * 2500,
-      avgOrderValue: 2500,
+  if (!reportError && reportData && reportData.length > 0) {
+    return reportData.map((row) => ({
+      date: row.date as string,
+      orders: row.orders as number,
+      revenue: row.revenue as number,
+      avgOrderValue: row.avg_order_value as number,
     }));
   }
 
+  // Fallback to database function for real-time aggregation
+  const { data, error } = await supabase.rpc('get_sales_by_date', { days_back: days });
+
+  if (error || !data || data.length === 0) return [];
+
   return data.map((row) => ({
-    date: row.date as string,
-    orders: row.orders as number,
-    revenue: row.revenue as number,
-    avgOrderValue: row.avg_order_value as number,
+    date: row.date,
+    orders: Number(row.orders),
+    revenue: Number(row.revenue),
+    avgOrderValue: Number(row.avg_order_value),
   }));
 };
 

@@ -544,27 +544,39 @@ export const getCustomerOrders = async (
 };
 
 export const getOrderById = async (trackingCode: string): Promise<Order | null> => {
+  // Use JOIN to fetch order and items in a single query (optimized!)
   const { data: order } = await supabase
     .from('orders')
-    .select('*')
+    .select('*, order_items(*)')
     .ilike('tracking_code', trackingCode)
     .single();
 
   if (!order) return null;
 
-  const { data: items } = await supabase
-    .from('order_items')
-    .select('*')
-    .eq('order_id', order.id);
+  // Extract items from the joined data
+  const items = (order.order_items as any[]) ?? [];
+  // Remove the nested items from order object before mapping
+  const { order_items, ...orderData } = order;
 
-  return mapOrder(order, items ?? []);
+  return mapOrder(orderData, items);
 };
 
 export const getOrderByUUID = async (orderId: string): Promise<Order | null> => {
-  const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  // Use JOIN to fetch order and items in a single query (optimized!)
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('id', orderId)
+    .single();
+
   if (!order) return null;
-  const { data: items } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-  return mapOrder(order, items ?? []);
+
+  // Extract items from the joined data
+  const items = (order.order_items as any[]) ?? [];
+  // Remove the nested items from order object before mapping
+  const { order_items, ...orderData } = order;
+
+  return mapOrder(orderData, items);
 };
 
 export const updateOrderStatus = async (
