@@ -80,14 +80,23 @@ const DispatchQueue = lazy(() => import('@/pages/warehouse/DispatchQueue'));
 // 404
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
-// Query client with caching strategy
+// Query client with optimized caching strategy
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000, // 2 minutes default
+      staleTime: 5 * 60 * 1000, // 5 minutes default (increased from 2 min)
       gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
-      refetchOnWindowFocus: true,
-      retry: 1,
+      refetchOnWindowFocus: false, // Disable aggressive refetching (was causing unnecessary requests)
+      refetchOnReconnect: true, // Refetch on network reconnection
+      retry: 1, // Retry failed requests once
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    },
+    mutations: {
+      retry: 0, // Don't retry mutations automatically
+      onError: (error) => {
+        // Global error handling for mutations
+        console.error('Mutation error:', error);
+      },
     },
   },
 });
@@ -132,16 +141,37 @@ const App = () => (
               }
             >
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboard />} />
+              <Route
+                path="dashboard"
+                element={
+                  <ErrorBoundary>
+                    <AdminDashboard />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="users" element={<UserManagement />} />
-              <Route path="orders" element={<OrderManagement />} />
+              <Route
+                path="orders"
+                element={
+                  <ErrorBoundary>
+                    <OrderManagement />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="drivers" element={<DriverManagement />} />
               <Route path="billing" element={<BillingFinancials />} />
               <Route path="profit-expense" element={<ProfitExpense />} />
               <Route path="marketing" element={<MarketingCampaigns />} />
               <Route path="loyalty" element={<LoyaltyManagement />} />
               <Route path="reviews" element={<ReviewsModeration />} />
-              <Route path="reports" element={<ReportsAnalytics />} />
+              <Route
+                path="reports"
+                element={
+                  <ErrorBoundary>
+                    <ReportsAnalytics />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="inventory" element={<Inventory />} />
               <Route path="communications" element={<Communications />} />
               <Route path="system-config" element={<SystemConfig />} />
@@ -161,10 +191,38 @@ const App = () => (
               }
             >
               <Route index element={<Navigate to="/portal/dashboard" replace />} />
-              <Route path="dashboard" element={<CustomerDashboard />} />
-              <Route path="request-pickup" element={<RequestPickup />} />
-              <Route path="orders" element={<OrderHistory />} />
-              <Route path="orders/:id" element={<OrderDetails />} />
+              <Route
+                path="dashboard"
+                element={
+                  <ErrorBoundary>
+                    <CustomerDashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="request-pickup"
+                element={
+                  <ErrorBoundary>
+                    <RequestPickup />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="orders"
+                element={
+                  <ErrorBoundary>
+                    <OrderHistory />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="orders/:id"
+                element={
+                  <ErrorBoundary>
+                    <OrderDetails />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="favorites" element={<FavoriteItems />} />
               <Route path="addresses" element={<Addresses />} />
               <Route path="invoices" element={<CustomerInvoices />} />

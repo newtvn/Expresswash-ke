@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -124,25 +124,24 @@ export const RequestPickup = () => {
     };
   }, [zone]);
 
-  const addItem = () => setItems([...items, newItemForm()]);
+  const addItem = useCallback(() => setItems(prev => [...prev, newItemForm()]), []);
 
-  const removeItem = (id: string) => {
-    if (items.length <= 1) return;
-    setItems(items.filter((i) => i.id !== id));
-  };
+  const removeItem = useCallback((id: string) => {
+    setItems(prev => prev.length <= 1 ? prev : prev.filter((i) => i.id !== id));
+  }, []);
 
-  const updateItem = (id: string, field: keyof ItemForm, value: string | number) => {
-    setItems(items.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
-  };
+  const updateItem = useCallback((id: string, field: keyof ItemForm, value: string | number) => {
+    setItems(prev => prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)));
+  }, []);
 
-  // Calculate pricing for each item
+  // Calculate pricing for each item (memoized to prevent recalculation on every render)
   const calculatedItems: (ItemForm & {
     sqInches: number;
     pricePerSqInch: number;
     unitPrice: number;
     totalPrice: number;
     isValid: boolean;
-  })[] = items.map((item) => {
+  })[] = useMemo(() => items.map((item) => {
     const l = parseFloat(item.lengthInches) || 0;
     const w = parseFloat(item.widthInches) || 0;
     const isValid = l > 0 && w > 0 && item.itemType !== '' && item.name !== '';
@@ -151,17 +150,39 @@ export const RequestPickup = () => {
     }
     const calc = calculateItemPrice(item.itemType, l, w, item.quantity);
     return { ...item, ...calc, isValid };
-  });
+  }), [items]);
 
-  const subtotal = calculatedItems.reduce((sum, i) => sum + i.totalPrice, 0);
-  const deliveryFee = zone ? getDeliveryFee(zone) : 0;
-  const vatAmount = Math.round((subtotal + deliveryFee) * PRICING.vatRate);
-  const grandTotal = subtotal + deliveryFee + vatAmount;
-  const allValid = calculatedItems.every((i) => i.isValid) && zone !== '' && pickupAddress !== '';
-  const hasItems = calculatedItems.some((i) => i.isValid);
-  const z = zone.toLowerCase();
+  // Memoize derived calculations
+  const subtotal = useMemo(
+    () => calculatedItems.reduce((sum, i) => sum + i.totalPrice, 0),
+    [calculatedItems]
+  );
 
-  const handleSubmit = async () => {
+  const deliveryFee = useMemo(() => zone ? getDeliveryFee(zone) : 0, [zone]);
+
+  const vatAmount = useMemo(
+    () => Math.round((subtotal + deliveryFee) * PRICING.vatRate),
+    [subtotal, deliveryFee]
+  );
+
+  const grandTotal = useMemo(
+    () => subtotal + deliveryFee + vatAmount,
+    [subtotal, deliveryFee, vatAmount]
+  );
+
+  const allValid = useMemo(
+    () => calculatedItems.every((i) => i.isValid) && zone !== '' && pickupAddress !== '',
+    [calculatedItems, zone, pickupAddress]
+  );
+
+  const hasItems = useMemo(
+    () => calculatedItems.some((i) => i.isValid),
+    [calculatedItems]
+  );
+
+  const z = useMemo(() => zone.toLowerCase(), [zone]);
+
+  const handleSubmit = useCallback(async () => {
     if (!user) {
       toast.error('Please sign in to request a pickup');
       return;
@@ -215,7 +236,7 @@ export const RequestPickup = () => {
     } else {
       toast.error(result.error ?? 'Failed to create order');
     }
-  };
+  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, vatAmount, notes, eta]);
 
   // Success state
   if (orderCreated) {

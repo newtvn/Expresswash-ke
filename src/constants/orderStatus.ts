@@ -47,3 +47,79 @@ export const ORDER_STATUS_LABELS: Record<OrderStatusCode, string> = {
 export function getOrderStatusLabel(statusCode: number): string {
   return ORDER_STATUS_LABELS[statusCode as OrderStatusCode] ?? 'Unknown Status';
 }
+
+/**
+ * Status options for dropdowns/selects in UI
+ */
+export const ORDER_STATUS_OPTIONS = [
+  { value: ORDER_STATUS.PENDING, label: ORDER_STATUS_LABELS[ORDER_STATUS.PENDING] },
+  { value: ORDER_STATUS.CONFIRMED, label: ORDER_STATUS_LABELS[ORDER_STATUS.CONFIRMED] },
+  { value: ORDER_STATUS.DRIVER_ASSIGNED, label: ORDER_STATUS_LABELS[ORDER_STATUS.DRIVER_ASSIGNED] },
+  { value: ORDER_STATUS.PICKUP_SCHEDULED, label: ORDER_STATUS_LABELS[ORDER_STATUS.PICKUP_SCHEDULED] },
+  { value: ORDER_STATUS.PICKED_UP, label: ORDER_STATUS_LABELS[ORDER_STATUS.PICKED_UP] },
+  { value: ORDER_STATUS.IN_PROCESSING, label: ORDER_STATUS_LABELS[ORDER_STATUS.IN_PROCESSING] },
+  { value: ORDER_STATUS.PROCESSING_COMPLETE, label: ORDER_STATUS_LABELS[ORDER_STATUS.PROCESSING_COMPLETE] },
+  { value: ORDER_STATUS.QUALITY_CHECK, label: ORDER_STATUS_LABELS[ORDER_STATUS.QUALITY_CHECK] },
+  { value: ORDER_STATUS.QUALITY_APPROVED, label: ORDER_STATUS_LABELS[ORDER_STATUS.QUALITY_APPROVED] },
+  { value: ORDER_STATUS.READY_FOR_DELIVERY, label: ORDER_STATUS_LABELS[ORDER_STATUS.READY_FOR_DELIVERY] },
+  { value: ORDER_STATUS.OUT_FOR_DELIVERY, label: ORDER_STATUS_LABELS[ORDER_STATUS.OUT_FOR_DELIVERY] },
+  { value: ORDER_STATUS.DELIVERED, label: ORDER_STATUS_LABELS[ORDER_STATUS.DELIVERED] },
+  { value: ORDER_STATUS.CANCELLED, label: ORDER_STATUS_LABELS[ORDER_STATUS.CANCELLED] },
+  { value: ORDER_STATUS.REFUNDED, label: ORDER_STATUS_LABELS[ORDER_STATUS.REFUNDED] },
+];
+
+/**
+ * Badge variants for different order statuses (for UI components)
+ */
+export const ORDER_STATUS_VARIANTS: Record<
+  OrderStatusCode,
+  'default' | 'secondary' | 'destructive' | 'outline'
+> = {
+  [ORDER_STATUS.PENDING]: 'outline',
+  [ORDER_STATUS.CONFIRMED]: 'secondary',
+  [ORDER_STATUS.DRIVER_ASSIGNED]: 'secondary',
+  [ORDER_STATUS.PICKUP_SCHEDULED]: 'secondary',
+  [ORDER_STATUS.PICKED_UP]: 'default',
+  [ORDER_STATUS.IN_PROCESSING]: 'default',
+  [ORDER_STATUS.PROCESSING_COMPLETE]: 'default',
+  [ORDER_STATUS.QUALITY_CHECK]: 'default',
+  [ORDER_STATUS.QUALITY_APPROVED]: 'default',
+  [ORDER_STATUS.READY_FOR_DELIVERY]: 'default',
+  [ORDER_STATUS.OUT_FOR_DELIVERY]: 'default',
+  [ORDER_STATUS.DELIVERED]: 'default',
+  [ORDER_STATUS.CANCELLED]: 'destructive',
+  [ORDER_STATUS.REFUNDED]: 'destructive',
+};
+
+/**
+ * Helper function to check if order is active (not cancelled, refunded, or delivered)
+ */
+export function isActiveOrder(status: number): boolean {
+  return (
+    status >= ORDER_STATUS.PENDING &&
+    status <= ORDER_STATUS.OUT_FOR_DELIVERY &&
+    status !== ORDER_STATUS.CANCELLED &&
+    status !== ORDER_STATUS.REFUNDED
+  );
+}
+
+/**
+ * Helper function to check if order can be cancelled
+ */
+export function canCancelOrder(status: number): boolean {
+  return status >= ORDER_STATUS.PENDING && status <= ORDER_STATUS.PICKUP_SCHEDULED;
+}
+
+/**
+ * Helper function to check if order is completed
+ */
+export function isOrderCompleted(status: number): boolean {
+  return status === ORDER_STATUS.DELIVERED;
+}
+
+/**
+ * Helper function to check if order is cancelled or refunded
+ */
+export function isOrderCancelled(status: number): boolean {
+  return status === ORDER_STATUS.CANCELLED || status === ORDER_STATUS.REFUNDED;
+}

@@ -195,4 +195,167 @@ export function validateQuantity(value: string | number): { valid: boolean; erro
   return { valid: true };
 }
 
+/**
+ * Validate phone number (Kenyan format)
+ * Accepts: 0712345678, +254712345678, 254712345678
+ */
+export function validatePhoneNumber(phone: string): { valid: boolean; error?: string } {
+  if (!phone || phone.trim().length === 0) {
+    return { valid: false, error: 'Phone number is required' };
+  }
+
+  const sanitized = phone.trim().replace(/\s+/g, '');
+
+  // Kenyan phone number patterns
+  const patterns = [
+    /^0[71]\d{8}$/, // 0712345678
+    /^\+2547\d{8}$/, // +254712345678
+    /^2547\d{8}$/, // 254712345678
+  ];
+
+  const isValid = patterns.some((pattern) => pattern.test(sanitized));
+
+  if (!isValid) {
+    return {
+      valid: false,
+      error: 'Invalid phone number. Use format: 0712345678 or +254712345678',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Format phone number to standard Kenyan format (+254XXXXXXXXX)
+ */
+export function formatPhoneNumber(phone: string): string {
+  const sanitized = phone.trim().replace(/\s+/g, '');
+
+  // Already in correct format
+  if (sanitized.startsWith('+254')) {
+    return sanitized;
+  }
+
+  // Convert 254XXXXXXXXX to +254XXXXXXXXX
+  if (sanitized.startsWith('254')) {
+    return `+${sanitized}`;
+  }
+
+  // Convert 0XXXXXXXXX to +254XXXXXXXXX
+  if (sanitized.startsWith('0')) {
+    return `+254${sanitized.substring(1)}`;
+  }
+
+  return sanitized;
+}
+
+/**
+ * Validate email address
+ */
+export function validateEmail(email: string): { valid: boolean; error?: string } {
+  if (!email || email.trim().length === 0) {
+    return { valid: false, error: 'Email is required' };
+  }
+
+  const sanitized = email.trim().toLowerCase();
+
+  // RFC 5322 simplified email regex
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!emailRegex.test(sanitized)) {
+    return { valid: false, error: 'Invalid email address' };
+  }
+
+  if (sanitized.length > 254) {
+    return { valid: false, error: 'Email address is too long' };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate password strength
+ */
+export function validatePassword(password: string): { valid: boolean; error?: string; strength?: 'weak' | 'medium' | 'strong' } {
+  if (!password || password.length === 0) {
+    return { valid: false, error: 'Password is required' };
+  }
+
+  if (password.length < 8) {
+    return { valid: false, error: 'Password must be at least 8 characters', strength: 'weak' };
+  }
+
+  if (password.length > 128) {
+    return { valid: false, error: 'Password is too long (max 128 characters)' };
+  }
+
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+
+  let strength: 'weak' | 'medium' | 'strong' = 'weak';
+  const criteriaMet = [hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar].filter(Boolean).length;
+
+  if (criteriaMet >= 4 && password.length >= 12) {
+    strength = 'strong';
+  } else if (criteriaMet >= 3 && password.length >= 8) {
+    strength = 'medium';
+  }
+
+  if (criteriaMet < 2) {
+    return {
+      valid: false,
+      error: 'Password must contain at least uppercase, lowercase, and numbers',
+      strength: 'weak',
+    };
+  }
+
+  return { valid: true, strength };
+}
+
+/**
+ * Validate name (first name or last name)
+ */
+export function validateName(name: string, fieldName = 'Name'): { valid: boolean; error?: string } {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, error: `${fieldName} is required` };
+  }
+
+  const sanitized = sanitizeString(name);
+
+  if (sanitized.length > MAX_LENGTHS.NAME) {
+    return { valid: false, error: `${fieldName} must be ${MAX_LENGTHS.NAME} characters or less` };
+  }
+
+  if (sanitized.length < 2) {
+    return { valid: false, error: `${fieldName} must be at least 2 characters` };
+  }
+
+  // Only allow letters, spaces, hyphens, and apostrophes
+  const nameRegex = /^[a-zA-Z\s'-]+$/;
+  if (!nameRegex.test(sanitized)) {
+    return { valid: false, error: `${fieldName} can only contain letters, spaces, hyphens, and apostrophes` };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate amount/price
+ */
+export function validateAmount(value: string | number): { valid: boolean; error?: string } {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+
+  if (isNaN(num) || num < 0) {
+    return { valid: false, error: 'Amount must be a positive number' };
+  }
+
+  if (num > 10000000) {
+    return { valid: false, error: 'Amount is too large' };
+  }
+
+  return { valid: true };
+}
+
 export const MAX_INPUT_LENGTHS = MAX_LENGTHS;
