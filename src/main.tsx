@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { validateEnvironmentOrThrow } from "./lib/envValidation";
+import { registerServiceWorker, reportWebVitals } from "./utils/performance";
 
 // Validate environment variables before app starts
 try {
@@ -23,4 +24,22 @@ try {
   throw error;
 }
 
+// Render app
 createRoot(document.getElementById("root")!).render(<App />);
+
+// Register Service Worker for PWA support (production only)
+if (import.meta.env.PROD) {
+  registerServiceWorker();
+}
+
+// Report Web Vitals for performance monitoring
+reportWebVitals((metric) => {
+  // Log to console in development
+  if (import.meta.env.DEV) {
+    console.log(metric);
+  }
+
+  // In production, send to analytics endpoint
+  // TODO: Integrate with your analytics service
+  // Example: sendToAnalytics(metric);
+});

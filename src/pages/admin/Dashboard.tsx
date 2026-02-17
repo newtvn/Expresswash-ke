@@ -1,11 +1,19 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader, KPICard } from '@/components/shared';
-import { SalesChart, OrderStatusPieChart } from '@/components/reports';
 import { RecentOrdersTable } from '@/components/admin';
 import { DollarSign, ShoppingCart, Users, Star } from 'lucide-react';
 import { getDashboardKPIs, getSalesData, getOrderStatusCounts } from '@/services/reportService';
 import { getOrders } from '@/services/orderService';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Lazy load heavy chart components (recharts library is ~140KB)
+const SalesChart = lazy(() =>
+  import('@/components/reports').then((module) => ({ default: module.SalesChart }))
+);
+const OrderStatusPieChart = lazy(() =>
+  import('@/components/reports').then((module) => ({ default: module.OrderStatusPieChart }))
+);
 
 export const Dashboard = () => {
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -83,8 +91,12 @@ export const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart data={salesData} />
-        <OrderStatusPieChart data={statusCounts} />
+        <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+          <SalesChart data={salesData} />
+        </Suspense>
+        <Suspense fallback={<Skeleton className="h-80 rounded-xl" />}>
+          <OrderStatusPieChart data={statusCounts} />
+        </Suspense>
       </div>
 
       <RecentOrdersTable orders={recentOrders} />
