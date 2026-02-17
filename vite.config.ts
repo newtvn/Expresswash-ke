@@ -104,5 +104,11 @@ export default defineConfig(({ mode }) => ({
 
     // Target modern browsers for smaller bundles
     target: 'es2020',
+
+    // Enable compression
+    reportCompressedSize: true,
   },
+
+  // Compression plugins would be added here for production
+  // vite-plugin-compression can add Brotli/Gzip compression
 }));

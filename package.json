@@ -7,10 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:analyze": "vite build && vite-bundle-visualizer",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "performance:check": "npm run build && node scripts/check-bundle-size.js",
+    "pwa:test": "npm run build && npx serve dist"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
