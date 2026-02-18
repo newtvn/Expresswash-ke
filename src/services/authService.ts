@@ -141,19 +141,6 @@ export const signInWithGoogle = async (): Promise<{ success: boolean; error?: st
   return { success: true };
 };
 
-export const signInWithGithub = async (): Promise<{ success: boolean; error?: string }> => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'github',
-    options: {
-      redirectTo: `${window.location.origin}/portal/dashboard`,
-    },
-  });
-  if (error) {
-    return { success: false, error: error.message };
-  }
-  return { success: true };
-};
-
 export const signOut = async (): Promise<void> => {
   await supabase.auth.signOut();
 };
