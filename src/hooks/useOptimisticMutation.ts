@@ -112,17 +112,17 @@ export function useOptimisticOrderUpdate() {
     },
     onOptimistic: ({ orderId, status }) => {
       // Update the order in cache immediately
-      queryClient.setQueryData(['order', orderId], (old: any) => ({
+      queryClient.setQueryData(['order', orderId], (old: Record<string, unknown> | undefined) => ({
         ...old,
         status,
       }));
 
       // Update in orders list if present
-      queryClient.setQueryData(['orders'], (old: any) => {
+      queryClient.setQueryData(['orders'], (old: { data?: Array<Record<string, unknown>> } | undefined) => {
         if (!old?.data) return old;
         return {
           ...old,
-          data: old.data.map((order: any) =>
+          data: old.data.map((order) =>
             order.id === orderId ? { ...order, status } : order
           ),
         };

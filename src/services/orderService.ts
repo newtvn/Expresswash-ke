@@ -556,7 +556,7 @@ export const getOrderById = async (trackingCode: string): Promise<Order | null> 
   if (!order) return null;
 
   // Extract items from the joined data
-  const items = (order.order_items as any[]) ?? [];
+  const items = (order.order_items as Record<string, unknown>[]) ?? [];
   // Remove the nested items from order object before mapping
   const { order_items, ...orderData } = order;
 
@@ -574,7 +574,7 @@ export const getOrderByUUID = async (orderId: string): Promise<Order | null> => 
   if (!order) return null;
 
   // Extract items from the joined data
-  const items = (order.order_items as any[]) ?? [];
+  const items = (order.order_items as Record<string, unknown>[]) ?? [];
   // Remove the nested items from order object before mapping
   const { order_items, ...orderData } = order;
 

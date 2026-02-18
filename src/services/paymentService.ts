@@ -515,7 +515,7 @@ export async function getOrderPayments(orderId: string): Promise<Payment[]> {
 /**
  * Map database record to Payment type
  */
-function mapDatabaseToPayment(data: any): Payment {
+function mapDatabaseToPayment(data: Record<string, unknown>): Payment {
   return {
     id: data.id,
     orderId: data.order_id,
