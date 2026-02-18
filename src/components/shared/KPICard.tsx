@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 interface KPICardProps {
   label: string;
   value: string | number;
-  change: number;
-  changeDirection: 'up' | 'down' | 'flat';
+  change?: number;
+  changeDirection?: 'up' | 'down' | 'flat';
   format?: 'number' | 'currency' | 'percentage';
   icon?: LucideIcon;
   className?: string;
@@ -32,6 +32,8 @@ export const KPICard = ({
     }
   };
 
+  const showChange = change != null && !isNaN(change) && changeDirection != null;
+
   const TrendIcon =
     changeDirection === 'up'
       ? TrendingUp
@@ -53,16 +55,18 @@ export const KPICard = ({
             </div>
           )}
         </div>
-        <div
-          className={cn('flex items-center gap-1 mt-3 text-sm', {
-            'text-green-600': changeDirection === 'up',
-            'text-red-500': changeDirection === 'down',
-            'text-muted-foreground': changeDirection === 'flat',
-          })}
-        >
-          <TrendIcon className="w-4 h-4" />
-          <span>{Math.abs(change)}% vs last period</span>
-        </div>
+        {showChange && (
+          <div
+            className={cn('flex items-center gap-1 mt-3 text-sm', {
+              'text-green-600': changeDirection === 'up',
+              'text-red-500': changeDirection === 'down',
+              'text-muted-foreground': changeDirection === 'flat',
+            })}
+          >
+            <TrendIcon className="w-4 h-4" />
+            <span>{Math.abs(change)}% vs last period</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

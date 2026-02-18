@@ -15,18 +15,9 @@ import {
 import { Star, PenLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const mockReviews = [
-  { id: '1', orderId: 'EW-2025-00380', date: '2025-01-23', rating: 5, comment: 'Excellent service! My carpet looks brand new.', status: 'published' },
-  { id: '2', orderId: 'EW-2025-00365', date: '2025-01-21', rating: 4, comment: 'Good quality cleaning, delivery was slightly delayed.', status: 'published' },
-  { id: '3', orderId: 'EW-2025-00350', date: '2025-01-19', rating: 5, comment: 'Very happy with the Persian rug cleaning. Great care taken.', status: 'published' },
-  { id: '4', orderId: 'EW-2025-00320', date: '2025-01-13', rating: 3, comment: 'Decent job but some stains remained. Follow-up was good.', status: 'published' },
-  { id: '5', orderId: 'EW-2025-00305', date: '2025-01-11', rating: 4, comment: 'Professional drivers and clean results.', status: 'pending' },
-  { id: '6', orderId: 'EW-2025-00290', date: '2025-01-09', rating: 5, comment: 'Best carpet cleaning service in Kitengela!', status: 'published' },
-];
+const mockReviews: { id: string; orderId: string; date: string; rating: number; comment: string; status: string }[] = [];
 
-const pendingOrders = [
-  { orderId: 'EW-2025-00395', date: '2025-01-25', items: '3 Curtain Pairs' },
-];
+const pendingOrders: { orderId: string; date: string; items: string }[] = [];
 
 function StarRating({ rating, onRate, interactive = false }: { rating: number; onRate?: (r: number) => void; interactive?: boolean }) {
   return (

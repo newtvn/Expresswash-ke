@@ -25,6 +25,8 @@ const PricingPage = lazy(() => import('@/pages/public/PricingPage'));
 const TrackOrder = lazy(() => import('@/pages/public/TrackOrder'));
 const FAQ = lazy(() => import('@/pages/public/FAQ'));
 const Contact = lazy(() => import('@/pages/public/Contact'));
+const PrivacyPolicy = lazy(() => import('@/pages/public/PrivacyPolicy'));
+const TermsOfService = lazy(() => import('@/pages/public/TermsOfService'));
 
 // Auth Pages
 const SignIn = lazy(() => import('@/pages/auth/SignIn'));
@@ -124,6 +126,8 @@ const App = () => {
               <Route path="/track" element={<TrackOrder />} />
               <Route path="/faq" element={<FAQ />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
             </Route>
 
             {/* Auth Routes (no layout wrapper - standalone pages) */}

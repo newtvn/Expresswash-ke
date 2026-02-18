@@ -35,23 +35,7 @@ const iconMap: Record<string, React.ElementType> = {
   payment: CheckCircle,
 };
 
-const initialNotifications: Notification[] = [
-  { id: '1', type: 'order', title: 'Order Processing', message: 'Your order EW-2025-00412 is now being washed.', timestamp: '2 hours ago', read: false },
-  { id: '2', type: 'delivery', title: 'Pickup Completed', message: 'Driver James Kiprop has picked up your items for order EW-2025-00412.', timestamp: '5 hours ago', read: false },
-  { id: '3', type: 'loyalty', title: 'Points Earned', message: 'You earned 120 loyalty points from order EW-2025-00408.', timestamp: '1 day ago', read: false },
-  { id: '4', type: 'promo', title: 'Weekend Special!', message: 'Get 15% off all carpet cleaning this weekend. Use code WEEKEND15.', timestamp: '1 day ago', read: true },
-  { id: '5', type: 'payment', title: 'Payment Received', message: 'Payment of KES 2,200 received for invoice INV-2025-0042 via M-Pesa.', timestamp: '2 days ago', read: true },
-  { id: '6', type: 'order', title: 'Order Delivered', message: 'Your order EW-2025-00380 has been delivered. Please confirm receipt.', timestamp: '3 days ago', read: true },
-  { id: '7', type: 'loyalty', title: 'Tier Upgrade!', message: 'Congratulations! You have been upgraded to Silver tier.', timestamp: '5 days ago', read: true },
-  { id: '8', type: 'promo', title: 'New Year Offer', message: 'Start the year fresh! 20% off on all services for returning customers.', timestamp: '1 week ago', read: true },
-  { id: '9', type: 'alert', title: 'Invoice Due Soon', message: 'Invoice INV-2025-0045 for KES 3,500 is due in 3 days.', timestamp: '1 week ago', read: true },
-  { id: '10', type: 'delivery', title: 'Quality Check Passed', message: 'Items from order EW-2025-00350 have passed quality inspection.', timestamp: '2 weeks ago', read: true },
-  { id: '11', type: 'promo', title: 'Refer a Friend', message: 'Invite friends to ExpressWash and earn 200 bonus points each!', timestamp: '2 weeks ago', read: true },
-  { id: '12', type: 'payment', title: 'Payment Confirmed', message: 'Payment of KES 4,500 received for invoice INV-2025-0025.', timestamp: '3 weeks ago', read: true },
-  { id: '13', type: 'order', title: 'Order Confirmed', message: 'Your order EW-2025-00350 has been confirmed. Pickup scheduled for tomorrow.', timestamp: '3 weeks ago', read: true },
-  { id: '14', type: 'loyalty', title: 'Bonus Points', message: 'You received 50 bonus points for your 10th order. Thank you!', timestamp: '1 month ago', read: true },
-  { id: '15', type: 'promo', title: 'Holiday Discount', message: 'Enjoy 25% off curtain cleaning for the festive season.', timestamp: '1 month ago', read: true },
-];
+const initialNotifications: Notification[] = [];
 
 export const Notifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
@@ -97,6 +81,12 @@ export const Notifications = () => {
         </Select>
       </div>
 
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Bell className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No notifications yet</p>
+        </div>
+      ) : (
       <div className="space-y-3">
         {filtered.map((notification) => {
           const Icon = iconMap[notification.type] ?? Bell;
@@ -141,6 +131,7 @@ export const Notifications = () => {
           );
         })}
       </div>
+      )}
     </div>
   );
 };

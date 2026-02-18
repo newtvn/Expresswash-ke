@@ -113,8 +113,8 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
   const endDate = new Date(now);
   endDate.setDate(endDate.getDate() + 30);
   const holidays = await getHolidayDates(
-    now.toISOString().split('T')[0],
-    endDate.toISOString().split('T')[0]
+    new Date(now),
+    endDate
   ).catch(err => {
     orderLogger.warn('Failed to fetch holidays for ETA calculation', err);
     return []; // Continue without holidays if fetch fails
@@ -322,9 +322,11 @@ export const createOrder = async (
     }
 
     // Update customer profile stats (non-critical, ignore errors)
-    await supabase.rpc('increment_customer_orders', { customer_id: payload.customerId }).catch((err) => {
-      orderLogger.warn('Failed to increment customer order count', { error: err.message });
-    });
+    try {
+      await supabase.rpc('increment_customer_orders', { customer_id: payload.customerId });
+    } catch (err: unknown) {
+      orderLogger.warn('Failed to increment customer order count', { error: err instanceof Error ? err.message : String(err) });
+    }
 
     const order = await getOrderById(trackingCode);
 

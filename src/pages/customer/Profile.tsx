@@ -161,6 +161,14 @@ export const Profile = () => {
                   <SelectItem value="Athi River">Athi River</SelectItem>
                   <SelectItem value="Syokimau">Syokimau</SelectItem>
                   <SelectItem value="Mlolongo">Mlolongo</SelectItem>
+                  <SelectItem value="nairobi-cbd">Nairobi CBD</SelectItem>
+                  <SelectItem value="westlands">Westlands</SelectItem>
+                  <SelectItem value="kilimani">Kilimani</SelectItem>
+                  <SelectItem value="karen">Karen</SelectItem>
+                  <SelectItem value="lavington">Lavington</SelectItem>
+                  <SelectItem value="south-bc">South B/C</SelectItem>
+                  <SelectItem value="eastlands">Eastlands</SelectItem>
+                  <SelectItem value="thika-road">Thika Road</SelectItem>
                 </SelectContent>
               </Select>
             </div>
