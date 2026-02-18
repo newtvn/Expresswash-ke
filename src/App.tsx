@@ -140,6 +140,10 @@ const App = () => {
             <Route path="/signin" element={<Navigate to="/auth/signin" replace />} />
             <Route path="/signup" element={<Navigate to="/auth/signup" replace />} />
 
+            {/* Legacy path redirects */}
+            <Route path="/customer" element={<Navigate to="/portal/dashboard" replace />} />
+            <Route path="/customer/*" element={<Navigate to="/portal/dashboard" replace />} />
+
             {/* Admin Portal */}
             <Route
               path="/admin"
