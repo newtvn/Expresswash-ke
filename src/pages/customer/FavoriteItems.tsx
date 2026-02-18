@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageHeader, ConfirmDialog } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,16 +24,10 @@ interface FavoriteItem {
   notes: string;
 }
 
-const initialFavorites: FavoriteItem[] = [
-  { id: '1', name: 'Living Room Carpet', type: 'Carpet', cleaningPreference: 'Deep Clean', notes: 'Large, dark brown' },
-  { id: '2', name: 'Master Bedroom Curtains', type: 'Curtain', cleaningPreference: 'Gentle Wash', notes: '2 pairs, silk blend' },
-  { id: '3', name: 'Persian Rug', type: 'Rug', cleaningPreference: 'Hand Wash', notes: 'Antique, handle with care' },
-  { id: '4', name: 'Dining Room Carpet', type: 'Carpet', cleaningPreference: 'Standard Wash', notes: 'Medium size, cream' },
-  { id: '5', name: 'Guest Room Curtains', type: 'Curtain', cleaningPreference: 'Standard Wash', notes: '1 pair, cotton' },
-  { id: '6', name: 'Office Rug', type: 'Rug', cleaningPreference: 'Deep Clean', notes: 'Small, high traffic' },
-];
+const initialFavorites: FavoriteItem[] = [];
 
 export const FavoriteItems = () => {
+  const navigate = useNavigate();
   const [favorites, setFavorites] = useState<FavoriteItem[]>(initialFavorites);
   const [addOpen, setAddOpen] = useState(false);
   const [removeId, setRemoveId] = useState<string | null>(null);
@@ -64,6 +59,12 @@ export const FavoriteItems = () => {
         </Button>
       </PageHeader>
 
+      {favorites.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Heart className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No favorites yet. Add items for quick reordering!</p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {favorites.map((item) => (
           <Card key={item.id} className="hover:shadow-md transition-shadow">
@@ -84,7 +85,7 @@ export const FavoriteItems = () => {
                   <p className="text-xs text-muted-foreground">{item.notes}</p>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" className="flex-1">
+                  <Button size="sm" className="flex-1" onClick={() => navigate('/portal/request-pickup')}>
                     <ShoppingCart className="mr-1 h-3 w-3" />
                     Reorder
                   </Button>
@@ -101,6 +102,7 @@ export const FavoriteItems = () => {
           </Card>
         ))}
       </div>
+      )}
 
       {/* Add Favorite Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

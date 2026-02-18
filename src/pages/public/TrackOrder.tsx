@@ -102,7 +102,7 @@ const TrackOrder = () => {
             </p>
           )}
           <p className="text-xs text-muted-foreground text-center mt-3">
-            Try "EW-2024-00123" for a demo
+            Enter a tracking code like "EW-2026-XXXXX" from your order confirmation
           </p>
         </div>
 

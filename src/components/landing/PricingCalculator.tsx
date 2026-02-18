@@ -203,6 +203,10 @@ const PricingCalculator = () => {
                       </p>
                     </div>
 
+                    <p className="text-xs text-muted-foreground mt-2">
+                      * Estimates based on standard sizes. Final price is calculated from actual item dimensions at booking.
+                    </p>
+
                     <Button variant="hero" className="w-full" size="lg">
                       Book Now
                       <ArrowRight className="w-4 h-4" />

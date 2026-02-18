@@ -96,12 +96,12 @@ const Footer = () => {
             © {currentYear} ExpressWash. All rights reserved.
           </p>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-background/40 hover:text-primary transition-colors">
+            <Link to="/privacy" className="text-sm text-background/40 hover:text-primary transition-colors">
               Privacy Policy
-            </a>
-            <a href="#" className="text-sm text-background/40 hover:text-primary transition-colors">
+            </Link>
+            <Link to="/terms" className="text-sm text-background/40 hover:text-primary transition-colors">
               Terms of Service
-            </a>
+            </Link>
           </div>
         </div>
       </div>

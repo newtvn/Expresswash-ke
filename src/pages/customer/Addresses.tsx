@@ -30,11 +30,7 @@ const labelIcons: Record<string, React.ElementType> = {
   Other: MoreHorizontal,
 };
 
-const initialAddresses: AddressItem[] = [
-  { id: '1', label: 'Home', addressLine: '45 Namanga Road, Kitengela', zone: 'Kitengela', isDefault: true },
-  { id: '2', label: 'Office', addressLine: '12 Moi Avenue, Nairobi CBD', zone: 'Nairobi', isDefault: false },
-  { id: '3', label: 'Other', addressLine: '8 River View Estate, Athi River', zone: 'Athi River', isDefault: false },
-];
+const initialAddresses: AddressItem[] = [];
 
 const emptyForm = { label: '', addressLine: '', zone: '', isDefault: false };
 
@@ -96,6 +92,12 @@ export const Addresses = () => {
         </Button>
       </PageHeader>
 
+      {addresses.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <MapPin className="h-10 w-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No addresses yet. Add your first pickup address!</p>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {addresses.map((addr) => {
           const Icon = labelIcons[addr.label] ?? MapPin;
@@ -142,6 +144,7 @@ export const Addresses = () => {
           );
         })}
       </div>
+      )}
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
