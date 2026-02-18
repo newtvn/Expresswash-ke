@@ -128,6 +128,19 @@ export const resetPassword = async (newPassword: string): Promise<{ success: boo
   return { success: !error };
 };
 
+export const signInWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/portal/dashboard`,
+    },
+  });
+  if (error) {
+    return { success: false, error: error.message };
+  }
+  return { success: true };
+};
+
 export const signOut = async (): Promise<void> => {
   await supabase.auth.signOut();
 };

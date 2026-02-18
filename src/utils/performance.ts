@@ -82,7 +82,7 @@ export const reportWebVitals = (onReport: ReportHandler): void => {
 function observeLCP(onReport: ReportHandler): void {
   const observer = new PerformanceObserver((list) => {
     const entries = list.getEntries();
-    const lastEntry = entries[entries.length - 1] as any;
+    const lastEntry = entries[entries.length - 1] as PerformanceEntry & { renderTime?: number; loadTime?: number };
 
     const metric: WebVitalMetric = {
       name: 'LCP',
@@ -106,7 +106,7 @@ function observeFID(onReport: ReportHandler): void {
     const entries = list.getEntries();
 
     for (const entry of entries) {
-      const fidEntry = entry as any;
+      const fidEntry = entry as PerformanceEntry & { processingStart: number };
       const metric: WebVitalMetric = {
         name: 'FID',
         value: fidEntry.processingStart - fidEntry.startTime,
@@ -130,7 +130,7 @@ function observeCLS(onReport: ReportHandler): void {
 
   const observer = new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
-      const layoutShift = entry as any;
+      const layoutShift = entry as PerformanceEntry & { hadRecentInput: boolean; value: number };
       if (!layoutShift.hadRecentInput) {
         clsValue += layoutShift.value;
       }
@@ -213,6 +213,7 @@ function getRating(value: number, thresholds: [number, number]): 'good' | 'needs
  * Debounce function - delays execution until after specified wait time has elapsed
  * Use for: search inputs, window resize, scroll events
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
@@ -234,6 +235,7 @@ export function debounce<T extends (...args: any[]) => any>(
  * Throttle function - ensures function is only called once per specified interval
  * Use for: scroll events, mouse movement, API calls
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
   limit: number
@@ -291,7 +293,7 @@ export const setupLazyLoading = (): void => {
 interface BatchRequest<T> {
   key: string;
   resolve: (value: T) => void;
-  reject: (error: any) => void;
+  reject: (error: unknown) => void;
 }
 
 /**

@@ -45,7 +45,7 @@ export const prefetchNextPage = async (
   queryClient: QueryClient,
   currentPage: number,
   queryKey: string[],
-  queryFn: (page: number) => Promise<any>
+  queryFn: (page: number) => Promise<unknown>
 ) => {
   await queryClient.prefetchQuery({
     queryKey: [...queryKey, currentPage + 1],
@@ -187,7 +187,7 @@ export const prefetchCriticalData = async (
   queryClient: QueryClient,
   userRole: 'admin' | 'customer' | 'driver' | 'warehouse'
 ) => {
-  const prefetchTasks: Promise<any>[] = [];
+  const prefetchTasks: Promise<unknown>[] = [];
 
   switch (userRole) {
     case 'admin':

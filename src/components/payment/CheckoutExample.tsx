@@ -110,11 +110,11 @@ export function CheckoutExample({ order, onOrderComplete }: CheckoutExampleProps
         title: 'Payment Request Sent',
         description: 'Check your phone for the M-Pesa prompt',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('STK Push error:', error);
       toast({
         title: 'Payment Failed',
-        description: error.message || 'Failed to initiate payment',
+        description: error instanceof Error ? error.message : 'Failed to initiate payment',
         variant: 'destructive',
       });
       throw error;
