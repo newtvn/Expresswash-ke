@@ -21,6 +21,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -36,19 +37,44 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/authStore';
 
-const navItems = [
-  { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
-  { title: 'Request Pickup', href: '/portal/request-pickup', icon: Truck },
-  { title: 'My Orders', href: '/portal/orders', icon: Package },
-  { title: 'Favorites', href: '/portal/favorites', icon: Heart },
-  { title: 'Addresses', href: '/portal/addresses', icon: MapPin },
-  { title: 'Invoices', href: '/portal/invoices', icon: FileText },
-  { title: 'Payments', href: '/portal/payments', icon: CreditCard },
-  { title: 'Loyalty & Rewards', href: '/portal/loyalty', icon: Award },
-  { title: 'Referrals', href: '/portal/referrals', icon: Users },
-  { title: 'Reviews', href: '/portal/reviews', icon: Star },
-  { title: 'Profile', href: '/portal/profile', icon: UserCircle },
-  { title: 'Notifications', href: '/portal/notifications', icon: Bell },
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [
+      { title: 'Dashboard', href: '/portal/dashboard', icon: LayoutDashboard },
+      { title: 'Request Pickup', href: '/portal/request-pickup', icon: Truck },
+    ],
+  },
+  {
+    label: 'Orders',
+    items: [
+      { title: 'My Orders', href: '/portal/orders', icon: Package },
+      { title: 'Favorites', href: '/portal/favorites', icon: Heart },
+    ],
+  },
+  {
+    label: 'Billing',
+    items: [
+      { title: 'Invoices', href: '/portal/invoices', icon: FileText },
+      { title: 'Payments', href: '/portal/payments', icon: CreditCard },
+    ],
+  },
+  {
+    label: 'Rewards',
+    items: [
+      { title: 'Loyalty & Rewards', href: '/portal/loyalty', icon: Award },
+      { title: 'Referrals', href: '/portal/referrals', icon: Users },
+      { title: 'Reviews', href: '/portal/reviews', icon: Star },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { title: 'Addresses', href: '/portal/addresses', icon: MapPin },
+      { title: 'Profile', href: '/portal/profile', icon: UserCircle },
+      { title: 'Notifications', href: '/portal/notifications', icon: Bell },
+    ],
+  },
 ];
 
 export function CustomerSidebar() {
@@ -85,29 +111,32 @@ export function CustomerSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive =
-                  item.href === '/portal/dashboard'
-                    ? location.pathname === '/portal/dashboard' || location.pathname === '/portal'
-                    : location.pathname.startsWith(item.href);
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => {
+                  const isActive =
+                    item.href === '/portal/dashboard'
+                      ? location.pathname === '/portal/dashboard' || location.pathname === '/portal'
+                      : location.pathname.startsWith(item.href);
 
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
-                      <Link to={item.href}>
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
+                        <Link to={item.href}>
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       <SidebarFooter>
