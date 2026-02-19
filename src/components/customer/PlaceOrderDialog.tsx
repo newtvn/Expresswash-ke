@@ -71,9 +71,7 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
     },
   });
 
-  const canProceedStep1 =
-    form.zone && form.pickupDate && form.pickupAddress &&
-    form.items.some((i) => i.name.trim() !== '');
+  const canProceedStep1 = form.items.some((i) => i.name.trim() !== '');
 
   const handleClose = () => {
     onOpenChange(false);
