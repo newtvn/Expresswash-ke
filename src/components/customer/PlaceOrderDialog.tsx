@@ -88,7 +88,7 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             {step === 1 ? 'What needs cleaning?' : step === 2 ? 'Pickup Details' : 'Order Placed!'}
