@@ -181,6 +181,66 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
+  /* Mobile Menu Stagger Animation */
+  .animate-menu-stagger {
+    animation: menu-stagger 0.4s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes menu-stagger {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Transition duration utilities */
+  .duration-400 {
+    transition-duration: 400ms;
+  }
+
+  /* Mobile touch optimization */
+  @media (hover: none) and (pointer: coarse) {
+    /* Larger touch targets on touch devices */
+    .touch-manipulation {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Disable hover effects on touch devices to prevent sticky hover */
+    .mobile-menu-link:hover {
+      background-color: transparent;
+    }
+
+    .mobile-menu-link:active {
+      background-color: hsl(var(--primary) / 0.1);
+    }
+  }
+
+  /* Button press ripple feedback */
+  .btn-press {
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .btn-press::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at var(--press-x, 50%) var(--press-y, 50%), hsl(var(--primary) / 0.15) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .btn-press:active::after {
+    opacity: 1;
+  }
+
   /* Bubble Background Effect */
   .bubble-effect {
     position: fixed;

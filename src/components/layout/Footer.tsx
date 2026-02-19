@@ -22,13 +22,13 @@ const Footer = () => {
               Professional carpet and fabric cleaning services. 
               We pick up, clean, and deliver with care.
             </p>
-            <div className="space-y-2">
-              <a href="tel:+254700000000" className="flex items-center gap-2 text-sm text-background/60 hover:text-primary transition-colors">
-                <Phone className="w-4 h-4" />
+            <div className="space-y-1">
+              <a href="tel:+254700000000" className="flex items-center gap-2 text-sm text-background/60 hover:text-primary active:text-primary/80 transition-colors py-2 touch-manipulation [-webkit-tap-highlight-color:transparent]">
+                <Phone className="w-4 h-4 shrink-0" />
                 +254 700 000 000
               </a>
-              <a href="mailto:hello@expresswash.co.ke" className="flex items-center gap-2 text-sm text-background/60 hover:text-primary transition-colors">
-                <Mail className="w-4 h-4" />
+              <a href="mailto:hello@expresswash.co.ke" className="flex items-center gap-2 text-sm text-background/60 hover:text-primary active:text-primary/80 transition-colors py-2 touch-manipulation [-webkit-tap-highlight-color:transparent]">
+                <Mail className="w-4 h-4 shrink-0" />
                 hello@expresswash.co.ke
               </a>
             </div>
@@ -37,10 +37,10 @@ const Footer = () => {
           {/* Services */}
           <div>
             <h4 className="font-semibold text-background mb-4">Services</h4>
-            <ul className="space-y-2">
+            <ul className="space-y-0.5">
               {["Carpets", "Sofas", "Curtains", "Rugs", "Mattresses", "Chairs"].map((item) => (
                 <li key={item}>
-                  <a href="#services" className="text-sm text-background/60 hover:text-primary transition-colors">
+                  <a href="#services" className="inline-block text-sm text-background/60 hover:text-primary active:text-primary/80 transition-colors py-1.5 touch-manipulation [-webkit-tap-highlight-color:transparent]">
                     {item} Cleaning
                   </a>
                 </li>
@@ -51,7 +51,7 @@ const Footer = () => {
           {/* Company */}
           <div>
             <h4 className="font-semibold text-background mb-4">Company</h4>
-            <ul className="space-y-2">
+            <ul className="space-y-0.5">
               {[
                 { name: "About Us", href: "#" },
                 { name: "How It Works", href: "#process" },
@@ -61,7 +61,7 @@ const Footer = () => {
                 { name: "Contact", href: "#" },
               ].map((item) => (
                 <li key={item.name}>
-                  <a href={item.href} className="text-sm text-background/60 hover:text-primary transition-colors">
+                  <a href={item.href} className="inline-block text-sm text-background/60 hover:text-primary active:text-primary/80 transition-colors py-1.5 touch-manipulation [-webkit-tap-highlight-color:transparent]">
                     {item.name}
                   </a>
                 </li>
