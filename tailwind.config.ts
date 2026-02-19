@@ -88,6 +88,7 @@ export default {
         'apple-lg': 'var(--shadow-lg)',
         'apple-xl': 'var(--shadow-xl)',
         'glow': 'var(--shadow-glow)',
+        'menu': '0 8px 30px -4px hsl(220 13% 13% / 0.1), 0 4px 10px -2px hsl(220 13% 13% / 0.05)',
       },
       keyframes: {
         "accordion-down": {
@@ -110,6 +111,10 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "menu-stagger": {
+          from: { opacity: "0", transform: "translateY(-8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -117,6 +122,7 @@ export default {
         "fade-in": "fade-in 0.5s ease-out forwards",
         "slide-up": "slide-up 0.6s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
+        "menu-stagger": "menu-stagger 0.4s ease-out forwards",
       },
     },
   },

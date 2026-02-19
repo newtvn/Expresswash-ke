@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Sparkles, LayoutDashboard } from "lucide-react";
+import { Sparkles, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { UserRole } from "@/types";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const { user, isAuthenticated } = useAuthStore();
 
   const navLinks = [
@@ -16,6 +17,38 @@ const Header = () => {
     { name: "Pricing", href: "#pricing" },
     { name: "Track Order", href: "/track" },
   ];
+
+  // Track scroll position for header background
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
+
+  // Close menu on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [mobileMenuOpen]);
+
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const getDashboardPath = () => {
     if (!user) return "/signin";
@@ -44,130 +77,194 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
-      <div className="container mx-auto">
-        <nav className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-glow">
-              <Sparkles className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold text-foreground tracking-tight">
-              Express<span className="text-primary">Wash</span>
-            </span>
-          </Link>
+    <>
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled || mobileMenuOpen
+            ? "bg-background/80 backdrop-blur-xl shadow-apple-sm border-b border-border/50"
+            : "bg-transparent"
+        }`}
+      >
+        <div className="container mx-auto">
+          <nav className="flex items-center justify-between h-16 md:h-20">
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2 relative z-50">
+              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-glow">
+                <Sparkles className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="text-xl font-bold text-foreground tracking-tight">
+                Express<span className="text-primary">Wash</span>
+              </span>
+            </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-8">
+              {navLinks.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
+                >
+                  {link.name}
+                </a>
+              ))}
+            </div>
+
+            {/* Desktop CTA */}
+            <div className="hidden md:flex items-center gap-3">
+              {isAuthenticated && user ? (
+                <>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to={getDashboardPath()} className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                  <Link to={getDashboardPath()} className="flex items-center gap-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.avatarUrl} alt={user.name} />
+                      <AvatarFallback className="text-xs">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm font-medium text-foreground">
+                      {user.name}
+                    </span>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/signin">Sign In</Link>
+                  </Button>
+                  <Button variant="default" size="sm" asChild>
+                    <Link to="/signup">Get Started</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Mobile Menu Toggle - Animated Hamburger */}
+            <button
+              className="md:hidden relative z-50 w-11 h-11 flex items-center justify-center rounded-xl transition-colors duration-200 active:bg-primary/10 touch-manipulation"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={mobileMenuOpen}
+            >
+              <div className="w-6 h-5 relative flex flex-col justify-between">
+                <span
+                  className={`block h-[2px] w-6 bg-foreground rounded-full transition-all duration-300 origin-center ${
+                    mobileMenuOpen ? "rotate-45 translate-y-[9px]" : ""
+                  }`}
+                />
+                <span
+                  className={`block h-[2px] w-6 bg-foreground rounded-full transition-all duration-300 ${
+                    mobileMenuOpen ? "opacity-0 scale-x-0" : ""
+                  }`}
+                />
+                <span
+                  className={`block h-[2px] w-6 bg-foreground rounded-full transition-all duration-300 origin-center ${
+                    mobileMenuOpen ? "-rotate-45 -translate-y-[9px]" : ""
+                  }`}
+                />
+              </div>
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      <div
+        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${
+          mobileMenuOpen ? "visible" : "invisible pointer-events-none"
+        }`}
+      >
+        {/* Backdrop with blur */}
+        <div
+          className={`absolute inset-0 bg-background/60 backdrop-blur-md transition-opacity duration-300 ${
+            mobileMenuOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={closeMobileMenu}
+          aria-hidden="true"
+        />
+
+        {/* Menu Panel */}
+        <div
+          className={`absolute inset-x-0 top-0 bg-background/95 backdrop-blur-xl border-b border-border/50 shadow-apple-xl pt-20 pb-8 px-6 transition-all duration-400 ${
+            mobileMenuOpen
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-4 opacity-0"
+          }`}
+        >
+          <div className="flex flex-col gap-1">
+            {navLinks.map((link, index) => (
               <a
                 key={link.name}
                 href={link.href}
-                className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                className={`mobile-menu-link flex items-center text-lg font-medium text-muted-foreground hover:text-foreground active:text-primary py-3 px-4 rounded-xl transition-all duration-200 hover:bg-secondary/80 active:bg-primary/10 active:scale-[0.98] touch-manipulation ${
+                  mobileMenuOpen ? "animate-menu-stagger" : ""
+                }`}
+                style={{ animationDelay: `${index * 50 + 100}ms` }}
+                onClick={closeMobileMenu}
               >
                 {link.name}
               </a>
             ))}
           </div>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          <div
+            className={`flex flex-col gap-3 pt-6 mt-4 border-t border-border/50 ${
+              mobileMenuOpen ? "animate-menu-stagger" : ""
+            }`}
+            style={{ animationDelay: `${navLinks.length * 50 + 150}ms` }}
+          >
             {isAuthenticated && user ? (
               <>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to={getDashboardPath()} className="flex items-center gap-2">
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                </Button>
-                <Link to={getDashboardPath()} className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
+                <div className="flex items-center gap-3 py-3 px-4">
+                  <Avatar className="h-10 w-10 ring-2 ring-primary/20">
                     <AvatarImage src={user.avatarUrl} alt={user.name} />
-                    <AvatarFallback className="text-xs">
+                    <AvatarFallback className="text-sm font-semibold">
                       {getInitials(user.name)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium text-foreground">
-                    {user.name}
-                  </span>
-                </Link>
+                  <div className="flex flex-col">
+                    <span className="text-base font-semibold text-foreground">
+                      {user.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {user.role?.replace("_", " ")}
+                    </span>
+                  </div>
+                </div>
+                <Button variant="default" size="lg" className="w-full" asChild>
+                  <Link
+                    to={getDashboardPath()}
+                    onClick={closeMobileMenu}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <LayoutDashboard className="h-5 w-5" />
+                    Go to Dashboard
+                  </Link>
+                </Button>
               </>
             ) : (
               <>
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/signin">Sign In</Link>
+                <Button variant="outline" size="lg" className="w-full" asChild>
+                  <Link to="/signin" onClick={closeMobileMenu}>
+                    Sign In
+                  </Link>
                 </Button>
-                <Button variant="default" size="sm" asChild>
-                  <Link to="/signup">Get Started</Link>
+                <Button variant="default" size="lg" className="w-full" asChild>
+                  <Link to="/signup" onClick={closeMobileMenu}>
+                    Get Started
+                  </Link>
                 </Button>
               </>
             )}
           </div>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden p-2 text-foreground"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </nav>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden pb-6 animate-fade-in">
-            <div className="flex flex-col gap-4">
-              {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  className="text-base font-medium text-muted-foreground hover:text-foreground transition-colors py-2"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {link.name}
-                </a>
-              ))}
-              <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                {isAuthenticated && user ? (
-                  <>
-                    <div className="flex items-center gap-3 py-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.avatarUrl} alt={user.name} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(user.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium text-foreground">
-                        {user.name}
-                      </span>
-                    </div>
-                    <Button variant="default" asChild>
-                      <Link
-                        to={getDashboardPath()}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center gap-2"
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        Dashboard
-                      </Link>
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button variant="ghost" asChild>
-                      <Link to="/signin">Sign In</Link>
-                    </Button>
-                    <Button variant="default" asChild>
-                      <Link to="/signup">Get Started</Link>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
-    </header>
+    </>
   );
 };
 

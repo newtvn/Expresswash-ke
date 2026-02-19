@@ -5,18 +5,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium ring-offset-background transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 select-none touch-manipulation [-webkit-tap-highlight-color:transparent]",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-apple-sm hover:bg-primary/90 hover:shadow-apple-md active:scale-[0.98]",
-        destructive: "bg-destructive text-destructive-foreground shadow-apple-sm hover:bg-destructive/90 active:scale-[0.98]",
-        outline: "border border-input bg-background hover:bg-secondary hover:border-primary/20 active:scale-[0.98]",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.98]",
-        ghost: "hover:bg-secondary hover:text-secondary-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-primary text-primary-foreground shadow-glow hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] font-semibold",
-        heroOutline: "border-2 border-primary/20 bg-background/80 backdrop-blur-sm text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary active:scale-[0.98] font-semibold",
+        default: "bg-primary text-primary-foreground shadow-apple-sm hover:bg-primary/90 hover:shadow-apple-md active:scale-[0.97] active:shadow-apple-sm active:brightness-95 transition-[transform,box-shadow,filter] duration-150",
+        destructive: "bg-destructive text-destructive-foreground shadow-apple-sm hover:bg-destructive/90 active:scale-[0.97] active:brightness-95 transition-[transform,filter] duration-150",
+        outline: "border border-input bg-background hover:bg-secondary hover:border-primary/20 active:scale-[0.97] active:bg-secondary/80 transition-[transform,background-color] duration-150",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:scale-[0.97] active:bg-secondary/60 transition-[transform,background-color] duration-150",
+        ghost: "hover:bg-secondary hover:text-secondary-foreground active:scale-[0.97] active:bg-secondary/80 transition-[transform,background-color] duration-150",
+        link: "text-primary underline-offset-4 hover:underline active:opacity-70",
+        hero: "bg-primary text-primary-foreground shadow-glow hover:shadow-xl hover:scale-[1.02] active:scale-[0.97] active:shadow-apple-md active:brightness-95 font-semibold transition-[transform,box-shadow,filter] duration-150",
+        heroOutline: "border-2 border-primary/20 bg-background/80 backdrop-blur-sm text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary active:scale-[0.97] active:brightness-95 font-semibold transition-[transform,filter] duration-150",
       },
       size: {
         default: "h-10 px-5 py-2",

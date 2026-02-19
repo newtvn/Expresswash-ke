@@ -27,7 +27,7 @@ const DriverLayout = () => {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur-lg pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around h-16">
           {bottomNavItems.map((item) => (
             <NavLink
@@ -36,15 +36,32 @@ const DriverLayout = () => {
               end={item.href === '/driver/dashboard'}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center justify-center gap-1 px-3 py-2 text-xs font-medium transition-colors',
+                  'flex flex-col items-center justify-center gap-1 min-w-[4rem] min-h-[3rem] px-3 py-2 text-xs font-medium transition-all duration-200 rounded-lg touch-manipulation [-webkit-tap-highlight-color:transparent] active:scale-95 active:bg-primary/5',
                   isActive
                     ? 'text-primary'
                     : 'text-muted-foreground hover:text-foreground'
                 )
               }
             >
-              <item.icon className="h-5 w-5" />
-              <span>{item.name}</span>
+              {({ isActive }) => (
+                <>
+                  <div className={cn(
+                    'relative flex items-center justify-center transition-all duration-200',
+                    isActive && 'scale-110'
+                  )}>
+                    <item.icon className="h-5 w-5 relative z-10" />
+                    {isActive && (
+                      <div className="absolute inset-0 -m-1.5 rounded-full bg-primary/10 animate-scale-in" />
+                    )}
+                  </div>
+                  <span className={cn(
+                    'transition-all duration-200',
+                    isActive ? 'font-semibold' : 'font-medium'
+                  )}>
+                    {item.name}
+                  </span>
+                </>
+              )}
             </NavLink>
           ))}
         </div>
