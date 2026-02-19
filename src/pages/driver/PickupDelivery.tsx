@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MapPin, Clock, CheckCircle, Package, Navigation, Phone, Ruler } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, Package, Navigation, Phone, Ruler, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
@@ -45,14 +45,18 @@ export const PickupDelivery = () => {
     enabled: !!user?.id,
   });
 
+  /**
+   * Driver-allowed status transitions:
+   * Pickup flow:  -> PICKED_UP (5) -> then warehouse staff takes over
+   * Delivery flow: -> OUT_FOR_DELIVERY (11) -> DELIVERED (12)
+   */
   const completeMutation = useMutation({
     mutationFn: async ({ stopId, orderId, type }: { stopId: string; orderId: string; type: 'pickup' | 'delivery' }) => {
       await completeRouteStop(stopId);
-      // Advance order status: pickup -> Picked Up, delivery -> Delivered
-      await updateOrderStatus(
-        orderId,
-        type === 'pickup' ? ORDER_STATUS.PICKED_UP : ORDER_STATUS.DELIVERED
-      );
+      const newStatus = type === 'pickup'
+        ? ORDER_STATUS.PICKED_UP
+        : ORDER_STATUS.DELIVERED;
+      await updateOrderStatus(orderId, newStatus);
     },
     onSuccess: () => {
       toast.success('Stop completed and order updated!');
@@ -60,6 +64,27 @@ export const PickupDelivery = () => {
       setMeasurementDialog(null);
     },
     onError: () => toast.error('Failed to complete stop'),
+  });
+
+  // Separate mutation for driver-only status updates (e.g. Out for Delivery)
+  const statusUpdateMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: number }) => {
+      // Guard: drivers can only set these statuses
+      const allowedStatuses = [
+        ORDER_STATUS.PICKED_UP,
+        ORDER_STATUS.OUT_FOR_DELIVERY,
+        ORDER_STATUS.DELIVERED,
+      ];
+      if (!allowedStatuses.includes(status)) {
+        throw new Error('You are not authorized to set this status');
+      }
+      await updateOrderStatus(orderId, status);
+    },
+    onSuccess: () => {
+      toast.success('Order status updated!');
+      qc.invalidateQueries({ queryKey: ['driver', 'routes', user?.id] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to update status'),
   });
 
   // Open measurement dialog for pickup
@@ -227,29 +252,44 @@ export const PickupDelivery = () => {
                 >
                   <Navigation className="h-3 w-3 mr-1" /> Navigate
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (stop.type === 'pickup') {
-                      // For pickups, open measurement dialog
-                      handleCompletePickup(stop.id ?? stop.orderId, stop.orderId);
-                    } else {
-                      // For deliveries, complete directly
-                      completeMutation.mutate({
-                        stopId: stop.id ?? stop.orderId,
-                        orderId: stop.orderId,
-                        type: stop.type,
-                      });
-                    }
-                  }}
-                  disabled={completeMutation.isPending}
-                >
-                  {stop.type === 'pickup' ? (
-                    <><Ruler className="h-3 w-3 mr-1" /> Measure & Complete</>
-                  ) : (
-                    <><CheckCircle className="h-3 w-3 mr-1" /> Complete</>
-                  )}
-                </Button>
+                {stop.type === 'pickup' ? (
+                  <Button
+                    size="sm"
+                    onClick={() => handleCompletePickup(stop.id ?? stop.orderId, stop.orderId)}
+                    disabled={completeMutation.isPending}
+                  >
+                    <Ruler className="h-3 w-3 mr-1" /> Measure & Pick Up
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        statusUpdateMutation.mutate({
+                          orderId: stop.orderId,
+                          status: ORDER_STATUS.OUT_FOR_DELIVERY,
+                        })
+                      }
+                      disabled={statusUpdateMutation.isPending}
+                    >
+                      <Truck className="h-3 w-3 mr-1" /> Out for Delivery
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        completeMutation.mutate({
+                          stopId: stop.id ?? stop.orderId,
+                          orderId: stop.orderId,
+                          type: stop.type,
+                        })
+                      }
+                      disabled={completeMutation.isPending}
+                    >
+                      <CheckCircle className="h-3 w-3 mr-1" /> Mark Delivered
+                    </Button>
+                  </>
+                )}
               </>
             )}
             {stop.status === 'completed' && (

@@ -15,6 +15,7 @@ import {
   Settings,
   Shield,
   FileText,
+  ClipboardList,
   Sparkles,
   ChevronUp,
   DollarSign,
@@ -52,6 +53,7 @@ const navGroups = [
   {
     label: 'Management',
     items: [
+      { title: 'Requested Quotes', href: '/admin/quotes', icon: ClipboardList },
       { title: 'Users', href: '/admin/users', icon: Users },
       { title: 'Orders', href: '/admin/orders', icon: Package },
       { title: 'Drivers', href: '/admin/drivers', icon: Truck },

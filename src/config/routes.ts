@@ -34,6 +34,7 @@ export const ROUTES = {
 
   // Admin Portal
   ADMIN_DASHBOARD: '/admin/dashboard',
+  ADMIN_QUOTES: '/admin/quotes',
   ADMIN_USERS: '/admin/users',
   ADMIN_ORDERS: '/admin/orders',
   ADMIN_DRIVERS: '/admin/drivers',
