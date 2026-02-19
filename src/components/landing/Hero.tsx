@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, MapPin, Clock, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-carpet.jpg";
 
 const Hero = () => {
@@ -32,12 +33,16 @@ const Hero = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12 animate-slide-up" style={{ animationDelay: '0.2s' }}>
-              <Button variant="hero" size="xl">
-                Schedule Pickup
-                <ArrowRight className="w-5 h-5" />
+              <Button variant="hero" size="xl" asChild>
+                <Link to="/portal/request-pickup">
+                  Schedule Pickup
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
               </Button>
-              <Button variant="heroOutline" size="xl">
-                Get a Quote
+              <Button variant="heroOutline" size="xl" asChild>
+                <a href="#pricing">
+                  Get a Quote
+                </a>
               </Button>
             </div>
 
