@@ -106,13 +106,10 @@ export const OTPVerification = () => {
 
       if (data.session) {
         toast.success('Verified successfully!', {
-          description: 'Your identity has been confirmed.',
+          description: 'You can now set a new password.',
         });
-        // Clear stored email
         sessionStorage.removeItem('reset_email');
-        // User is now authenticated and can reset password
-        // Redirect to profile or a dedicated password reset page
-        navigate(ROUTES.CUSTOMER_PROFILE);
+        navigate(ROUTES.RESET_PASSWORD);
       }
     } catch (error) {
       console.error('OTP verification error:', error);
