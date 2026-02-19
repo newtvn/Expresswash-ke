@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
-import { UserRole } from "@/types";
+import { getDefaultRouteForRole } from "@/config/permissions";
+import { ROUTES } from "@/config/routes";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -51,20 +52,8 @@ const Header = () => {
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const getDashboardPath = () => {
-    if (!user) return "/signin";
-    switch (user.role) {
-      case UserRole.ADMIN:
-      case UserRole.SUPER_ADMIN:
-        return "/admin";
-      case UserRole.CUSTOMER:
-        return "/customer";
-      case UserRole.DRIVER:
-        return "/driver";
-      case UserRole.WAREHOUSE_STAFF:
-        return "/warehouse";
-      default:
-        return "/signin";
-    }
+    if (!user) return ROUTES.SIGN_IN;
+    return getDefaultRouteForRole(user.role);
   };
 
   const getInitials = (name: string) => {
@@ -135,10 +124,10 @@ const Header = () => {
               ) : (
                 <>
                   <Button variant="ghost" size="sm" asChild>
-                    <Link to="/signin">Sign In</Link>
+                    <Link to={ROUTES.SIGN_IN}>Sign In</Link>
                   </Button>
                   <Button variant="default" size="sm" asChild>
-                    <Link to="/signup">Get Started</Link>
+                    <Link to={ROUTES.SIGN_UP}>Get Started</Link>
                   </Button>
                 </>
               )}

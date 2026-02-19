@@ -101,6 +101,7 @@ export const signUp = async (formData: SignUpFormData): Promise<AuthResponse> =>
         phone: formData.phone,
         role: UserRole.CUSTOMER,
         zone: formData.zone,
+        isActive: true,
         createdAt: new Date().toISOString(),
       };
 
@@ -144,7 +145,8 @@ export const signInWithGoogle = async (): Promise<{ success: boolean; error?: st
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/portal/dashboard`,
+      // Redirect to home — onAuthStateChange in authStore handles role-based routing
+      redirectTo: `${window.location.origin}/`,
     },
   });
   if (error) {

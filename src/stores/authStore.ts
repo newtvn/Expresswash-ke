@@ -145,11 +145,20 @@ supabase.auth.onAuthStateChange(async (event, session) => {
   // Handle OAuth callback (e.g. Google sign-in) — populate store from profile
   if (event === 'SIGNED_IN' && session && !store.user) {
     try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      // Retry profile fetch — DB trigger may not have created it yet for new OAuth users
+      let profile = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        if (p) {
+          profile = p;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
 
       if (profile) {
         const user: User = {
