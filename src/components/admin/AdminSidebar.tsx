@@ -133,9 +133,11 @@ export function AdminSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+        {navGroups.map((group, idx) => (
+          <SidebarGroup key={group.label} className={idx > 0 ? 'border-t border-sidebar-border pt-2' : ''}>
+            <SidebarGroupLabel className="uppercase tracking-widest text-[0.65rem] font-semibold text-sidebar-foreground/50 px-3 mb-1">
+              {group.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
