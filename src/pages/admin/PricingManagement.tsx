@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { DollarSign, Truck, Package, TrendingUp, Save, Shield, AlertCircle, Loader2 } from 'lucide-react';
+import { DollarSign, Truck, Package, TrendingUp, Save, Shield, AlertCircle, Loader2, Upload, ImageIcon, BookOpen } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { PRICING } from '@/services/orderService';
 import { getPricingConfig, updatePricingConfig, type PricingConfig } from '@/services/pricingService';
 import { useAuth } from '@/hooks/useAuth';
@@ -51,6 +53,98 @@ const PricingManagement = () => {
   // Other Settings State
   const [vatRate, setVatRate] = useState(PRICING.vatRate * 100); // Convert to percentage
   const [minimumOrder, setMinimumOrder] = useState(PRICING.minimumOrder);
+
+  // Service catalog state (descriptions + photos per item type)
+  const [catalog, setCatalog] = useState<Record<string, { description: string; photoUrl: string }>>({
+    carpet: { description: '', photoUrl: '' },
+    rug: { description: '', photoUrl: '' },
+    curtain: { description: '', photoUrl: '' },
+    sofa: { description: '', photoUrl: '' },
+    mattress: { description: '', photoUrl: '' },
+    chair: { description: '', photoUrl: '' },
+    pillow: { description: '', photoUrl: '' },
+    other: { description: '', photoUrl: '' },
+  });
+  const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Load catalog from system_config
+  const { data: catalogData } = useQuery({
+    queryKey: ['pricing', 'catalog'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('system_config')
+        .select('*')
+        .eq('id', 'service_catalog')
+        .single();
+      if (error || !data) return null;
+      return data.config as Record<string, { description: string; photoUrl: string }>;
+    },
+  });
+
+  useEffect(() => {
+    if (catalogData) {
+      setCatalog((prev) => ({ ...prev, ...catalogData }));
+    }
+  }, [catalogData]);
+
+  const handlePhotoUpload = async (itemType: string, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File must be smaller than 5MB');
+      return;
+    }
+
+    setUploadingPhoto(itemType);
+    const ext = file.name.split('.').pop();
+    const path = `pricing/${itemType}-${Date.now()}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('public')
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      toast.error('Failed to upload photo');
+      setUploadingPhoto(null);
+      return;
+    }
+
+    const { data: urlData } = supabase.storage.from('public').getPublicUrl(path);
+    setCatalog((prev) => ({
+      ...prev,
+      [itemType]: { ...prev[itemType], photoUrl: urlData.publicUrl },
+    }));
+    setUploadingPhoto(null);
+    toast.success(`Photo uploaded for ${itemType}`);
+  };
+
+  const handleSaveCatalog = async () => {
+    if (!isSuperAdmin || !user) {
+      toast.error('Only super admins can update the service catalog');
+      return;
+    }
+
+    setSaving(true);
+    const { error } = await supabase
+      .from('system_config')
+      .upsert({
+        id: 'service_catalog',
+        config: catalog,
+        updated_at: new Date().toISOString(),
+        updated_by: user.id,
+      });
+
+    setSaving(false);
+
+    if (error) {
+      toast.error('Failed to save catalog', { description: error.message });
+    } else {
+      toast.success('Service catalog saved!');
+    }
+  };
 
   // Load pricing from backend when available
   useEffect(() => {
@@ -165,6 +259,10 @@ const PricingManagement = () => {
           <TabsTrigger value="general" className="gap-2">
             <TrendingUp className="w-4 h-4" />
             General Settings
+          </TabsTrigger>
+          <TabsTrigger value="catalog" className="gap-2">
+            <BookOpen className="w-4 h-4" />
+            Service Catalog
           </TabsTrigger>
         </TabsList>
 
@@ -321,6 +419,132 @@ const PricingManagement = () => {
               Read-only: Only super admins can modify settings
             </p>
           )}
+        </TabsContent>
+
+        {/* Service Catalog Tab */}
+        <TabsContent value="catalog" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5" />
+                    Service Catalog
+                  </CardTitle>
+                  <CardDescription>
+                    Add descriptions and photos for each item type. These appear on the pricing page and customer portal.
+                  </CardDescription>
+                </div>
+                {isSuperAdmin && (
+                  <Button onClick={handleSaveCatalog} disabled={saving} size="sm" className="gap-2">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Save Catalog
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {Object.entries(catalog).map(([key, value]) => (
+                <div key={key} className="border rounded-lg p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold capitalize text-base">{key}</h4>
+                    <span className="text-xs text-muted-foreground">
+                      KES {itemPrices[key as keyof typeof itemPrices]?.toFixed(2) ?? '—'} per sq in
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Description */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`desc-${key}`}>Description</Label>
+                      <Textarea
+                        id={`desc-${key}`}
+                        placeholder={`Describe the ${key} cleaning service...`}
+                        value={value.description}
+                        onChange={(e) =>
+                          setCatalog((prev) => ({
+                            ...prev,
+                            [key]: { ...prev[key], description: e.target.value },
+                          }))
+                        }
+                        rows={3}
+                        disabled={!isSuperAdmin}
+                      />
+                    </div>
+
+                    {/* Photo */}
+                    <div className="space-y-2">
+                      <Label>Photo</Label>
+                      <div className="border-2 border-dashed rounded-lg p-4 text-center space-y-2">
+                        {value.photoUrl ? (
+                          <div className="relative">
+                            <img
+                              src={value.photoUrl}
+                              alt={key}
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                            {isSuperAdmin && (
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                className="absolute bottom-2 right-2 text-xs"
+                                onClick={() => fileInputRefs.current[key]?.click()}
+                                disabled={uploadingPhoto === key}
+                              >
+                                {uploadingPhoto === key ? (
+                                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                ) : (
+                                  <Upload className="w-3 h-3 mr-1" />
+                                )}
+                                Replace
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">No photo uploaded</p>
+                            {isSuperAdmin && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fileInputRefs.current[key]?.click()}
+                                disabled={uploadingPhoto === key}
+                              >
+                                {uploadingPhoto === key ? (
+                                  <><Loader2 className="w-3 h-3 animate-spin mr-1" /> Uploading...</>
+                                ) : (
+                                  <><Upload className="w-3 h-3 mr-1" /> Upload Photo</>
+                                )}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                        <input
+                          ref={(el) => { fileInputRefs.current[key] = el; }}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePhotoUpload(key, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {!isSuperAdmin && (
+                <p className="text-sm text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  Read-only: Only super admins can modify the service catalog
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

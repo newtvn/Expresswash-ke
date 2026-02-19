@@ -51,6 +51,7 @@ const SystemConfig = lazy(() => import('@/pages/admin/SystemConfig'));
 const AuditLogs = lazy(() => import('@/pages/admin/AuditLogs'));
 const SystemLogs = lazy(() => import('@/pages/admin/SystemLogs'));
 const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
+const RequestedQuotes = lazy(() => import('@/pages/admin/RequestedQuotes'));
 const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
 
 // Customer Pages
@@ -162,6 +163,7 @@ const App = () => {
                   </ErrorBoundary>
                 }
               />
+              <Route path="quotes" element={<RequestedQuotes />} />
               <Route path="users" element={<UserManagement />} />
               <Route
                 path="orders"
