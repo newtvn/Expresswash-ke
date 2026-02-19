@@ -52,8 +52,9 @@ export const ForgotPassword = () => {
         return;
       }
 
-      // Store email in sessionStorage for OTP verification
+      // Store email + timestamp in sessionStorage for OTP verification
       sessionStorage.setItem('reset_email', values.email);
+      sessionStorage.setItem('reset_email_ts', Date.now().toString());
 
       setSubmitted(true);
       toast.success('Verification code sent', {

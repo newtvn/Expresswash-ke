@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
+import { signOut as signOutService } from '@/services/authService';
 import { toast } from 'sonner';
 
 interface UseSessionTimeoutOptions {
@@ -56,8 +57,9 @@ export const useSessionTimeout = (options: UseSessionTimeoutOptions = {}) => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
   }, []);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     clearTimeouts();
+    await signOutService();
     clearAuth();
     setShowWarning(false);
     navigate('/auth/signin');

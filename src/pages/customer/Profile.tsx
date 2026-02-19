@@ -10,12 +10,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { User, Lock, Bell, Save, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 import { updateUser } from '@/services/userService';
 import { supabase } from '@/lib/supabase';
+import { ROUTES } from '@/config/routes';
 
 export const Profile = () => {
+  const navigate = useNavigate();
   const { user, updateUser: updateAuthUser } = useAuth();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
 
   const [profile, setProfile] = useState({
     name: '',
@@ -108,8 +113,12 @@ export const Profile = () => {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success('Password changed successfully');
+        toast.success('Password changed successfully. Please sign in again.');
         setPasswords({ current: '', newPassword: '', confirm: '' });
+        // Sign out to invalidate old session tokens
+        await supabase.auth.signOut();
+        clearAuth();
+        navigate(ROUTES.SIGN_IN);
       }
     } catch (error) {
       toast.error('Failed to change password. Please try again.');

@@ -71,9 +71,7 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
     },
   });
 
-  const canProceedStep1 =
-    form.zone && form.pickupDate && form.pickupAddress &&
-    form.items.some((i) => i.name.trim() !== '');
+  const canProceedStep1 = form.items.some((i) => i.name.trim() !== '');
 
   const handleClose = () => {
     onOpenChange(false);
@@ -90,7 +88,7 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>
             {step === 1 ? 'What needs cleaning?' : step === 2 ? 'Pickup Details' : 'Order Placed!'}

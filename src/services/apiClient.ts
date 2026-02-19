@@ -8,6 +8,7 @@ interface RequestConfig extends RequestInit {
 
 class ApiClient {
   private baseUrl: string;
+  private redirectingOn401 = false;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
@@ -44,7 +45,10 @@ class ApiClient {
       },
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 && !this.redirectingOn401) {
+      this.redirectingOn401 = true;
+      // Reset flag after 5s so future 401s (e.g. after manual navigation back) still redirect
+      setTimeout(() => { this.redirectingOn401 = false; }, 5000);
       useAuthStore.getState().clearAuth();
       window.location.href = '/auth/signin';
       throw new Error('Session expired');

@@ -37,6 +37,12 @@ export const signIn = async (formData: SignInFormData): Promise<AuthResponse> =>
     return { success: false, error: 'Profile not found' };
   }
 
+  // Block inactive/deactivated accounts
+  if (profile.is_active === false) {
+    await supabase.auth.signOut();
+    return { success: false, error: 'Your account has been deactivated. Please contact support.' };
+  }
+
   // Update last login
   await supabase
     .from('profiles')
@@ -71,14 +77,20 @@ export const signUp = async (formData: SignUpFormData): Promise<AuthResponse> =>
     return { success: false, error: error?.message || 'Registration failed' };
   }
 
-  // Wait briefly for trigger to create profile, then fetch
-  await new Promise((r) => setTimeout(r, 500));
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', data.user.id)
-    .single();
+  // Poll for profile creation (database trigger may take a moment)
+  let profile = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+    const { data: p } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+    if (p) {
+      profile = p;
+      break;
+    }
+  }
 
   const user: User = profile
     ? mapProfile(profile)
@@ -89,6 +101,7 @@ export const signUp = async (formData: SignUpFormData): Promise<AuthResponse> =>
         phone: formData.phone,
         role: UserRole.CUSTOMER,
         zone: formData.zone,
+        isActive: true,
         createdAt: new Date().toISOString(),
       };
 
@@ -114,7 +127,7 @@ export const verifyOTP = async (email: string, otp: string): Promise<{ success: 
   const { error } = await supabase.auth.verifyOtp({
     email,
     token: otp,
-    type: 'email',
+    type: 'recovery',
   });
   return { success: !error };
 };
@@ -132,7 +145,8 @@ export const signInWithGoogle = async (): Promise<{ success: boolean; error?: st
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/portal/dashboard`,
+      // Redirect to home — onAuthStateChange in authStore handles role-based routing
+      redirectTo: `${window.location.origin}/`,
     },
   });
   if (error) {

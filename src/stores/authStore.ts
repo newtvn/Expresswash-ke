@@ -63,6 +63,13 @@ export const useAuthStore = create<AuthState>()(
               .single();
 
             if (profile) {
+              // Block inactive/deactivated users
+              if (profile.is_active === false) {
+                await supabase.auth.signOut();
+                set({ user: null, tokens: null, isAuthenticated: false });
+                return;
+              }
+
               const user: User = {
                 id: profile.id,
                 email: profile.email,
@@ -127,10 +134,60 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     return;
   }
 
-  if (event === 'TOKEN_REFRESHED' && session) {
+  // Safe token refresh — only if user still exists in store
+  if (event === 'TOKEN_REFRESHED' && session && store.user) {
     store.setAuth(
-      store.user!,
+      store.user,
       { accessToken: session.access_token, refreshToken: session.refresh_token },
     );
+  }
+
+  // Handle OAuth callback (e.g. Google sign-in) — populate store from profile
+  if (event === 'SIGNED_IN' && session && !store.user) {
+    try {
+      // Retry profile fetch — DB trigger may not have created it yet for new OAuth users
+      let profile = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data: p } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        if (p) {
+          profile = p;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+
+      if (profile) {
+        const user: User = {
+          id: profile.id,
+          email: profile.email,
+          name: profile.name ?? '',
+          role: profile.role as UserRole,
+          phone: profile.phone ?? undefined,
+          zone: profile.zone ?? undefined,
+          avatarUrl: profile.avatar_url ?? undefined,
+          isActive: profile.is_active ?? true,
+          createdAt: profile.created_at ?? '',
+          lastLoginAt: profile.last_login_at ?? undefined,
+        };
+
+        // Block inactive users
+        if (!user.isActive) {
+          await supabase.auth.signOut();
+          store.clearAuth();
+          return;
+        }
+
+        store.setAuth(
+          user,
+          { accessToken: session.access_token, refreshToken: session.refresh_token },
+        );
+      }
+    } catch {
+      // Profile fetch failed — initSession will retry on next load
+    }
   }
 });

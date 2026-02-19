@@ -33,6 +33,7 @@ const SignIn = lazy(() => import('@/pages/auth/SignIn'));
 const SignUp = lazy(() => import('@/pages/auth/SignUp'));
 const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'));
 const OTPVerification = lazy(() => import('@/pages/auth/OTPVerification'));
+const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'));
 
 // Admin Pages
 const AdminDashboard = lazy(() => import('@/pages/admin/Dashboard'));
@@ -136,6 +137,7 @@ const App = () => {
             <Route path="/auth/signup" element={<SignUp />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
             <Route path="/auth/verify-otp" element={<OTPVerification />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
 
             {/* Legacy auth redirects */}
             <Route path="/signin" element={<Navigate to="/auth/signin" replace />} />

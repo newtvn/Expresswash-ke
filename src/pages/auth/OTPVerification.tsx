@@ -80,9 +80,14 @@ export const OTPVerification = () => {
       return;
     }
 
-    // Retrieve email from sessionStorage
+    // Retrieve email from sessionStorage and validate it's not stale (10 min max)
     const email = sessionStorage.getItem('reset_email');
-    if (!email) {
+    const emailTs = sessionStorage.getItem('reset_email_ts');
+    const TEN_MINUTES = 10 * 60 * 1000;
+
+    if (!email || !emailTs || Date.now() - parseInt(emailTs, 10) > TEN_MINUTES) {
+      sessionStorage.removeItem('reset_email');
+      sessionStorage.removeItem('reset_email_ts');
       toast.error('Session expired. Please request a new code.');
       navigate(ROUTES.FORGOT_PASSWORD);
       return;
@@ -106,13 +111,11 @@ export const OTPVerification = () => {
 
       if (data.session) {
         toast.success('Verified successfully!', {
-          description: 'Your identity has been confirmed.',
+          description: 'You can now set a new password.',
         });
-        // Clear stored email
         sessionStorage.removeItem('reset_email');
-        // User is now authenticated and can reset password
-        // Redirect to profile or a dedicated password reset page
-        navigate(ROUTES.CUSTOMER_PROFILE);
+        sessionStorage.removeItem('reset_email_ts');
+        navigate(ROUTES.RESET_PASSWORD);
       }
     } catch (error) {
       console.error('OTP verification error:', error);

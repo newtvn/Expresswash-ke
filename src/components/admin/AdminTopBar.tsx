@@ -20,6 +20,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
+import { signOut } from '@/services/authService';
 
 export function AdminTopBar() {
   const location = useLocation();
@@ -35,9 +36,10 @@ export function AdminTopBar() {
       .slice(0, 2);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     clearAuth();
-    navigate('/signin');
+    navigate('/auth/signin');
   };
 
   // Build breadcrumbs from the path

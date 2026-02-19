@@ -33,7 +33,8 @@ export const useAuth = () => {
       const response = await signUpService(formData);
       if (response.success && response.user && response.tokens) {
         setAuth(response.user, response.tokens);
-        navigate('/portal/dashboard');
+        const defaultRoute = getDefaultRouteForRole(response.user.role);
+        navigate(defaultRoute);
         return { success: true };
       }
       return { success: false, error: response.error || 'Registration failed' };

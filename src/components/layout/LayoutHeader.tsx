@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
+import { signOut } from '@/services/authService';
 
 interface LayoutHeaderProps {
   subtitle?: string;
@@ -16,7 +17,8 @@ export function LayoutHeader({ subtitle, className = '' }: LayoutHeaderProps) {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     clearAuth();
     navigate('/auth/signin');
   };

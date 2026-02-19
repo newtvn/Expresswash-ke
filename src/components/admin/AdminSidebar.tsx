@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthStore } from '@/stores/authStore';
+import { signOut } from '@/services/authService';
 
 const navGroups = [
   {
@@ -101,7 +102,14 @@ const navGroups = [
 
 export function AdminSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
+
+  const handleLogout = async () => {
+    await signOut();
+    clearAuth();
+    navigate('/auth/signin');
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -196,7 +204,7 @@ export function AdminSidebar() {
                 <DropdownMenuItem asChild>
                   <Link to="/portal/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={clearAuth}>
+                <DropdownMenuItem onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
