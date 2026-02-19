@@ -10,7 +10,7 @@ const CustomerLayout = () => {
       <CustomerSidebar />
       <SidebarInset>
         <AdminTopBar />
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-4 md:p-6">
           <ErrorBoundary fullPage={true} showHomeButton={true} fallbackTitle="Customer Page Error">
             <Outlet />
           </ErrorBoundary>
