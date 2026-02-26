@@ -8,11 +8,14 @@ import { DollarSign, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
 import { getInvoices } from '@/services/invoiceService';
 import { toast } from 'sonner';
 import type { Invoice } from '@/types';
+import { InvoiceDownloadButton } from '@/components/shared';
 
 // ── Row shape used by DataTable ──────────────────────────────────────
 
 interface InvoiceRow {
   id: string;
+  invoiceId: string;
+  pdfUrl?: string;
   customer: string;
   amount: number;
   status: string;
@@ -24,6 +27,8 @@ interface InvoiceRow {
 function toRow(inv: Invoice): InvoiceRow {
   return {
     id: inv.invoiceNumber,
+    invoiceId: inv.id,
+    pdfUrl: inv.pdfUrl,
     customer: inv.customerName,
     amount: inv.total,
     status: inv.status,
@@ -86,6 +91,13 @@ const invoiceColumns: Column<InvoiceRow>[] = [
   { key: 'issuedDate', header: 'Issued', sortable: true },
   { key: 'dueDate', header: 'Due Date', sortable: true },
   { key: 'paidDate', header: 'Paid Date' },
+  {
+    key: 'invoiceId',
+    header: 'PDF',
+    render: (row) => (
+      <InvoiceDownloadButton invoiceId={row.invoiceId} pdfUrl={row.pdfUrl} size="sm" variant="ghost" />
+    ),
+  },
 ];
 
 // ── Skeleton loaders ─────────────────────────────────────────────────

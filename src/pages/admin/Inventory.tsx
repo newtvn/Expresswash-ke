@@ -11,69 +11,6 @@ import { toast } from 'sonner';
 import { getWarehouseStats, getProcessingItems } from '@/services/warehouseService';
 import type { WarehouseStats, ProcessingItem } from '@/types';
 
-// ── Mock Stock Data (no stock table in DB yet) ──────────────────────────
-
-const mockStock = [
-  { id: 'STK-001', item: 'Carpet Shampoo (5L)', category: 'Cleaning Supplies', inStock: 24, minLevel: 10, status: 'ok', lastRestocked: '2024-12-10' },
-  { id: 'STK-002', item: 'Fabric Softener (5L)', category: 'Cleaning Supplies', inStock: 8, minLevel: 10, status: 'low', lastRestocked: '2024-12-05' },
-  { id: 'STK-003', item: 'Stain Remover Spray', category: 'Cleaning Supplies', inStock: 45, minLevel: 20, status: 'ok', lastRestocked: '2024-12-12' },
-  { id: 'STK-004', item: 'Washing Machine Pods', category: 'Consumables', inStock: 120, minLevel: 50, status: 'ok', lastRestocked: '2024-12-08' },
-  { id: 'STK-005', item: 'Plastic Wrapping Roll', category: 'Packaging', inStock: 3, minLevel: 5, status: 'low', lastRestocked: '2024-11-28' },
-  { id: 'STK-006', item: 'Garment Bags (Large)', category: 'Packaging', inStock: 200, minLevel: 100, status: 'ok', lastRestocked: '2024-12-01' },
-  { id: 'STK-007', item: 'Drying Rack Clips', category: 'Equipment', inStock: 50, minLevel: 20, status: 'ok', lastRestocked: '2024-11-25' },
-  { id: 'STK-008', item: 'Steam Iron Refills', category: 'Equipment', inStock: 2, minLevel: 5, status: 'low', lastRestocked: '2024-11-20' },
-  { id: 'STK-009', item: 'Dust Masks (Box)', category: 'Safety', inStock: 15, minLevel: 5, status: 'ok', lastRestocked: '2024-12-06' },
-  { id: 'STK-010', item: 'Latex Gloves (Box)', category: 'Safety', inStock: 4, minLevel: 10, status: 'low', lastRestocked: '2024-11-30' },
-];
-
-// ── Column definitions ──────────────────────────────────────────────────
-
-const stockColumns: Column<(typeof mockStock)[0]>[] = [
-  { key: 'item', header: 'Item', sortable: true },
-  { key: 'category', header: 'Category', sortable: true },
-  {
-    key: 'inStock',
-    header: 'In Stock',
-    sortable: true,
-    render: (row) => (
-      <span className={cn('font-medium', row.status === 'low' && 'text-red-600 font-bold')}>
-        {row.inStock}
-      </span>
-    ),
-  },
-  { key: 'minLevel', header: 'Min Level' },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (row) =>
-      row.status === 'low' ? (
-        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          Low Stock
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-200">
-          OK
-        </Badge>
-      ),
-  },
-  { key: 'lastRestocked', header: 'Last Restocked', sortable: true },
-  {
-    key: 'id',
-    header: 'Action',
-    render: (row) => (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => toast.success(`Restock request sent for ${row.item}`)}
-      >
-        <RefreshCw className="w-3 h-3 mr-1" />
-        Restock
-      </Button>
-    ),
-  },
-];
-
 const itemColumns: Column<ProcessingItem>[] = [
   { key: 'id', header: 'Item ID', sortable: true },
   { key: 'orderNumber', header: 'Order', sortable: true },
@@ -171,8 +108,6 @@ export const Inventory = () => {
     fetchItems();
   }, [fetchStats, fetchItems]);
 
-  const lowStockCount = mockStock.filter((i) => i.status === 'low').length;
-
   // Build KPI cards from live stats
   const warehouseKPIs = stats
     ? [
@@ -232,21 +167,20 @@ export const Inventory = () => {
         </Card>
       )}
 
-      {/* Low Stock Alert */}
-      {lowStockCount > 0 && (
-        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          <span className="text-sm font-medium">
-            {lowStockCount} item{lowStockCount > 1 ? 's' : ''} below minimum stock level
-          </span>
-        </div>
-      )}
-
-      {/* Stock Table (mock data) */}
+      {/* Stock Table (placeholder — no stock table in DB yet) */}
       <Card className="bg-card border-border/50">
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Stock Levels</h3>
-          <DataTable data={mockStock} columns={stockColumns} searchPlaceholder="Search stock..." />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Stock Levels</h3>
+            <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
+              Coming Soon
+            </Badge>
+          </div>
+          <div className="text-center py-10 text-muted-foreground">
+            <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
+            <p className="text-sm font-medium">Stock management is coming soon</p>
+            <p className="text-xs mt-1">Inventory tracking will be available in a future update</p>
+          </div>
         </CardContent>
       </Card>
 

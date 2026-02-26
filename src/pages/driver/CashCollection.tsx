@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, KPICard, StatusBadge, ConfirmDialog } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,25 +14,34 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Wallet, Banknote, ArrowUpRight, CheckCircle } from 'lucide-react';
+import { Wallet, Banknote, ArrowUpRight, CheckCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/config/queryKeys';
+import { getPayments, recordPayment } from '@/services/invoiceService';
+import { getOrders } from '@/services/orderService';
+import type { Payment } from '@/types';
 
-const mockCashEntries = [
-  { id: '1', orderNumber: 'EW-2025-00380', customer: 'Grace Wanjiku', amount: 3500, method: 'cash', time: '09:45 AM', status: 'collected' },
-  { id: '2', orderNumber: 'EW-2025-00365', customer: 'Peter Kamau', amount: 2400, method: 'cash', time: '10:30 AM', status: 'collected' },
-  { id: '3', orderNumber: 'EW-2025-00350', customer: 'Mary Njeri', amount: 4500, method: 'mpesa', time: '11:15 AM', status: 'completed' },
-  { id: '4', orderNumber: 'EW-2025-00398', customer: 'John Odera', amount: 1800, method: 'cash', time: '12:00 PM', status: 'collected' },
-  { id: '5', orderNumber: 'EW-2025-00401', customer: 'Sarah Wambui', amount: 2200, method: 'mpesa', time: '01:30 PM', status: 'completed' },
-  { id: '6', orderNumber: 'EW-2025-00405', customer: 'David Maina', amount: 3100, method: 'cash', time: '02:45 PM', status: 'collected' },
-  { id: '7', orderNumber: 'EW-2025-00410', customer: 'Faith Akinyi', amount: 1500, method: 'cash', time: '03:30 PM', status: 'remitted' },
-  { id: '8', orderNumber: 'EW-2025-00412', customer: 'James Mwangi', amount: 2800, method: 'cash', time: '04:15 PM', status: 'collected' },
-];
+interface CashEntry {
+  id: string;
+  orderNumber: string;
+  customer: string;
+  amount: number;
+  method: string;
+  time: string;
+  status: string;
+  invoiceId: string;
+  invoiceNumber: string;
+}
 
 const methodLabels: Record<string, string> = {
   cash: 'Cash',
   mpesa: 'M-Pesa',
+  card: 'Card',
+  bank_transfer: 'Bank Transfer',
 };
 
-const columns: Column<(typeof mockCashEntries)[0]>[] = [
+const columns: Column<CashEntry>[] = [
   { key: 'orderNumber', header: 'Order #', sortable: true },
   { key: 'customer', header: 'Customer', sortable: true },
   {
@@ -58,14 +68,86 @@ const columns: Column<(typeof mockCashEntries)[0]>[] = [
 ];
 
 export const CashCollection = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [remitOpen, setRemitOpen] = useState(false);
   const [confirmRemit, setConfirmRemit] = useState(false);
   const [remitAmount, setRemitAmount] = useState('');
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [collectOrderId, setCollectOrderId] = useState('');
+  const [collectAmount, setCollectAmount] = useState('');
+  const [collectInvoiceId, setCollectInvoiceId] = useState('');
+  const [collectInvoiceNumber, setCollectInvoiceNumber] = useState('');
 
-  const cashEntries = mockCashEntries.filter((e) => e.method === 'cash');
-  const totalCollected = cashEntries.reduce((sum, e) => sum + e.amount, 0);
-  const remitted = cashEntries.filter((e) => e.status === 'remitted').reduce((sum, e) => sum + e.amount, 0);
+  // Fetch today's payments recorded by this driver
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: [...queryKeys.payments.list(), 'driver', user?.id],
+    queryFn: async () => {
+      const allPayments = await getPayments();
+      // Filter to payments recorded by this driver
+      return allPayments.filter((p) => p.recordedBy === user?.id);
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch orders assigned to this driver that are in delivery status
+  const { data: driverOrders } = useQuery({
+    queryKey: [...queryKeys.orders.lists(), 'driver-delivery', user?.id],
+    queryFn: () => getOrders({ page: 1, limit: 100 }),
+    enabled: !!user?.id,
+    select: (result) =>
+      result.data.filter(
+        (o) => o.driverId === user?.id && o.status >= 10 && o.status <= 12
+      ),
+  });
+
+  // Map payments to CashEntry format
+  const cashEntries: CashEntry[] = payments.map((p) => ({
+    id: p.id,
+    orderNumber: p.invoiceNumber || p.orderId || '--',
+    customer: p.invoiceNumber || p.customerName || '--',
+    amount: p.amount,
+    method: p.method,
+    time: new Date(p.createdAt).toLocaleTimeString('en-KE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    status: p.status === 'completed' ? 'collected' : p.status,
+    invoiceId: p.invoiceId || '',
+    invoiceNumber: p.invoiceNumber || '',
+  }));
+
+  const cashOnlyEntries = cashEntries.filter((e) => e.method === 'cash');
+  const totalCollected = cashOnlyEntries.reduce((sum, e) => sum + e.amount, 0);
+  const remitted = cashOnlyEntries
+    .filter((e) => e.status === 'remitted')
+    .reduce((sum, e) => sum + e.amount, 0);
   const toRemit = totalCollected - remitted;
+
+  // Record cash payment mutation
+  const collectMutation = useMutation({
+    mutationFn: () =>
+      recordPayment({
+        invoiceId: collectInvoiceId,
+        invoiceNumber: collectInvoiceNumber,
+        amount: parseFloat(collectAmount),
+        method: 'cash',
+        reference: `CASH-${Date.now()}`,
+        status: 'completed',
+        recordedBy: user?.id ?? '',
+      }),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Cash payment recorded');
+        queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
+        setCollectOpen(false);
+        setCollectAmount('');
+      } else {
+        toast.error('Failed to record payment');
+      }
+    },
+    onError: () => toast.error('Failed to record payment'),
+  });
 
   const handleRemitSubmit = () => {
     setRemitOpen(false);
@@ -116,7 +198,7 @@ export const CashCollection = () => {
         </CardHeader>
         <CardContent>
           <DataTable
-            data={mockCashEntries}
+            data={cashEntries}
             columns={columns}
             searchable
             searchPlaceholder="Search collections..."

@@ -40,6 +40,7 @@ import {
   type CreateOrderPayload,
   type PickupRequestItem,
 } from '@/services/orderService';
+import { calculateServerPrice } from '@/services/pricingService';
 
 const ITEM_TYPES = [
   { value: 'carpet', label: 'Carpet' },
@@ -198,6 +199,31 @@ export const RequestPickup = () => {
 
     setIsSubmitting(true);
 
+    // Server-side pricing validation
+    let validatedSubtotal = subtotal;
+    let validatedDeliveryFee = deliveryFee;
+    let validatedVat = vatAmount;
+    let validatedTotal = grandTotal;
+
+    try {
+      const serverItems = calculatedItems
+        .filter((i) => i.isValid)
+        .map((i) => ({
+          item_type: i.itemType,
+          length_inches: parseFloat(i.lengthInches),
+          width_inches: parseFloat(i.widthInches),
+          quantity: i.quantity,
+        }));
+
+      const serverPrice = await calculateServerPrice(serverItems, zone);
+      validatedSubtotal = serverPrice.subtotal;
+      validatedDeliveryFee = serverPrice.delivery_fee;
+      validatedVat = serverPrice.vat_amount;
+      validatedTotal = serverPrice.total;
+    } catch {
+      // Fall back to frontend pricing if server validation fails
+    }
+
     const payload: CreateOrderPayload = {
       customerId: user.id,
       customerName: user.name,
@@ -216,10 +242,10 @@ export const RequestPickup = () => {
           unitPrice: i.unitPrice,
           totalPrice: i.totalPrice,
         })),
-      subtotal,
-      deliveryFee,
-      vat: vatAmount,
-      total: grandTotal,
+      subtotal: validatedSubtotal,
+      deliveryFee: validatedDeliveryFee,
+      vat: validatedVat,
+      total: validatedTotal,
       notes: notes || undefined,
     };
 
@@ -230,7 +256,7 @@ export const RequestPickup = () => {
       setOrderCreated({
         trackingCode: result.order.trackingCode,
         eta: eta?.label ?? 'To be confirmed',
-        total: grandTotal,
+        total: validatedTotal,
       });
       toast.success('Pickup request submitted!');
     } else {

@@ -1,9 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
+import type { Payment } from '@/types/payment';
 import {
   Invoice,
   InvoiceItem,
-  Payment,
   InvoiceFilters,
   PaginatedResponse,
 } from '@/types';
@@ -41,16 +41,27 @@ function mapInvoice(row: Record<string, unknown>, items: Record<string, unknown>
 function mapPayment(row: Record<string, unknown>): Payment {
   return {
     id: row.id as string,
-    invoiceId: row.invoice_id as string,
-    invoiceNumber: row.invoice_number as string,
+    orderId: (row.order_id as string) ?? undefined,
+    invoiceId: (row.invoice_id as string) ?? undefined,
+    invoiceNumber: (row.invoice_number as string) ?? undefined,
     amount: row.amount as number,
     method: row.method as Payment['method'],
-    reference: row.reference as string,
-    mpesaReceiptNumber: (row.mpesa_receipt_number as string) ?? undefined,
     status: row.status as Payment['status'],
-    recordedBy: row.recorded_by as string,
+    phoneNumber: (row.phone_number as string) ?? undefined,
+    customerName: (row.customer_name as string) ?? undefined,
+    recordedBy: (row.recorded_by as string) ?? undefined,
+    merchantRequestId: (row.merchant_request_id as string) ?? undefined,
+    checkoutRequestId: (row.checkout_request_id as string) ?? undefined,
+    reference: (row.reference as string) ?? undefined,
+    referenceNumber: (row.reference_number as string) ?? undefined,
+    mpesaReceiptNumber: (row.mpesa_receipt_number as string) ?? undefined,
+    resultCode: (row.result_code as number) ?? undefined,
+    resultDesc: (row.result_desc as string) ?? undefined,
+    failureReason: (row.failure_reason as string) ?? undefined,
     notes: (row.notes as string) ?? undefined,
     createdAt: row.created_at as string,
+    updatedAt: (row.updated_at as string) ?? undefined,
+    completedAt: (row.completed_at as string) ?? undefined,
   };
 }
 
@@ -221,6 +232,7 @@ export const recordPayment = async (
     () => supabase
       .from('payments')
       .insert({
+        order_id: payment.orderId ?? null,
         invoice_id: payment.invoiceId,
         invoice_number: payment.invoiceNumber,
         amount: payment.amount,

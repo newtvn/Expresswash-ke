@@ -1,75 +1,26 @@
-import { PageHeader, DataTable, StatusBadge } from "@/components/shared";
-import type { Column } from "@/components/shared";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/shared";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Send, Users, BarChart3, Megaphone } from "lucide-react";
+import { Send, Users, BarChart3, Megaphone } from "lucide-react";
 
 const campaignStats = [
-  { label: "Total Campaigns", value: "0", icon: Megaphone, color: "bg-primary/10 text-primary" },
-  { label: "Messages Sent", value: "0", icon: Send, color: "bg-blue-100 text-blue-600" },
-  { label: "Unique Reach", value: "0", icon: Users, color: "bg-emerald-100 text-emerald-600" },
-  { label: "Avg Open Rate", value: "0%", icon: BarChart3, color: "bg-amber-100 text-amber-600" },
-];
-
-type Campaign = {
-  id: string;
-  name: string;
-  type: string;
-  audience: string;
-  sent: number;
-  delivered: number;
-  failed: number;
-  status: string;
-  date: string;
-};
-
-const campaignColumns: Column<Campaign>[] = [
-  { key: "name", header: "Campaign", sortable: true },
-  { key: "type", header: "Type", sortable: true },
-  { key: "audience", header: "Audience" },
-  {
-    key: "sent",
-    header: "Sent",
-    sortable: true,
-    render: (row) => <span className="font-medium">{row.sent.toLocaleString()}</span>,
-  },
-  {
-    key: "delivered",
-    header: "Delivered",
-    sortable: true,
-    render: (row) => (
-      <span className="text-emerald-600 font-medium">{row.delivered.toLocaleString()}</span>
-    ),
-  },
-  {
-    key: "failed",
-    header: "Failed",
-    render: (row) => (
-      <span className={row.failed > 0 ? "text-red-500 font-medium" : "text-muted-foreground"}>
-        {row.failed}
-      </span>
-    ),
-  },
-  { key: "status", header: "Status", render: (row) => <StatusBadge status={row.status} /> },
-  { key: "date", header: "Date", sortable: true },
+  { label: "Total Campaigns", value: "--", icon: Megaphone, color: "bg-primary/10 text-primary" },
+  { label: "Messages Sent", value: "--", icon: Send, color: "bg-blue-100 text-blue-600" },
+  { label: "Unique Reach", value: "--", icon: Users, color: "bg-emerald-100 text-emerald-600" },
+  { label: "Avg Open Rate", value: "--", icon: BarChart3, color: "bg-amber-100 text-amber-600" },
 ];
 
 /**
  * Admin Marketing Campaigns Page
- * Campaign list table with stats and create button.
- * TODO: Connect to real campaign service
+ * Coming soon — campaign management will be available in a future update.
  */
 export const MarketingCampaigns = () => {
-  // TODO: Fetch campaigns from Supabase
-  const campaigns: Campaign[] = [];
-
   return (
     <div className="space-y-6">
       <PageHeader title="Marketing Campaigns" description="Manage promotional campaigns and track engagement">
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Campaign
-        </Button>
+        <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
+          Coming Soon
+        </Badge>
       </PageHeader>
 
       {/* Stats Cards */}
@@ -89,12 +40,17 @@ export const MarketingCampaigns = () => {
         ))}
       </div>
 
-      {/* Campaigns Table */}
-      <DataTable
-        data={campaigns}
-        columns={campaignColumns}
-        searchPlaceholder="Search campaigns..."
-      />
+      {/* Coming Soon */}
+      <Card className="bg-card border-border/50">
+        <CardContent className="py-16 text-center">
+          <Megaphone className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Campaign Management Coming Soon</h3>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Create and manage SMS and email marketing campaigns to engage your customers.
+            This feature will be available in a future update.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

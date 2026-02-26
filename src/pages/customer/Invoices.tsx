@@ -5,9 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Download, FileText, Calendar } from 'lucide-react';
+import { FileText, Calendar } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { getInvoices } from '@/services/invoiceService';
+import { InvoiceDownloadButton } from '@/components/shared';
 
 export const Invoices = () => {
   const { user } = useAuth();
@@ -65,15 +66,7 @@ export const Invoices = () => {
                     <span className="font-medium text-foreground">KES {inv.total.toLocaleString()}</span>
                   </div>
                 </div>
-                {inv.pdfUrl ? (
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={inv.pdfUrl} target="_blank" rel="noreferrer">
-                      <Download className="h-4 w-4 mr-1" /> Download
-                    </a>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" disabled><Download className="h-4 w-4 mr-1" /> PDF</Button>
-                )}
+                <InvoiceDownloadButton invoiceId={inv.id} pdfUrl={inv.pdfUrl} />
               </CardContent>
             </Card>
           ))}

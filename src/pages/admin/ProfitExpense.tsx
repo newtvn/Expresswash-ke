@@ -1,106 +1,310 @@
-import { PageHeader, KPICard } from "@/components/shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingUp, TrendingDown, Percent } from "lucide-react";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PageHeader, KPICard, DataTable, StatusBadge, ConfirmDialog } from '@/components/shared';
+import type { Column } from '@/components/shared';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Plus, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/config/queryKeys';
+import {
+  getExpenses,
+  createExpense,
+  approveExpense,
+  rejectExpense,
+  getExpenseSummary,
+  getExpenseKPIs,
+  type Expense,
+  type CreateExpensePayload,
+} from '@/services/expenseService';
 
-const summaryKPIs = [
-  { label: "Total Revenue", value: 2450000, change: 12.5, changeDirection: "up" as const, icon: DollarSign, format: "currency" as const },
-  { label: "Total Expenses", value: 1680000, change: 8.1, changeDirection: "up" as const, icon: TrendingDown, format: "currency" as const },
-  { label: "Net Profit", value: 770000, change: 18.2, changeDirection: "up" as const, icon: TrendingUp, format: "currency" as const },
-  { label: "Profit Margin", value: 31.4, change: 4.3, changeDirection: "up" as const, icon: Percent, format: "percentage" as const },
+const EXPENSE_CATEGORIES = [
+  'fuel',
+  'supplies',
+  'salary',
+  'rent',
+  'utilities',
+  'marketing',
+  'maintenance',
+  'other',
 ];
 
-const monthlyData = [
-  { month: "Jan", revenue: 185000, expenses: 128000 },
-  { month: "Feb", revenue: 210000, expenses: 145000 },
-  { month: "Mar", revenue: 248000, expenses: 168000 },
-  { month: "Apr", revenue: 225000, expenses: 155000 },
-  { month: "May", revenue: 275000, expenses: 185000 },
-  { month: "Jun", revenue: 298000, expenses: 198000 },
-  { month: "Jul", revenue: 320000, expenses: 210000 },
-  { month: "Aug", revenue: 270000, expenses: 188000 },
-  { month: "Sep", revenue: 305000, expenses: 205000 },
-  { month: "Oct", revenue: 338000, expenses: 225000 },
-  { month: "Nov", revenue: 365000, expenses: 240000 },
-  { month: "Dec", revenue: 385000, expenses: 250000 },
-];
-
-const expenseCategories = [
-  { category: "Staff Salaries", amount: 680000, percentage: 40.5 },
-  { category: "Transport & Fuel", amount: 302400, percentage: 18.0 },
-  { category: "Cleaning Supplies", amount: 252000, percentage: 15.0 },
-  { category: "Rent & Utilities", amount: 168000, percentage: 10.0 },
-  { category: "Equipment Maintenance", amount: 117600, percentage: 7.0 },
-  { category: "Marketing", amount: 84000, percentage: 5.0 },
-  { category: "Insurance", amount: 42000, percentage: 2.5 },
-  { category: "Miscellaneous", amount: 34000, percentage: 2.0 },
-];
+const PAYMENT_METHODS = ['cash', 'mpesa', 'bank_transfer', 'card'];
 
 const categoryColors = [
-  "bg-primary",
-  "bg-blue-500",
-  "bg-amber-500",
-  "bg-violet-500",
-  "bg-rose-500",
-  "bg-emerald-500",
-  "bg-orange-500",
-  "bg-gray-400",
+  'bg-primary',
+  'bg-blue-500',
+  'bg-amber-500',
+  'bg-violet-500',
+  'bg-rose-500',
+  'bg-emerald-500',
+  'bg-orange-500',
+  'bg-gray-400',
+  'bg-cyan-500',
+  'bg-pink-500',
+];
+
+const expenseColumns: Column<Expense>[] = [
+  {
+    key: 'expenseDate',
+    header: 'Date',
+    sortable: true,
+    render: (row) => new Date(row.expenseDate).toLocaleDateString('en-KE'),
+  },
+  {
+    key: 'category',
+    header: 'Category',
+    sortable: true,
+    render: (row) => (
+      <span className="capitalize">{row.category.replace('_', ' ')}</span>
+    ),
+  },
+  {
+    key: 'description',
+    header: 'Description',
+    render: (row) => (
+      <span className="text-sm truncate max-w-xs block">{row.description}</span>
+    ),
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    sortable: true,
+    render: (row) => <span className="font-medium">KES {row.amount.toLocaleString()}</span>,
+  },
+  {
+    key: 'paymentMethod',
+    header: 'Method',
+    render: (row) => (
+      <span className="capitalize text-sm">{row.paymentMethod.replace('_', ' ')}</span>
+    ),
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (row) => <StatusBadge status={row.status} />,
+  },
 ];
 
 /**
  * Admin Profit & Expense Page
- * KPI summary, revenue vs expenses chart, and expense breakdown.
+ * KPI summary, revenue vs expenses chart, expense breakdown, and expense CRUD.
  */
 export const ProfitExpense = () => {
-  const maxVal = Math.max(...monthlyData.map((d) => Math.max(d.revenue, d.expenses)));
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
+
+  // Form state for new expense
+  const [formCategory, setFormCategory] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [formMethod, setFormMethod] = useState('');
+  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Queries
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
+    queryKey: queryKeys.expenses.list({}),
+    queryFn: () => getExpenses(),
+  });
+
+  const { data: kpis, isLoading: kpisLoading } = useQuery({
+    queryKey: queryKeys.expenses.kpis(),
+    queryFn: () => getExpenseKPIs(),
+  });
+
+  const { data: summary = [], isLoading: summaryLoading } = useQuery({
+    queryKey: queryKeys.expenses.summary(),
+    queryFn: () => getExpenseSummary(),
+  });
+
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: (payload: CreateExpensePayload) => createExpense(payload, user?.id ?? ''),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Expense added');
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+        setAddOpen(false);
+        resetForm();
+      } else {
+        toast.error(result.error ?? 'Failed to add expense');
+      }
+    },
+    onError: () => toast.error('Failed to add expense'),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (expenseId: string) => approveExpense(expenseId, user?.id ?? ''),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Expense approved');
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      } else {
+        toast.error(result.error ?? 'Failed to approve expense');
+      }
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (expenseId: string) => rejectExpense(expenseId),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Expense rejected');
+        queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+      } else {
+        toast.error(result.error ?? 'Failed to reject expense');
+      }
+    },
+  });
+
+  const resetForm = () => {
+    setFormCategory('');
+    setFormDescription('');
+    setFormAmount('');
+    setFormMethod('');
+    setFormDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleAddExpense = () => {
+    if (!formCategory || !formDescription || !formAmount || !formMethod) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    createMutation.mutate({
+      category: formCategory,
+      description: formDescription,
+      amount: parseFloat(formAmount),
+      paymentMethod: formMethod,
+      expenseDate: formDate,
+    });
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmAction) return;
+    if (confirmAction.action === 'approve') {
+      approveMutation.mutate(confirmAction.id);
+    } else {
+      rejectMutation.mutate(confirmAction.id);
+    }
+    setConfirmAction(null);
+  };
+
+  // KPI data
+  const kpiCards = [
+    {
+      label: 'Total Revenue',
+      value: kpis?.totalRevenue ?? 0,
+      change: 0,
+      changeDirection: 'flat' as const,
+      icon: DollarSign,
+      format: 'currency' as const,
+    },
+    {
+      label: 'Total Expenses',
+      value: kpis?.totalExpenses ?? 0,
+      change: 0,
+      changeDirection: 'flat' as const,
+      icon: TrendingDown,
+      format: 'currency' as const,
+    },
+    {
+      label: 'Net Profit',
+      value: kpis?.netProfit ?? 0,
+      change: 0,
+      changeDirection: 'flat' as const,
+      icon: TrendingUp,
+      format: 'currency' as const,
+    },
+    {
+      label: 'Profit Margin',
+      value: kpis?.profitMargin ?? 0,
+      change: 0,
+      changeDirection: 'flat' as const,
+      icon: Percent,
+      format: 'percentage' as const,
+    },
+  ];
+
+  // Expense columns with actions
+  const columnsWithActions: Column<Expense>[] = [
+    ...expenseColumns,
+    {
+      key: 'id',
+      header: 'Actions',
+      render: (row) =>
+        row.status === 'pending' ? (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+              onClick={() => setConfirmAction({ id: row.id, action: 'approve' })}
+            >
+              <CheckCircle className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+              onClick={() => setConfirmAction({ id: row.id, action: 'reject' })}
+            >
+              <XCircle className="w-4 h-4" />
+            </Button>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">--</span>
+        ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Profit & Expenses" description="Financial overview and expense tracking" />
+      <PageHeader title="Profit & Expenses" description="Financial overview and expense tracking">
+        <Button onClick={() => setAddOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Expense
+        </Button>
+      </PageHeader>
 
       {/* Summary KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryKPIs.map((kpi) => (
-          <KPICard key={kpi.label} {...kpi} />
-        ))}
-      </div>
-
-      {/* Revenue vs Expenses Chart */}
-      <Card className="bg-card border-border/50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-semibold">Revenue vs Expenses</CardTitle>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-primary" />
-                <span className="text-muted-foreground">Revenue</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-rose-400" />
-                <span className="text-muted-foreground">Expenses</span>
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-end gap-1">
-            {monthlyData.map((d) => (
-              <div key={d.month} className="flex-1 flex flex-col items-center gap-0.5">
-                <div className="w-full flex gap-0.5 justify-center items-end" style={{ height: "200px" }}>
-                  <div
-                    className="w-[45%] bg-primary/80 hover:bg-primary rounded-t transition-colors"
-                    style={{ height: `${(d.revenue / maxVal) * 200}px` }}
-                  />
-                  <div
-                    className="w-[45%] bg-rose-400/80 hover:bg-rose-400 rounded-t transition-colors"
-                    style={{ height: `${(d.expenses / maxVal) * 200}px` }}
-                  />
-                </div>
-                <span className="text-xs text-muted-foreground">{d.month}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {kpisLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="bg-card border-border/50">
+              <CardContent className="p-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiCards.map((kpi) => (
+            <KPICard key={kpi.label} {...kpi} />
+          ))}
+        </div>
+      )}
 
       {/* Expense Breakdown */}
       <Card className="bg-card border-border/50">
@@ -108,32 +312,148 @@ export const ProfitExpense = () => {
           <CardTitle className="text-lg font-semibold">Expense Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {expenseCategories.map((item, index) => (
-              <div key={item.category} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded ${categoryColors[index]}`} />
-                    <span className="text-foreground font-medium">{item.category}</span>
+          {summaryLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : summary.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">No approved expenses to display</p>
+          ) : (
+            <div className="space-y-4">
+              {summary.map((item, index) => (
+                <div key={item.category} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded ${categoryColors[index % categoryColors.length]}`} />
+                      <span className="text-foreground font-medium capitalize">{item.category.replace('_', ' ')}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">{item.percentage}%</span>
+                      <span className="font-medium text-foreground w-28 text-right">
+                        KES {item.total.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-muted-foreground">{item.percentage}%</span>
-                    <span className="font-medium text-foreground w-28 text-right">
-                      KES {item.amount.toLocaleString()}
-                    </span>
+                  <div className="w-full bg-secondary rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${categoryColors[index % categoryColors.length]} transition-all`}
+                      style={{ width: `${item.percentage}%` }}
+                    />
                   </div>
                 </div>
-                <div className="w-full bg-secondary rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${categoryColors[index]} transition-all`}
-                    style={{ width: `${item.percentage}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Expenses Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">All Expenses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            data={expenses}
+            columns={columnsWithActions}
+            searchable
+            searchPlaceholder="Search expenses..."
+            pageSize={10}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Add Expense Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Expense</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Category *</Label>
+              <Select value={formCategory} onValueChange={setFormCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      <span className="capitalize">{cat.replace('_', ' ')}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Description *</Label>
+              <Textarea
+                value={formDescription}
+                onChange={(e) => setFormDescription(e.target.value)}
+                placeholder="What was this expense for?"
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Amount (KES) *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formAmount}
+                  onChange={(e) => setFormAmount(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label>Date *</Label>
+                <Input
+                  type="date"
+                  value={formDate}
+                  onChange={(e) => setFormDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Payment Method *</Label>
+              <Select value={formMethod} onValueChange={setFormMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      <span className="capitalize">{m.replace('_', ' ')}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleAddExpense}
+              disabled={createMutation.isPending || !formCategory || !formDescription || !formAmount || !formMethod}
+            >
+              {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Expense
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm approve/reject dialog */}
+      <ConfirmDialog
+        open={!!confirmAction}
+        onOpenChange={(open) => { if (!open) setConfirmAction(null); }}
+        title={confirmAction?.action === 'approve' ? 'Approve Expense' : 'Reject Expense'}
+        description={`Are you sure you want to ${confirmAction?.action} this expense?`}
+        confirmLabel={confirmAction?.action === 'approve' ? 'Yes, Approve' : 'Yes, Reject'}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 };

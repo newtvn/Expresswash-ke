@@ -63,4 +63,17 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.drivers.all, 'detail', id] as const,
     routes: (driverId: string) => [...queryKeys.drivers.all, 'routes', driverId] as const,
   },
+  reviews: {
+    all: ['reviews'] as const,
+    myReviews: () => [...queryKeys.reviews.all, 'my'] as const,
+    pending: () => [...queryKeys.reviews.all, 'pending'] as const,
+    stats: () => [...queryKeys.reviews.all, 'stats'] as const,
+    public: (limit: number) => [...queryKeys.reviews.all, 'public', limit] as const,
+  },
+  expenses: {
+    all: ['expenses'] as const,
+    list: (filters: Record<string, unknown>) => [...queryKeys.expenses.all, 'list', filters] as const,
+    summary: (month?: string) => [...queryKeys.expenses.all, 'summary', month] as const,
+    kpis: (month?: string) => [...queryKeys.expenses.all, 'kpis', month] as const,
+  },
 } as const;

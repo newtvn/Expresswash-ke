@@ -24,10 +24,25 @@ export interface OrderStatusCount {
 
 export const getDashboardKPIs = async (): Promise<DashboardKPIs> => {
   // Use database function for server-side aggregation (much faster!)
-  const { data, error } = await supabase.rpc('get_dashboard_kpis').single();
+  const [kpiResult, ratingResult] = await Promise.all([
+    supabase.rpc('get_dashboard_kpis').single(),
+    supabase
+      .from('reviews')
+      .select('overall_rating')
+      .eq('status', 'approved'),
+  ]);
 
-  if (error || !data) {
-    // Fallback to default values if function fails
+  // Calculate average rating from approved reviews
+  let avgRating = 0;
+  if (!ratingResult.error && ratingResult.data && ratingResult.data.length > 0) {
+    const sum = ratingResult.data.reduce(
+      (acc, r) => acc + ((r.overall_rating as number) ?? 0),
+      0,
+    );
+    avgRating = Math.round((sum / ratingResult.data.length) * 10) / 10;
+  }
+
+  if (kpiResult.error || !kpiResult.data) {
     return {
       totalRevenue: 0,
       totalRevenueChange: 0,
@@ -35,18 +50,18 @@ export const getDashboardKPIs = async (): Promise<DashboardKPIs> => {
       activeOrdersChange: 0,
       totalCustomers: 0,
       totalCustomersChange: 0,
-      avgRating: 4.7,
+      avgRating,
     };
   }
 
   return {
-    totalRevenue: Number(data.total_revenue) || 0,
-    totalRevenueChange: 0, // TODO: Implement historical comparison
-    activeOrders: Number(data.active_orders) || 0,
-    activeOrdersChange: 0, // TODO: Implement historical comparison
-    totalCustomers: Number(data.total_customers) || 0,
-    totalCustomersChange: 0, // TODO: Implement historical comparison
-    avgRating: 4.7, // TODO: Fetch from reviews table
+    totalRevenue: Number(kpiResult.data.total_revenue) || 0,
+    totalRevenueChange: 0,
+    activeOrders: Number(kpiResult.data.active_orders) || 0,
+    activeOrdersChange: 0,
+    totalCustomers: Number(kpiResult.data.total_customers) || 0,
+    totalCustomersChange: 0,
+    avgRating,
   };
 };
 

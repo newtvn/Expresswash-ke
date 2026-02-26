@@ -65,11 +65,11 @@ export const PaymentHistory = () => {
       month: 'short',
       day: 'numeric',
     }),
-    invoiceId: payment.invoiceNumber,
+    invoiceId: payment.invoiceNumber || payment.orderId || '--',
     method: payment.method,
     amount: payment.amount,
     status: payment.status,
-    reference: payment.reference || payment.mpesaReceiptNumber || 'N/A',
+    reference: payment.reference || payment.mpesaReceiptNumber || payment.referenceNumber || 'N/A',
   }));
 
   const completedPayments = payments.filter((p) => p.status === 'completed');

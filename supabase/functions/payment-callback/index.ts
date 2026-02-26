@@ -73,34 +73,23 @@ function validateCallback(req: Request): boolean {
 }
 
 /**
- * Map result code to payment status
- */
-function getPaymentStatus(resultCode: number): string {
-  if (resultCode === 0) {
-    return 'completed';
-  } else if (resultCode === 1032 || resultCode === 1037) {
-    return 'cancelled'; // User cancelled or timeout
-  } else {
-    return 'failed';
-  }
-}
-
-/**
- * Send notification to customer
- * You can integrate SMS/email here
+ * Queue notification to customer via notification_history table.
+ * The send-notification Edge Function (invoked by pg_cron) picks up
+ * pending rows and dispatches SMS via Africa's Talking / email via Resend.
  */
 async function sendPaymentNotification(
-  supabase: any,
+  supabaseClient: ReturnType<typeof createClient>,
   orderId: string,
   status: string,
   transactionId: string | null
 ): Promise<void> {
   try {
-    // Get order and customer details
-    const { data: order } = await supabase
+    // Get order + invoice + customer details
+    const { data: order } = await supabaseClient
       .from('orders')
       .select(`
         tracking_code,
+        total,
         customer_id,
         profiles:customer_id (
           name,
@@ -113,39 +102,106 @@ async function sendPaymentNotification(
 
     if (!order) return;
 
-    const customerName = order.profiles?.name || 'Customer';
-    const customerEmail = order.profiles?.email;
-    const customerPhone = order.profiles?.phone;
+    const customerName = (order.profiles as Record<string, unknown>)?.name as string || 'Customer';
+    const customerEmail = (order.profiles as Record<string, unknown>)?.email as string | null;
+    const customerPhone = (order.profiles as Record<string, unknown>)?.phone as string | null;
+
+    // Get invoice for this order (if exists)
+    const { data: invoice } = await supabaseClient
+      .from('invoices')
+      .select('invoice_number')
+      .eq('order_id', orderId)
+      .limit(1)
+      .single();
+
+    const invoiceNumber = invoice?.invoice_number || '';
+    const orderNumber = order.tracking_code || '';
+    const amount = order.total ? Number(order.total).toLocaleString() : '0';
 
     if (status === 'completed') {
-      // Payment successful
-      const message = `Payment received! Your ExpressWash order #${order.tracking_code} is confirmed. Transaction ID: ${transactionId}`;
+      // Fetch SMS template
+      const { data: smsTpl } = await supabaseClient
+        .from('notification_templates')
+        .select('body')
+        .eq('name', 'Payment Confirmation')
+        .eq('channel', 'sms')
+        .limit(1)
+        .single();
 
-      console.log('Would send success notification:', {
-        to: customerPhone,
-        email: customerEmail,
-        message,
-      });
+      // Queue SMS notification
+      if (smsTpl?.body && customerPhone) {
+        let smsBody = smsTpl.body as string;
+        smsBody = smsBody.replace(/\{\{customerName\}\}/g, customerName);
+        smsBody = smsBody.replace(/\{\{amount\}\}/g, amount);
+        smsBody = smsBody.replace(/\{\{orderNumber\}\}/g, orderNumber);
+        smsBody = smsBody.replace(/\{\{invoiceNumber\}\}/g, invoiceNumber);
+        smsBody = smsBody.replace(/\{\{paymentMethod\}\}/g, 'M-Pesa');
 
-      // TODO: Integrate with Africa's Talking SMS API
-      // await sendSMS(customerPhone, message);
+        await supabaseClient.from('notification_history').insert({
+          recipient_id: order.customer_id,
+          recipient_name: customerName,
+          recipient_contact: customerPhone,
+          channel: 'sms',
+          template_name: 'Payment Confirmation',
+          body: smsBody,
+          status: 'pending',
+        });
+      }
 
-      // TODO: Send email
-      // await sendEmail(customerEmail, 'Payment Confirmed', message);
+      // Fetch email template
+      const { data: emailTpl } = await supabaseClient
+        .from('notification_templates')
+        .select('subject, body')
+        .eq('name', 'Payment Confirmation')
+        .eq('channel', 'email')
+        .limit(1)
+        .single();
+
+      // Queue email notification
+      if (emailTpl?.body && customerEmail) {
+        let emailBody = emailTpl.body as string;
+        emailBody = emailBody.replace(/\{\{customerName\}\}/g, customerName);
+        emailBody = emailBody.replace(/\{\{amount\}\}/g, amount);
+        emailBody = emailBody.replace(/\{\{orderNumber\}\}/g, orderNumber);
+        emailBody = emailBody.replace(/\{\{invoiceNumber\}\}/g, invoiceNumber);
+        emailBody = emailBody.replace(/\{\{paymentMethod\}\}/g, 'M-Pesa');
+
+        let emailSubject = (emailTpl.subject as string) || 'Payment Received';
+        emailSubject = emailSubject.replace(/\{\{invoiceNumber\}\}/g, invoiceNumber);
+
+        await supabaseClient.from('notification_history').insert({
+          recipient_id: order.customer_id,
+          recipient_name: customerName,
+          recipient_contact: customerEmail,
+          channel: 'email',
+          template_name: 'Payment Confirmation',
+          subject: emailSubject,
+          body: emailBody,
+          status: 'pending',
+        });
+      }
+
+      logger.info('Payment notifications queued', { orderId, sms: !!customerPhone, email: !!customerEmail });
 
     } else if (status === 'failed') {
-      // Payment failed
-      const message = `Payment failed for order #${order.tracking_code}. Please try again or contact support.`;
-
-      console.log('Would send failure notification:', {
-        to: customerPhone,
-        email: customerEmail,
-        message,
-      });
+      // Queue failure SMS (simple message, no template needed)
+      if (customerPhone) {
+        await supabaseClient.from('notification_history').insert({
+          recipient_id: order.customer_id,
+          recipient_name: customerName,
+          recipient_contact: customerPhone,
+          channel: 'sms',
+          template_name: 'Payment Confirmation',
+          body: `Payment failed for order #${orderNumber}. Please try again or contact support.`,
+          status: 'pending',
+        });
+      }
     }
 
   } catch (error) {
-    console.error('Error sending notification:', error);
+    logger.error('Error queuing notification', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
     // Don't throw - notification failure shouldn't break callback processing
   }
 }

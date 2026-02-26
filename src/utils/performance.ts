@@ -9,7 +9,6 @@
 
 export const registerServiceWorker = async (): Promise<void> => {
   if (!('serviceWorker' in navigator)) {
-    console.log('Service Worker not supported');
     return;
   }
 
@@ -17,8 +16,6 @@ export const registerServiceWorker = async (): Promise<void> => {
     const registration = await navigator.serviceWorker.register('/sw.js', {
       scope: '/',
     });
-
-    console.log('Service Worker registered successfully:', registration.scope);
 
     // Check for updates on page load
     registration.update();

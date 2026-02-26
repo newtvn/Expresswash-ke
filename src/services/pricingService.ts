@@ -145,6 +145,58 @@ export async function updatePricingConfig(
   }
 }
 
+// ── Server-Side Pricing Validation ───────────────────────────────────
+
+export interface ServerPriceItem {
+  item_type: string;
+  length_inches: number;
+  width_inches: number;
+  quantity: number;
+}
+
+export interface ServerPriceResult {
+  subtotal: number;
+  delivery_fee: number;
+  discount: number;
+  vat_rate: number;
+  vat_amount: number;
+  total: number;
+  zone: string;
+  promo_code: string | null;
+  items: Array<{
+    item_type: string;
+    length_inches: number;
+    width_inches: number;
+    quantity: number;
+    rate: number;
+    sq_inches: number;
+    unit_price: number;
+    total: number;
+  }>;
+}
+
+/**
+ * Call the server-side calculate_order_pricing() function
+ * for authoritative price validation.
+ */
+export async function calculateServerPrice(
+  items: ServerPriceItem[],
+  zoneName: string,
+  promoCode?: string,
+): Promise<ServerPriceResult> {
+  const { data, error } = await supabase.rpc('calculate_order_pricing', {
+    p_items: items,
+    p_zone_name: zoneName,
+    p_promo_code: promoCode ?? null,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? 'Server pricing calculation failed');
+  }
+
+  return data as ServerPriceResult;
+}
+
 /**
  * Get pricing change history from audit logs
  */
