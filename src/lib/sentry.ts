@@ -1,14 +1,11 @@
 /**
- * Sentry Error Monitoring Setup
+ * Sentry Error Monitoring
  *
- * This file provides the configuration for Sentry error monitoring.
- * To enable Sentry:
- * 1. Install Sentry: npm install @sentry/react
- * 2. Set VITE_SENTRY_DSN in your .env file
- * 3. Uncomment the code below and import in main.tsx
+ * Uses the modern functional integration API (@sentry/react v8+).
+ * To enable: set VITE_SENTRY_DSN in your .env file.
+ * If the DSN is not set, all exports become safe no-ops.
  */
 
-/*
 import * as Sentry from '@sentry/react';
 
 export const initSentry = () => {
@@ -22,40 +19,37 @@ export const initSentry = () => {
   Sentry.init({
     dsn: sentryDsn,
     environment: import.meta.env.MODE,
+    release: import.meta.env.VITE_APP_VERSION || 'development',
+
     integrations: [
-      new Sentry.BrowserTracing({
-        // Set sampling rate for performance monitoring
-        tracePropagationTargets: ['localhost', /^https:\/\/yourapp\.com/],
+      Sentry.browserTracingIntegration({
+        tracePropagationTargets: [
+          'localhost',
+          /^https:\/\/expresswash\.co\.ke/,
+        ],
       }),
-      new Sentry.Replay({
-        // Session replay for debugging
+      Sentry.replayIntegration({
         maskAllText: true,
         blockAllMedia: true,
       }),
     ],
 
-    // Performance Monitoring
-    tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0, // 10% in prod, 100% in dev
+    // Performance: 10% in prod, 100% in dev
+    tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
 
-    // Session Replay
-    replaysSessionSampleRate: 0.1, // 10% of sessions
-    replaysOnErrorSampleRate: 1.0, // 100% of sessions with errors
+    // Session Replay: 1% of normal sessions, 50% of error sessions
+    replaysSessionSampleRate: 0.01,
+    replaysOnErrorSampleRate: 0.5,
 
-    // Release tracking
-    release: import.meta.env.VITE_APP_VERSION || 'development',
-
-    // Error filtering
     beforeSend(event, hint) {
-      // Filter out known non-critical errors
       if (event.exception) {
         const error = hint.originalException;
         if (error instanceof Error) {
-          // Ignore network errors (handled by retry logic)
+          // Ignore network errors (handled by React Query retry logic)
           if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
             return null;
           }
-
-          // Ignore specific errors that are not actionable
+          // Ignore ResizeObserver errors (browser noise)
           if (error.message.includes('ResizeObserver loop')) {
             return null;
           }
@@ -64,43 +58,26 @@ export const initSentry = () => {
       return event;
     },
 
-    // User context (optional - add user info for better debugging)
-    beforeBreadcrumb(breadcrumb, hint) {
-      // Sanitize sensitive data from breadcrumbs
+    beforeBreadcrumb(breadcrumb) {
+      // Don't send console logs to Sentry
       if (breadcrumb.category === 'console') {
-        return null; // Don't send console logs to Sentry
+        return null;
       }
       return breadcrumb;
     },
   });
-
-  // Set user context when available
-  export const setSentryUser = (user: { id: string; email?: string; name?: string }) => {
-    Sentry.setUser({
-      id: user.id,
-      email: user.email,
-      username: user.name,
-    });
-  };
-
-  export const clearSentryUser = () => {
-    Sentry.setUser(null);
-  };
 };
 
-// Export Sentry for manual error logging
-export { Sentry };
-*/
-
-// Placeholder functions when Sentry is not installed
-export const initSentry = () => {
-  console.log('Sentry not configured. Install @sentry/react to enable error monitoring.');
-};
-
-export const setSentryUser = (_user: { id: string; email?: string; name?: string }) => {
-  // No-op when Sentry is not enabled
+export const setSentryUser = (user: { id: string; email?: string; name?: string }) => {
+  Sentry.setUser({
+    id: user.id,
+    email: user.email,
+    username: user.name,
+  });
 };
 
 export const clearSentryUser = () => {
-  // No-op when Sentry is not enabled
+  Sentry.setUser(null);
 };
+
+export { Sentry };
