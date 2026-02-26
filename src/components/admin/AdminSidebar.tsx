@@ -20,6 +20,7 @@ import {
   ChevronUp,
   DollarSign,
   Calendar,
+  Tag,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -71,6 +72,7 @@ const navGroups = [
     label: 'Marketing',
     items: [
       { title: 'Campaigns', href: '/admin/marketing', icon: Megaphone },
+      { title: 'Promotions', href: '/admin/promotions', icon: Tag },
       { title: 'Loyalty', href: '/admin/loyalty', icon: Heart },
       { title: 'Reviews', href: '/admin/reviews', icon: Star },
     ],

@@ -135,7 +135,7 @@ async function initiateSTKPush(
   amount: number,
   reference: string,
   narration: string,
-): Promise<any> {
+): Promise<Record<string, unknown>> {
   const accessToken = await getAccessToken();
 
   const requestBody = {

@@ -178,16 +178,21 @@ export interface ServerPriceResult {
 /**
  * Call the server-side calculate_order_pricing() function
  * for authoritative price validation.
+ *
+ * @param customerId - Optional customer UUID for per-customer promo usage checks.
+ *                     When provided, the server enforces usage_per_customer limits.
  */
 export async function calculateServerPrice(
   items: ServerPriceItem[],
   zoneName: string,
   promoCode?: string,
+  customerId?: string,
 ): Promise<ServerPriceResult> {
   const { data, error } = await supabase.rpc('calculate_order_pricing', {
     p_items: items,
     p_zone_name: zoneName,
     p_promo_code: promoCode ?? null,
+    p_customer_id: customerId ?? null,
   });
 
   if (error) {

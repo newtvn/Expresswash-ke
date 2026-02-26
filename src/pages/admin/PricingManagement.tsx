@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { DollarSign, Truck, Package, TrendingUp, Save, Shield, AlertCircle, Loader2, Upload, ImageIcon, BookOpen } from 'lucide-react';
+import { DollarSign, Truck, Package, TrendingUp, Save, Shield, AlertCircle, Loader2, Upload, ImageIcon, BookOpen, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PRICING } from '@/services/orderService';
 import { getPricingConfig, updatePricingConfig, type PricingConfig } from '@/services/pricingService';
 import { useAuth } from '@/hooks/useAuth';
+import { ZoneManagement } from '@/components/admin/ZoneManagement';
 
 const PricingManagement = () => {
   const { user } = useAuth();
@@ -260,6 +261,10 @@ const PricingManagement = () => {
             <TrendingUp className="w-4 h-4" />
             General Settings
           </TabsTrigger>
+          <TabsTrigger value="zones" className="gap-2">
+            <MapPin className="w-4 h-4" />
+            Zones
+          </TabsTrigger>
           <TabsTrigger value="catalog" className="gap-2">
             <BookOpen className="w-4 h-4" />
             Service Catalog
@@ -419,6 +424,11 @@ const PricingManagement = () => {
               Read-only: Only super admins can modify settings
             </p>
           )}
+        </TabsContent>
+
+        {/* Zones Tab */}
+        <TabsContent value="zones" className="space-y-4">
+          <ZoneManagement />
         </TabsContent>
 
         {/* Service Catalog Tab */}
