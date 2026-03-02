@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Eye, Package } from 'lucide-react';
+import { Eye, Package, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { getOrders, bulkUpdateOrderStatus, trackOrder } from '@/services/orderService';
 import { getDrivers } from '@/services/driverService';
@@ -17,6 +17,7 @@ import { Order } from '@/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
+import { OrderTimeline } from '@/components/admin/OrderTimeline';
 
 const STATUS_OPTIONS = [
   { value: '1', label: 'Pending' },
@@ -47,6 +48,7 @@ export const OrderManagement = () => {
   const [trackingCodeInput, setTrackingCodeInput] = useState('');
   const [trackedOrder, setTrackedOrder] = useState<Order | null>(null);
   const [trackLoading, setTrackLoading] = useState(false);
+  const [timelineOrder, setTimelineOrder] = useState<Order | null>(null);
 
   const { data: result, isLoading } = useQuery({
     queryKey: ['admin', 'orders', statusFilter, search, page],
@@ -186,6 +188,15 @@ export const OrderManagement = () => {
             onClick={() => navigate(`/portal/orders/${row.trackingCode}`)}
           >
             <Eye className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="View Timeline"
+            onClick={() => setTimelineOrder(row)}
+          >
+            <History className="w-4 h-4" />
           </Button>
           {!row.driverName && row.status === 1 && (
             <Button
@@ -397,6 +408,21 @@ export const OrderManagement = () => {
               Assign
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Timeline Dialog */}
+      <Dialog open={!!timelineOrder} onOpenChange={(open) => { if (!open) setTimelineOrder(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Order Timeline — {timelineOrder?.trackingCode}</DialogTitle>
+            <DialogDescription>
+              Status history for this order
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-96 overflow-y-auto">
+            {timelineOrder?.id && <OrderTimeline orderId={timelineOrder.id} />}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

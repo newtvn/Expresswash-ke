@@ -1,9 +1,11 @@
 // Service Worker for Progressive Web App
 // Implements caching strategies for offline support and performance
 
-const CACHE_NAME = 'expresswash-v1';
+const CACHE_NAME = 'expresswash-v2';
 const RUNTIME_CACHE = 'expresswash-runtime';
 const IMAGE_CACHE = 'expresswash-images';
+const API_CACHE = 'expresswash-api';
+const API_CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
 
 // Assets to cache immediately on install
 const PRECACHE_URLS = [
@@ -24,7 +26,7 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
+  const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE, API_CACHE];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return cacheNames.filter((cacheName) => !currentCaches.includes(cacheName));
@@ -41,13 +43,19 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip cross-origin requests
+  // Handle Supabase API requests (cross-origin) with NetworkFirst + cache expiration
+  if (url.hostname.includes('supabase')) {
+    event.respondWith(networkFirstWithExpiry(request, API_CACHE, API_CACHE_MAX_AGE));
+    return;
+  }
+
+  // Skip other cross-origin requests
   if (url.origin !== location.origin) {
     return;
   }
 
-  // API requests - Network First, fallback to cache
-  if (url.pathname.startsWith('/api') || url.hostname.includes('supabase')) {
+  // Local API requests - Network First, fallback to cache
+  if (url.pathname.startsWith('/api')) {
     event.respondWith(networkFirst(request));
     return;
   }
@@ -77,6 +85,48 @@ self.addEventListener('fetch', (event) => {
   // Default - Network First
   event.respondWith(networkFirst(request));
 });
+
+// Network First Strategy with cache expiration
+async function networkFirstWithExpiry(request, cacheName, maxAge) {
+  try {
+    const networkResponse = await fetch(request);
+
+    if (networkResponse && networkResponse.status === 200) {
+      const cloned = networkResponse.clone();
+      const cache = await caches.open(cacheName);
+      // Store response with timestamp header for expiry checking
+      const headers = new Headers(cloned.headers);
+      headers.set('sw-cache-timestamp', Date.now().toString());
+      const timedResponse = new Response(await cloned.blob(), {
+        status: cloned.status,
+        statusText: cloned.statusText,
+        headers,
+      });
+      cache.put(request, timedResponse);
+    }
+
+    return networkResponse;
+  } catch (error) {
+    const cachedResponse = await caches.match(request);
+
+    if (cachedResponse) {
+      // Check if cached response has expired
+      const cachedTime = cachedResponse.headers.get('sw-cache-timestamp');
+      if (cachedTime && (Date.now() - parseInt(cachedTime, 10)) > maxAge) {
+        // Expired — delete and return error
+        const cache = await caches.open(cacheName);
+        cache.delete(request);
+      } else {
+        return cachedResponse;
+      }
+    }
+
+    return new Response(JSON.stringify({ error: 'Network unavailable' }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+}
 
 // Network First Strategy
 async function networkFirst(request) {
@@ -154,8 +204,8 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Expresswash';
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/favicon.png',
-    badge: '/favicon.png',
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
     data: data.url,
   };
 

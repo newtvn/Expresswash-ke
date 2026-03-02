@@ -1,56 +1,153 @@
-import { PageHeader } from "@/components/shared";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Send, Users, BarChart3, Megaphone } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
+import { PageHeader, KPICard, DataTable } from '@/components/shared';
+import type { Column } from '@/components/shared';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { StatusBadge } from '@/components/shared';
+import { Send, Megaphone, CheckCircle, XCircle, Gift, Bell } from 'lucide-react';
+import { getNotificationStats } from '@/services/marketingService';
 
-const campaignStats = [
-  { label: "Total Campaigns", value: "--", icon: Megaphone, color: "bg-primary/10 text-primary" },
-  { label: "Messages Sent", value: "--", icon: Send, color: "bg-blue-100 text-blue-600" },
-  { label: "Unique Reach", value: "--", icon: Users, color: "bg-emerald-100 text-emerald-600" },
-  { label: "Avg Open Rate", value: "--", icon: BarChart3, color: "bg-amber-100 text-amber-600" },
+type NotifRow = {
+  id: string;
+  templateName: string;
+  channel: string;
+  recipientName: string;
+  status: string;
+  sentAt: string;
+};
+
+const notifColumns: Column<NotifRow>[] = [
+  { key: 'templateName', header: 'Template', sortable: true },
+  {
+    key: 'channel',
+    header: 'Channel',
+    sortable: true,
+    render: (row) => <span className="uppercase text-xs font-medium">{row.channel}</span>,
+  },
+  { key: 'recipientName', header: 'Recipient', sortable: true },
+  {
+    key: 'status',
+    header: 'Status',
+    render: (row) => <StatusBadge status={row.status} />,
+  },
+  {
+    key: 'sentAt',
+    header: 'Sent',
+    sortable: true,
+    render: (row) => row.sentAt ? new Date(row.sentAt).toLocaleString('en-KE') : '—',
+  },
 ];
 
-/**
- * Admin Marketing Campaigns Page
- * Coming soon — campaign management will be available in a future update.
- */
+type ChannelRow = { channel: string; sent: number; failed: number };
+const channelColumns: Column<ChannelRow>[] = [
+  { key: 'channel', header: 'Channel', render: (row) => <span className="uppercase font-medium">{row.channel}</span> },
+  { key: 'sent', header: 'Sent', sortable: true },
+  { key: 'failed', header: 'Failed', sortable: true },
+];
+
+type PromoRow = { id: string; name: string; code: string; timesUsed: number };
+const promoColumns: Column<PromoRow>[] = [
+  { key: 'name', header: 'Name', sortable: true },
+  { key: 'code', header: 'Code' },
+  { key: 'timesUsed', header: 'Times Used', sortable: true },
+];
+
+type ReminderRow = { id: string; invoiceId: string; channel: string; sentAt: string };
+const reminderColumns: Column<ReminderRow>[] = [
+  { key: 'invoiceId', header: 'Invoice ID' },
+  { key: 'channel', header: 'Channel', render: (row) => <span className="uppercase text-xs">{row.channel}</span> },
+  { key: 'sentAt', header: 'Sent At', render: (row) => row.sentAt ? new Date(row.sentAt).toLocaleString('en-KE') : '—' },
+];
+
 export const MarketingCampaigns = () => {
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ['admin', 'marketing', 'stats'],
+    queryFn: getNotificationStats,
+  });
+
   return (
     <div className="space-y-6">
-      <PageHeader title="Marketing Campaigns" description="Manage promotional campaigns and track engagement">
-        <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
-          Coming Soon
-        </Badge>
-      </PageHeader>
+      <PageHeader title="Marketing & Notifications" description="Notification analytics, promotions, and payment reminders" />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {campaignStats.map((stat) => (
-          <Card key={stat.label} className="bg-card border-border/50">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.color}`}>
-                <stat.icon className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                <p className="text-sm text-muted-foreground">{stat.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* KPI Cards */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+        </div>
+      ) : stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard label="Total Sent" value={stats.totalSent} format="number" icon={Send} />
+          <KPICard label="Total Failed" value={stats.totalFailed} format="number" icon={XCircle} />
+          <KPICard label="Delivery Rate" value={stats.deliveryRate} format="percentage" icon={CheckCircle} />
+          <KPICard label="Active Promos" value={stats.activePromos} format="number" icon={Megaphone} />
+        </div>
+      )}
 
-      {/* Coming Soon */}
-      <Card className="bg-card border-border/50">
-        <CardContent className="py-16 text-center">
-          <Megaphone className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Campaign Management Coming Soon</h3>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Create and manage SMS and email marketing campaigns to engage your customers.
-            This feature will be available in a future update.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Channel Breakdown */}
+      {!isLoading && stats && stats.channelBreakdown.length > 0 && (
+        <Card className="bg-card border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Bell className="w-5 h-5" />
+              Channel Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable data={stats.channelBreakdown} columns={channelColumns} searchable={false} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Notifications */}
+      {!isLoading && stats && (
+        <Card className="bg-card border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              Recent Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              data={stats.recentNotifications}
+              columns={notifColumns}
+              searchable
+              searchPlaceholder="Search notifications..."
+              pageSize={10}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Birthday Promos */}
+      {!isLoading && stats && stats.birthdayPromos.length > 0 && (
+        <Card className="bg-card border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Gift className="w-5 h-5" />
+              Birthday Promotions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable data={stats.birthdayPromos} columns={promoColumns} searchable={false} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment Reminders */}
+      {!isLoading && stats && stats.paymentReminders.length > 0 && (
+        <Card className="bg-card border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Bell className="w-5 h-5" />
+              Payment Reminders Sent
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable data={stats.paymentReminders} columns={reminderColumns} searchable={false} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

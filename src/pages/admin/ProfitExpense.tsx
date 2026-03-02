@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Plus, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Plus, CheckCircle, XCircle, Loader2, FileWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/config/queryKeys';
@@ -36,6 +36,7 @@ import {
   type Expense,
   type CreateExpensePayload,
 } from '@/services/expenseService';
+import { getFinancialReport } from '@/services/reportService';
 
 const EXPENSE_CATEGORIES = [
   'fuel',
@@ -136,6 +137,14 @@ export const ProfitExpense = () => {
   const { data: summary = [], isLoading: summaryLoading } = useQuery({
     queryKey: queryKeys.expenses.summary(),
     queryFn: () => getExpenseSummary(),
+  });
+
+  const { data: financialReport } = useQuery({
+    queryKey: [...queryKeys.reports.all, 'financial-pl'],
+    queryFn: () => getFinancialReport(
+      new Date(new Date().setDate(1)).toISOString().split('T')[0],
+      new Date().toISOString().split('T')[0],
+    ),
   });
 
   // Mutations
@@ -303,6 +312,24 @@ export const ProfitExpense = () => {
           {kpiCards.map((kpi) => (
             <KPICard key={kpi.label} {...kpi} />
           ))}
+        </div>
+      )}
+
+      {/* Outstanding Receivables */}
+      {financialReport && (financialReport.outstanding_receivables > 0 || financialReport.overdue_count > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <KPICard
+            label="Outstanding Receivables"
+            value={financialReport.outstanding_receivables}
+            format="currency"
+            icon={FileWarning}
+          />
+          <KPICard
+            label="Overdue Invoices"
+            value={financialReport.overdue_count}
+            format="number"
+            icon={FileWarning}
+          />
         </div>
       )}
 
