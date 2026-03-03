@@ -226,19 +226,33 @@ serve(async (req) => {
     }
 
     // Parse callback data
-    const callback = await req.json();
-    // Log with PII automatically masked
-    logger.info('Callback data received', {
+    const raw = await req.json();
+    logger.info('Raw callback data', { keys: Object.keys(raw) });
+
+    // Normalize fields: CreditBank may send PascalCase or camelCase
+    // Handle both { CheckoutRequestID: ... } and { checkoutRequestId: ... }
+    const callback = {
+      checkoutRequestId: raw.CheckoutRequestID || raw.checkoutRequestId,
+      merchantRequestId: raw.MerchantRequestID || raw.merchantRequestId,
+      resultCode: raw.ResultCode ?? raw.resultCode,
+      resultDesc: raw.ResultDesc || raw.resultDesc,
+      amount: raw.Amount || raw.amount,
+      mpesaReceiptNumber: raw.MpesaReceiptNumber || raw.mpesaReceiptNumber,
+      transactionDate: raw.TransactionDate || raw.transactionDate,
+      phoneNumber: raw.PhoneNumber || raw.phoneNumber,
+    };
+
+    logger.info('Callback data normalized', {
       checkoutRequestId: callback.checkoutRequestId,
       resultCode: callback.resultCode,
       resultDesc: callback.resultDesc,
-      amount: callback.amount,  // Will be masked
-      mpesaReceiptNumber: callback.mpesaReceiptNumber,  // Will be masked
+      amount: callback.amount,
+      mpesaReceiptNumber: callback.mpesaReceiptNumber,
     });
 
     // Validate required fields
     if (!callback.checkoutRequestId || callback.resultCode === undefined) {
-      logger.error('Invalid callback data received');
+      logger.error('Invalid callback data received', { raw });
       return new Response(
         JSON.stringify({
           success: false,

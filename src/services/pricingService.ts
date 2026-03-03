@@ -128,13 +128,22 @@ export async function updatePricingConfig(
     }
 
     // Log the pricing change to audit logs
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', userId)
+      .single();
+
     await supabase.from('audit_logs').insert({
       user_id: userId,
+      user_name: profile?.name ?? 'Unknown',
+      user_role: profile?.role ?? 'admin',
       action: 'update_pricing',
-      resource_type: 'system_config',
-      resource_id: 'pricing',
-      details: { config },
-      created_at: new Date().toISOString(),
+      entity: 'system_config',
+      entity_id: 'pricing',
+      details: JSON.stringify({ config }),
+      ip_address: 'client',
+      timestamp: new Date().toISOString(),
     }).catch(() => {
       // Non-critical, log silently
     });
@@ -219,9 +228,9 @@ export async function getPricingHistory(limit = 10): Promise<{
     const { data, error } = await retrySupabaseQuery(
       () => supabase
         .from('audit_logs')
-        .select('*, profiles(name)')
+        .select('*')
         .eq('action', 'update_pricing')
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(limit),
       { maxRetries: 2 }
     );
@@ -233,9 +242,9 @@ export async function getPricingHistory(limit = 10): Promise<{
     const history = data.map((log) => ({
       id: log.id as string,
       userId: log.user_id as string,
-      userName: (log.profiles as { name?: string } | null)?.name ?? 'Unknown',
-      timestamp: log.created_at as string,
-      changes: log.details?.config as PricingConfig,
+      userName: (log.user_name as string) ?? 'Unknown',
+      timestamp: log.timestamp as string,
+      changes: (() => { try { return JSON.parse(log.details as string)?.config; } catch { return null; } })() as PricingConfig,
     }));
 
     return { success: true, history };

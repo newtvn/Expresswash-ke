@@ -180,8 +180,13 @@ async function sendSMS(to: string, message: string): Promise<void> {
     params.append('from', atSenderId);
   }
 
+  // Sandbox uses a different host than production
+  const baseUrl = atUsername === 'sandbox'
+    ? 'https://api.sandbox.africastalking.com'
+    : 'https://api.africastalking.com';
+
   const response = await fetch(
-    'https://api.africastalking.com/version1/messaging',
+    `${baseUrl}/version1/messaging`,
     {
       method: 'POST',
       headers: {

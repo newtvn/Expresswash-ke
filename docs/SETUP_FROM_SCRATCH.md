@@ -44,10 +44,11 @@ Follow every step in order. Do not skip ahead.
 ### 1.6 — M-Pesa via Credit Bank (STK Push payments)
 
 1. Register with Credit Bank at <https://creditbank.co.ke>
-2. Apply for M-Pesa STK Push integration
-3. Get your **Consumer Key** and **Consumer Secret**
-4. Note the **API base URL** (e.g. `https://api.creditbank.co.ke`)
-5. You'll configure the callback URL later in Phase 5
+2. Create a project with STK Push enabled
+3. Get your **App ID** (`x-app-id`) and **API Key** (`x-api-key`) from the project dashboard
+4. **For development:** use sandbox — base URL is `https://sandboxkonnectapi.creditbank.co.ke`
+5. **For production:** base URL is `https://konnectapi.creditbank.co.ke` (confirm with Credit Bank)
+6. You'll configure the callback URL later in Phase 5
 
 ### 1.7 — VAPID Keys (Web Push notifications)
 
@@ -141,19 +142,54 @@ SELECT vault.create_secret('<your-service-role-key>', 'service_role_key');
 3. Public: **No** (private — signed URLs are used)
 4. File size limit: 10 MB
 
-Then add storage policies on the bucket's **Policies** tab:
+Then add storage policies. Run these in the **SQL Editor**:
 
-- **INSERT** policy: allow `service_role`
-- **SELECT** policy: allow `authenticated` users (so signed URLs work)
+```sql
+-- Allow service_role to upload files (Edge Functions use service_role)
+CREATE POLICY "service_role_insert" ON storage.objects
+  FOR INSERT TO service_role
+  WITH CHECK (bucket_id = 'documents');
+
+-- Allow authenticated users to read files (signed URLs)
+CREATE POLICY "authenticated_select" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'documents');
+```
 
 ---
 
 ## Phase 4: Run Migrations
 
+### 4.0 — Run the consolidated init script (REQUIRED FIRST)
+
+Before running any migrations, you must create all base tables. Open `supabase-init.sql` (in the project root) in the **SQL Editor** and run it.
+
+This single file replaces the old multi-file approach (`supabase-schema.sql`, `supabase-migration.sql`, `supabase-migration-payments.sql`, `supabase-migration-dimensions.sql`, `supabase-migration-security-fixes.sql`). It creates all 31 base tables, RLS policies, helper functions, and the unified payments schema.
+
+**Verify it ran successfully:**
+
+```sql
+SELECT COUNT(*) FROM information_schema.tables
+WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+-- Should return 31
+```
+
+### 4.0b — Run the seed data (REQUIRED before migrations)
+
+Run `supabase-seed.sql` (in the project root) in the **SQL Editor**. This inserts:
+
+- Sample orders, invoices, payments, profiles (for dev/testing)
+- **SMS notification templates** (Order Confirmation, Delivery Confirmation, etc.) — required by migration 010
+- Notification history and preference records
+
+> **Note:** Migration 010 will fail if the SMS templates don't exist. The seed file provides them.
+
+### 4.1 — Run migrations
+
 Run each migration file in the **SQL Editor**, one at a time, in this exact order.
 All files are in `supabase/migrations/`.
 
-> **Important:** The base tables (`orders`, `payments`, `profiles`, `system_config`, etc.) must already exist in your Supabase project before running any migrations. These are created during initial project setup.
+> **Note:** Migrations **000** (`fix_status_constraint`) and **001** (`alter_existing_tables`) can be **skipped** — the init script already includes these changes. Start from migration 002.
 
 ### Pre-WK1 Migrations (run these first)
 
@@ -167,8 +203,8 @@ All files are in `supabase/migrations/`.
 
 | # | File | What it does |
 |---|------|-------------|
-| 000 | `20260226_000_fix_status_constraint.sql` | Fixes status constraint |
-| 001 | `20260226_001_alter_existing_tables.sql` | Alters existing tables |
+| ~~000~~ | ~~`20260226_000_fix_status_constraint.sql`~~ | **SKIP** — already in init script |
+| ~~001~~ | ~~`20260226_001_alter_existing_tables.sql`~~ | **SKIP** — already in init script |
 | 002 | `20260226_002_create_new_tables.sql` | Creates new tables |
 | 003 | `20260226_003_indexes.sql` | Adds indexes |
 | 004 | `20260226_004_fix_aggregation_function.sql` | Fixes aggregation function |
@@ -267,9 +303,10 @@ supabase secrets set \
   AFRICASTALKING_USERNAME=sandbox \
   AFRICASTALKING_SENDER_ID=EXPRESSWASH \
   RESEND_API_KEY=re_your-resend-key \
-  BANK_API_BASE_URL=https://api.creditbank.co.ke \
-  BANK_CONSUMER_KEY=your-credit-bank-consumer-key \
-  BANK_CONSUMER_SECRET=your-credit-bank-consumer-secret \
+  VAPID_PRIVATE_KEY=your-vapid-private-key-from-step-1.7 \
+  BANK_API_BASE_URL=https://sandboxkonnectapi.creditbank.co.ke \
+  BANK_APP_ID=your-credit-bank-app-id \
+  BANK_API_KEY=your-credit-bank-api-key \
   CALLBACK_BASE_URL=https://your-project-ref.supabase.co/functions/v1 \
   BANK_CALLBACK_IPS=comma-separated-whitelist-ips-from-credit-bank
 ```
@@ -316,15 +353,26 @@ npm run dev     # Start the dev server
 
 ## Phase 8: Smoke Tests
 
-### 8.1 — Test: Notification Edge Function (manual trigger)
+> **Prerequisites for notification tests (8.1–8.2):**
+> The notification queue trigger requires orders to have a `customer_id` linked to a profile
+> with a real phone number and/or email. Seed data orders do NOT have `customer_id` set,
+> so you must create a test user and order first. See step 8.2 below.
+>
+> **Email sending** requires a verified domain on Resend. Until `expresswash.co.ke` is verified,
+> email notifications will fail with a 403 error. SMS requires Africa's Talking sandbox phone
+> numbers (register test numbers at <https://account.africastalking.com/apps/sandbox/sms/bulk>).
 
-```bash
-curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-notification \
-  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json"
+### 8.1 — Test: Notification Edge Function (empty queue)
+
+**POST** `https://<your-project-ref>.supabase.co/functions/v1/send-notification`
+
+Headers:
+```
+Authorization: Bearer <your-service-role-key>
+Content-Type: application/json
 ```
 
-Expected response (empty queue):
+No body needed. Expected response:
 
 ```json
 { "processed": 0, "failed": 0, "message": "Queue empty" }
@@ -332,15 +380,58 @@ Expected response (empty queue):
 
 ### 8.2 — Test: Full Notification Pipeline (end-to-end)
 
-**Step 1:** Find or create a test order with `status = 1` (Pending) and a real customer phone/email.
-
-**Step 2:** Change the order status from 1 → 2 (Confirmed):
+**Step 1:** Create a test user via `auth.users` (profiles are FK-linked to auth):
 
 ```sql
-UPDATE orders SET status = 2 WHERE tracking_code = 'YOUR_TEST_ORDER';
+-- Create the auth user
+INSERT INTO auth.users (id, instance_id, email, encrypted_password, email_confirmed_at, created_at, updated_at, aud, role)
+VALUES (
+  gen_random_uuid(),
+  '00000000-0000-0000-0000-000000000000',
+  'your-email@example.com',
+  crypt('TestPass123!', gen_salt('bf')),
+  now(), now(), now(),
+  'authenticated',
+  'authenticated'
+);
+
+-- Get the user ID
+SELECT id FROM auth.users WHERE email = 'your-email@example.com';
+
+-- Update the auto-created profile with your details
+UPDATE profiles SET
+  name = 'Your Name',
+  phone = '+254XXXXXXXXX',
+  role = 'customer',
+  zone = 'Kitengela',
+  is_active = true
+WHERE id = '<paste-uuid-from-above>';
 ```
 
-**Step 3:** Verify a notification was queued:
+**Step 2:** Create a test order linked to your profile:
+
+```sql
+INSERT INTO orders (id, tracking_code, customer_id, customer_name, status, pickup_date, estimated_delivery, zone, created_at)
+VALUES (
+  gen_random_uuid(),
+  'EW-TEST-001',
+  '<your-profile-uuid>',
+  'Your Name',
+  1,
+  CURRENT_DATE + INTERVAL '2 days',
+  CURRENT_DATE + INTERVAL '4 days',
+  'Kitengela',
+  now()
+);
+```
+
+**Step 3:** Trigger the notification by changing status (1 → 2):
+
+```sql
+UPDATE orders SET status = 2 WHERE tracking_code = 'EW-TEST-001';
+```
+
+**Step 4:** Verify a notification was queued:
 
 ```sql
 SELECT id, channel, recipient_contact, body, status, template_name
@@ -348,81 +439,83 @@ FROM notification_history
 WHERE status = 'pending'
 ORDER BY sent_at DESC
 LIMIT 5;
--- Should see a row with status = 'pending', template_name = 'Order Confirmation'
+-- Should see row(s) with status = 'pending', template_name = 'Order Confirmation'
 -- Body should have real values (no {{variable}} literals)
 ```
 
-**Step 4:** Trigger the Edge Function:
+> **Note:** Only channels with matching templates AND contact info will queue.
+> If the profile has an email but no phone, only email will appear (and vice versa).
 
-```bash
-curl -X POST https://YOUR_PROJECT_REF.supabase.co/functions/v1/send-notification \
-  -H "Authorization: Bearer YOUR_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json"
-```
+**Step 5:** Trigger the Edge Function (same Postman/curl request as 8.1).
 
 Expected: `{ "processed": 1, "failed": 0, "total": 1 }`
 
-**Step 5:** Verify delivery:
+**Step 6:** Verify delivery:
 
 ```sql
-SELECT id, status, body, failure_reason
+SELECT id, channel, status, failure_reason
 FROM notification_history
 ORDER BY sent_at DESC
 LIMIT 5;
--- status should now be 'sent'
+-- status should be 'sent' (or 'failed' with failure_reason if domain not verified / sandbox not configured)
 ```
 
-Check your phone for the SMS / inbox for the email.
+> **Common failures:**
+> - Email 403: "domain is not verified" → verify `expresswash.co.ke` on Resend, or skip email testing for now
+> - SMS failure → register sandbox test numbers on Africa's Talking dashboard
 
 ### 8.3 — Test: Status Validation
 
 ```sql
--- Should SUCCEED (valid: 1 → 2)
-UPDATE orders SET status = 2 WHERE tracking_code = 'YOUR_TEST_ORDER';
+-- Reset the test order
+UPDATE orders SET status = 1 WHERE tracking_code = 'EW-TEST-001';
 
--- Should FAIL with "Invalid status transition: 1 → 12"
-UPDATE orders SET status = 12 WHERE tracking_code = 'ANOTHER_ORDER_WITH_STATUS_1';
+-- Should SUCCEED (valid: 1 → 2)
+UPDATE orders SET status = 2 WHERE tracking_code = 'EW-TEST-001';
+
+-- Should FAIL with "Invalid status transition: 2 → 12"
+UPDATE orders SET status = 12 WHERE tracking_code = 'EW-TEST-001';
 
 -- Should SUCCEED (valid: 2 → 13, cancellation)
-UPDATE orders SET status = 13 WHERE tracking_code = 'YOUR_TEST_ORDER';
+UPDATE orders SET status = 13 WHERE tracking_code = 'EW-TEST-001';
 ```
 
 ### 8.4 — Test: Profile Stats
 
+> Requires a full order lifecycle (status 1 → 2 → ... → 12 delivered). Best tested via the browser in Phase 9.
+
 ```sql
--- Check a customer's stats before
-SELECT total_orders, total_spent FROM profiles WHERE id = 'CUSTOMER_UUID';
+-- Check stats before
+SELECT total_orders, total_spent FROM profiles WHERE id = '<your-profile-uuid>';
 
--- Move an order through to delivered (status 12)
--- (step through each valid transition)
-
--- Check stats after — total_orders and total_spent should have incremented
-SELECT total_orders, total_spent FROM profiles WHERE id = 'CUSTOMER_UUID';
+-- After completing an order through to delivered (status 12), check again
+-- total_orders and total_spent should have incremented
 ```
 
 ### 8.5 — Test: Ledger Events
 
 ```sql
--- Insert a payment → event should auto-log
+-- Get a valid order_id
+SELECT id FROM orders WHERE tracking_code = 'EW-TEST-001';
+
+-- Insert a test payment
 INSERT INTO payments (order_id, amount, method, status)
-VALUES ('<any-valid-order-id>', 100, 'cash', 'pending');
+VALUES ('<paste-order-uuid>', 100, 'cash', 'pending');
 
 -- Check event was created
 SELECT * FROM payment_status_events ORDER BY created_at DESC LIMIT 1;
--- Should show: from_status=NULL, to_status='pending', trigger_source='initial_insert'
+-- Should show: from_status=NULL, to_status='pending'
 
--- Update that payment's status → event should auto-log
+-- Get the payment id from above, then update
 UPDATE payments SET status = 'completed'
-WHERE id = '<the-id-from-above>';
+WHERE id = '<paste-payment-id>';
 
 -- Check both events exist
-SELECT * FROM payment_status_events
-WHERE payment_id = '<the-id-from-above>'
-ORDER BY created_at;
+SELECT * FROM payment_status_events ORDER BY created_at DESC LIMIT 2;
 -- Should show 2 rows: NULL→pending, then pending→completed
 
--- Clean up test data
-DELETE FROM payments WHERE id = '<the-id-from-above>';
+-- Clean up
+DELETE FROM payments WHERE id = '<paste-payment-id>';
 ```
 
 ### 8.6 — Test: Pricing Function (server-side)
@@ -571,6 +664,15 @@ supabase secrets set \
   AFRICASTALKING_API_KEY=your-live-api-key
 ```
 
+### 10.3 — Switch Credit Bank from sandbox to production
+
+```bash
+supabase secrets set \
+  BANK_API_BASE_URL=https://konnectapi.creditbank.co.ke \
+  BANK_APP_ID=your-live-app-id \
+  BANK_API_KEY=your-live-api-key
+```
+
 ---
 
 ## Quick Reference: Where Secrets Go
@@ -586,8 +688,9 @@ supabase secrets set \
 | `AFRICASTALKING_USERNAME` | `supabase secrets set` |
 | `AFRICASTALKING_SENDER_ID` | `supabase secrets set` |
 | `RESEND_API_KEY` | `supabase secrets set` |
-| `BANK_CONSUMER_KEY` | `supabase secrets set` |
-| `BANK_CONSUMER_SECRET` | `supabase secrets set` |
+| `VAPID_PRIVATE_KEY` | `supabase secrets set` |
+| `BANK_APP_ID` | `supabase secrets set` |
+| `BANK_API_KEY` | `supabase secrets set` |
 | `BANK_API_BASE_URL` | `supabase secrets set` |
 | `CALLBACK_BASE_URL` | `supabase secrets set` |
 | `BANK_CALLBACK_IPS` | `supabase secrets set` |
@@ -599,6 +702,24 @@ supabase secrets set \
 ## Things You Do NOT Need to Do
 
 - **Do NOT run** `MANUAL_post_deploy_pg_cron.sql` — fully replaced by migration 020
+- **Do NOT run** the old root-level SQL files individually — they are superseded by `supabase-init.sql`:
+  - `supabase-schema.sql`
+  - `supabase-migration.sql`
+  - `supabase-migration-payments.sql`
+  - `supabase-migration-dimensions.sql`
+  - `supabase-migration-security-fixes.sql`
 - **No extra env vars** for `generate-pdf` — `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-set by Supabase
-- **paymentService.ts** has a known issue writing wrong columns — this is pre-existing tech debt, does not affect current flows (WK2+ uses `invoiceService.ts` which is correct)
+- **Credit Bank go-live** (APIs → Webhooks → Upload Docs → Application Approval) is only needed for production. Sandbox works without it.
 - **docs/WK3.md** is an untracked reference doc with some outdated column names — the committed migrations are authoritative
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `notification_history` empty after status change | Order has no `customer_id` linked to a profile | Seed orders don't have `customer_id` — create a test user via `auth.users` and link the order |
+| Email notification fails with 403 | Resend domain not verified | Verify `expresswash.co.ke` on Resend, or temporarily use `onboarding@resend.dev` for testing |
+| SMS not sending in sandbox | Phone number not registered | Register test numbers at Africa's Talking sandbox dashboard |
+| Migration 010 fails: "Missing SMS template" | Seed data not loaded | Run `supabase-seed.sql` before migration 010 — it provides the SMS templates |
+| `invalid input syntax for type uuid` in seed file | Old seed file using string IDs like `'ord-126'` | Use the updated `supabase-seed.sql` which looks up UUIDs by tracking_code |
+| `profiles_id_fkey` violation | Tried to insert profile without auth user | Create auth user first via `INSERT INTO auth.users`, then update the auto-created profile |
+| Database reset needed | Schema conflicts or fresh start | Run the drop-all SQL (drop tables, functions, types in public schema), then re-run from Phase 3 |

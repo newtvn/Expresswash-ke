@@ -1,6 +1,6 @@
 -- ============================================================
 -- ExpressWash Seed Data
--- Run this in Supabase SQL Editor AFTER running supabase-schema.sql
+-- Run this in Supabase SQL Editor AFTER running supabase-init.sql
 -- ============================================================
 
 -- NOTE: Profile data is seeded directly (not via auth.users trigger)
@@ -77,35 +77,86 @@ VALUES (47, 12, 8, 5, 14, 3, 47, 200);
 
 -- ── Warehouse Intake ────────────────────────────────────────
 
-INSERT INTO warehouse_intake (order_id, order_number, customer_name, item_name, item_type, quantity, condition_notes, warehouse_location, received_at, received_by) VALUES
-  ('ord-126', 'EW-2024-00126', 'Peter Odhiambo', 'Curtain Pair', 'Curtain', 2, 'Slight discoloration on edges', 'Zone A - Rack 3', '2024-01-28T10:00:00Z', 'Jane Warehouse'),
-  ('ord-126', 'EW-2024-00126', 'Peter Odhiambo', 'Duvet', 'Bedding', 1, 'Good condition', 'Zone A - Rack 3', '2024-01-28T10:05:00Z', 'Jane Warehouse'),
-  ('ord-130', 'EW-2024-00130', 'Angela Wairimu', 'Carpet (Large)', 'Carpet', 1, 'Heavy staining in center', 'Zone B - Rack 1', '2024-01-30T11:00:00Z', 'Jane Warehouse'),
-  ('ord-130', 'EW-2024-00130', 'Angela Wairimu', 'Carpet (Medium)', 'Carpet', 2, 'Normal wear', 'Zone B - Rack 2', '2024-01-30T11:10:00Z', 'Jane Warehouse'),
-  ('ord-128', 'EW-2024-00128', 'Hassan Abdullahi', 'Carpet (Small)', 'Carpet', 2, 'Pet stains', 'Zone C - Rack 1', '2024-01-31T14:00:00Z', 'Tom Warehouse');
+DO $$
+DECLARE
+  oid UUID;
+BEGIN
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00126';
+  INSERT INTO warehouse_intake (order_id, order_number, customer_name, item_name, item_type, quantity, condition_notes, warehouse_location, received_at, received_by) VALUES
+    (oid, 'EW-2024-00126', 'Peter Odhiambo', 'Curtain Pair', 'Curtain', 2, 'Slight discoloration on edges', 'Zone A - Rack 3', '2024-01-28T10:00:00Z', 'Jane Warehouse'),
+    (oid, 'EW-2024-00126', 'Peter Odhiambo', 'Duvet', 'Bedding', 1, 'Good condition', 'Zone A - Rack 3', '2024-01-28T10:05:00Z', 'Jane Warehouse');
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00130';
+  INSERT INTO warehouse_intake (order_id, order_number, customer_name, item_name, item_type, quantity, condition_notes, warehouse_location, received_at, received_by) VALUES
+    (oid, 'EW-2024-00130', 'Angela Wairimu', 'Carpet (Large)', 'Carpet', 1, 'Heavy staining in center', 'Zone B - Rack 1', '2024-01-30T11:00:00Z', 'Jane Warehouse'),
+    (oid, 'EW-2024-00130', 'Angela Wairimu', 'Carpet (Medium)', 'Carpet', 2, 'Normal wear', 'Zone B - Rack 2', '2024-01-30T11:10:00Z', 'Jane Warehouse');
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00128';
+  INSERT INTO warehouse_intake (order_id, order_number, customer_name, item_name, item_type, quantity, condition_notes, warehouse_location, received_at, received_by) VALUES
+    (oid, 'EW-2024-00128', 'Hassan Abdullahi', 'Carpet (Small)', 'Carpet', 2, 'Pet stains', 'Zone C - Rack 1', '2024-01-31T14:00:00Z', 'Tom Warehouse');
+END $$;
 
 -- ── Warehouse Processing ────────────────────────────────────
 
-INSERT INTO warehouse_processing (order_id, order_number, customer_name, item_name, item_type, quantity, stage, assigned_to, started_at, estimated_completion, warehouse_location, days_in_warehouse) VALUES
-  ('ord-125', 'EW-2024-00125', 'Mary Akinyi', 'Carpet (Medium)', 'Carpet', 3, 'washing', 'James Washer', '2024-01-27T08:00:00Z', '2024-01-28T18:00:00Z', 'Zone A - Wash Bay 2', 4),
-  ('ord-132', 'EW-2024-00132', 'William Mutiso', 'Carpet (Large)', 'Carpet', 2, 'drying', 'Sarah Dryer', '2024-01-30T09:00:00Z', '2024-01-31T12:00:00Z', 'Zone B - Drying Area', 2),
-  ('ord-132', 'EW-2024-00132', 'William Mutiso', 'Carpet (Medium)', 'Carpet', 1, 'quality_check', NULL, '2024-01-30T14:00:00Z', NULL, 'Zone C - QC Station', 2),
-  ('ord-133', 'EW-2024-00133', 'Mercy Njoki', 'Curtain Pair', 'Curtain', 3, 'ready_for_dispatch', NULL, '2024-01-28T07:00:00Z', NULL, 'Zone D - Dispatch', 3);
+DO $$
+DECLARE
+  oid UUID;
+BEGIN
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00125';
+  INSERT INTO warehouse_processing (order_id, order_number, customer_name, item_name, item_type, quantity, stage, assigned_to, started_at, estimated_completion, warehouse_location, days_in_warehouse) VALUES
+    (oid, 'EW-2024-00125', 'Mary Akinyi', 'Carpet (Medium)', 'Carpet', 3, 'washing', 'James Washer', '2024-01-27T08:00:00Z', '2024-01-28T18:00:00Z', 'Zone A - Wash Bay 2', 4);
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00132';
+  INSERT INTO warehouse_processing (order_id, order_number, customer_name, item_name, item_type, quantity, stage, assigned_to, started_at, estimated_completion, warehouse_location, days_in_warehouse) VALUES
+    (oid, 'EW-2024-00132', 'William Mutiso', 'Carpet (Large)', 'Carpet', 2, 'drying', 'Sarah Dryer', '2024-01-30T09:00:00Z', '2024-01-31T12:00:00Z', 'Zone B - Drying Area', 2),
+    (oid, 'EW-2024-00132', 'William Mutiso', 'Carpet (Medium)', 'Carpet', 1, 'quality_check', NULL, '2024-01-30T14:00:00Z', NULL, 'Zone C - QC Station', 2);
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00133';
+  INSERT INTO warehouse_processing (order_id, order_number, customer_name, item_name, item_type, quantity, stage, assigned_to, started_at, estimated_completion, warehouse_location, days_in_warehouse) VALUES
+    (oid, 'EW-2024-00133', 'Mercy Njoki', 'Curtain Pair', 'Curtain', 3, 'ready_for_dispatch', NULL, '2024-01-28T07:00:00Z', NULL, 'Zone D - Dispatch', 3);
+END $$;
 
 -- ── Warehouse Dispatch ──────────────────────────────────────
 
-INSERT INTO warehouse_dispatch (order_id, order_number, customer_name, zone, items, total_items, ready_since, assigned_driver, scheduled_delivery) VALUES
-  ('ord-133', 'EW-2024-00133', 'Mercy Njoki', 'Kitengela', ARRAY['Curtain Pair x3'], 3, '2024-01-30T10:00:00Z', 'Brian Wekesa', '2024-01-31T09:00:00Z'),
-  ('ord-124', 'EW-2024-00124', 'John Kamau', 'Athi River', ARRAY['Sofa Set x1', 'Cushions x4'], 5, '2024-01-29T15:00:00Z', 'Alex Mutua', '2024-01-31T10:00:00Z');
+DO $$
+DECLARE
+  oid UUID;
+BEGIN
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00133';
+  INSERT INTO warehouse_dispatch (order_id, order_number, customer_name, zone, items, total_items, ready_since, assigned_driver, scheduled_delivery) VALUES
+    (oid, 'EW-2024-00133', 'Mercy Njoki', 'Kitengela', ARRAY['Curtain Pair x3'], 3, '2024-01-30T10:00:00Z', 'Brian Wekesa', '2024-01-31T09:00:00Z');
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00124';
+  INSERT INTO warehouse_dispatch (order_id, order_number, customer_name, zone, items, total_items, ready_since, assigned_driver, scheduled_delivery) VALUES
+    (oid, 'EW-2024-00124', 'John Kamau', 'Athi River', ARRAY['Sofa Set x1', 'Cushions x4'], 5, '2024-01-29T15:00:00Z', 'Alex Mutua', '2024-01-31T10:00:00Z');
+END $$;
 
 -- ── Invoices ────────────────────────────────────────────────
 
-INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
-  ('INV-2024-0033', 'ord-123', 'EW-2024-00123', 'Grace Wanjiku', 'grace@test.com', 16570, 16, 2651.20, 0, 19221.20, 'paid', '2024-01-20T12:00:00Z', '2024-02-03T12:00:00Z', '2024-01-26T09:15:00Z'),
-  ('INV-2024-0034', 'ord-127', 'EW-2024-00127', 'Faith Muthoni', 'faith.muthoni@gmail.com', 11000, 16, 1760, 500, 12260, 'overdue', '2024-01-16T10:00:00Z', '2024-01-30T10:00:00Z', NULL),
-  ('INV-2024-0040', 'ord-130', 'EW-2024-00130', 'Angela Wairimu', 'angela.wairimu@yahoo.com', 15500, 16, 2480, 0, 17980, 'sent', '2024-01-30T14:00:00Z', '2024-02-13T14:00:00Z', NULL),
-  ('INV-2024-0044', 'ord-131', 'EW-2024-00131', 'Mercy Njoki', 'mercy@test.com', 23925, 16, 3828, 0, 27753, 'paid', '2024-01-23T08:00:00Z', '2024-02-06T08:00:00Z', '2024-01-31T12:15:00Z'),
-  ('INV-2024-0045', 'ord-138', 'EW-2024-00138', 'Grace Wanjiku', 'grace@test.com', 12000, 16, 1920, 0, 13920, 'draft', '2024-01-31T15:00:00Z', '2024-02-14T15:00:00Z', NULL);
+DO $$
+DECLARE
+  oid UUID;
+BEGIN
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00123';
+  INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
+    ('INV-2024-0033', oid, 'EW-2024-00123', 'Grace Wanjiku', 'grace@test.com', 16570, 16, 2651.20, 0, 19221.20, 'paid', '2024-01-20T12:00:00Z', '2024-02-03T12:00:00Z', '2024-01-26T09:15:00Z');
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00127';
+  INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
+    ('INV-2024-0034', oid, 'EW-2024-00127', 'Faith Muthoni', 'faith.muthoni@gmail.com', 11000, 16, 1760, 500, 12260, 'overdue', '2024-01-16T10:00:00Z', '2024-01-30T10:00:00Z', NULL);
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00130';
+  INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
+    ('INV-2024-0040', oid, 'EW-2024-00130', 'Angela Wairimu', 'angela.wairimu@yahoo.com', 15500, 16, 2480, 0, 17980, 'sent', '2024-01-30T14:00:00Z', '2024-02-13T14:00:00Z', NULL);
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00131';
+  INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
+    ('INV-2024-0044', oid, 'EW-2024-00131', 'Mercy Njoki', 'mercy@test.com', 23925, 16, 3828, 0, 27753, 'paid', '2024-01-23T08:00:00Z', '2024-02-06T08:00:00Z', '2024-01-31T12:15:00Z');
+
+  SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00138';
+  INSERT INTO invoices (invoice_number, order_id, order_number, customer_name, customer_email, subtotal, vat_rate, vat_amount, discount, total, status, issued_at, due_at, paid_at) VALUES
+    ('INV-2024-0045', oid, 'EW-2024-00138', 'Grace Wanjiku', 'grace@test.com', 12000, 16, 1920, 0, 13920, 'draft', '2024-01-31T15:00:00Z', '2024-02-14T15:00:00Z', NULL);
+END $$;
 
 -- Invoice items
 DO $$
