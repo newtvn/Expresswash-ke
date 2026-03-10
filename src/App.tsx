@@ -3,7 +3,6 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import BubbleBackground from './components/BubbleBackground';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
@@ -114,7 +113,6 @@ const App = () => {
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BubbleBackground />
       <Sonner />
       <ErrorBoundary>
         <BrowserRouter>
