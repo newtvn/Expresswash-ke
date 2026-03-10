@@ -13,9 +13,9 @@ const Header = () => {
   const { user, isAuthenticated } = useAuthStore();
 
   const navLinks = [
-    { name: "Services", href: "#services" },
-    { name: "How It Works", href: "#process" },
-    { name: "Pricing", href: "#pricing" },
+    { name: "Services", href: "/#services" },
+    { name: "How It Works", href: "/#process" },
+    { name: "Pricing", href: "/#pricing" },
     { name: "Track Order", href: "/track" },
   ];
 
@@ -89,13 +89,13 @@ const Header = () => {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.name}
-                  href={link.href}
+                  to={link.href}
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
             </div>
 
@@ -187,9 +187,9 @@ const Header = () => {
         >
           <div className="flex flex-col gap-1">
             {navLinks.map((link, index) => (
-              <a
+              <Link
                 key={link.name}
-                href={link.href}
+                to={link.href}
                 className={`mobile-menu-link flex items-center text-lg font-medium text-muted-foreground hover:text-foreground active:text-primary py-3 px-4 rounded-xl transition-all duration-200 hover:bg-secondary/80 active:bg-primary/10 active:scale-[0.98] touch-manipulation ${
                   mobileMenuOpen ? "animate-menu-stagger" : ""
                 }`}
@@ -197,7 +197,7 @@ const Header = () => {
                 onClick={closeMobileMenu}
               >
                 {link.name}
-              </a>
+              </Link>
             ))}
           </div>
 

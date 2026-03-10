@@ -3,6 +3,7 @@ import Services from "@/components/landing/Services";
 import Process from "@/components/landing/Process";
 import PricingCalculator from "@/components/landing/PricingCalculator";
 import Testimonials from "@/components/landing/Testimonials";
+import FAQ from "@/components/landing/FAQ";
 import CTA from "@/components/landing/CTA";
 
 /**
@@ -17,6 +18,7 @@ const Home = () => {
       <Process />
       <PricingCalculator />
       <Testimonials />
+      <FAQ />
       <CTA />
     </main>
   );

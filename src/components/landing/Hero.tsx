@@ -150,7 +150,24 @@ const UnifiedCleanVisual = () => (
    ─────────────────────────────────────────────────────────────────── */
 const Hero = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useFiberCanvas(canvasRef);
+
+  useEffect(() => {
+    let rafId = 0;
+    const onScroll = () => {
+      rafId = requestAnimationFrame(() => {
+        if (contentRef.current) {
+          contentRef.current.style.transform = `translateY(${window.scrollY * 0.4}px)`;
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
 
   return (
     <section className="relative min-h-screen flex flex-col justify-center pt-24 pb-16 overflow-hidden bg-[#F1EFE9]">
@@ -163,7 +180,7 @@ const Hero = () => {
 
       <UnifiedCleanVisual />
 
-      <div className="container mx-auto max-w-7xl px-6 relative z-20 flex-grow flex flex-col justify-center h-full pointer-events-none">
+      <div ref={contentRef} className="container mx-auto max-w-7xl px-6 relative z-20 flex-grow flex flex-col justify-center h-full pointer-events-none">
         <div className="grid lg:grid-cols-12 gap-12 items-center h-full">
 
           <div className="lg:col-span-7 text-center lg:text-left pt-10 pointer-events-auto">
