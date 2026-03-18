@@ -10,7 +10,7 @@ ExpressWash is a modern web application for managing carpet and furniture cleani
 - **Order Tracking** - 12-stage order pipeline tracking system
 - **Instant Quote Calculator** - Real-time price estimation
 - **Responsive Design** - Mobile-first approach with modern UI
-- **Customer Testimonials** - Social proof and ratings display
+- **Customer Testimonials** - Social proof and the ratings display
 
 ## Technology Stack
 
