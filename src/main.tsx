@@ -3,6 +3,10 @@ import App from "./App.tsx";
 import "./index.css";
 import { validateEnvironmentOrThrow } from "./lib/envValidation";
 import { registerServiceWorker, reportWebVitals } from "./utils/performance";
+import { initSentry } from "./lib/sentry";
+
+// Initialize Sentry error monitoring (before anything else)
+initSentry();
 
 // Validate environment variables before app starts
 try {

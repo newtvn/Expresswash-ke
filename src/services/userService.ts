@@ -25,8 +25,8 @@ export const getUsers = async (
 ): Promise<PaginatedResponse<UserProfile>> => {
   let query = supabase.from('profiles').select('*', { count: 'exact' });
 
-  // Exclude deleted users by default
-  query = query.is('deleted_at', null);
+  // Exclude deleted/archived users by default
+  query = query.is('archived_at', null);
 
   if (filters.role) {
     query = query.eq('role', filters.role);
@@ -125,11 +125,11 @@ export const softDeleteUser = async (
       return { success: false, message: 'User not found' };
     }
 
-    // 1. Mark user profile as deleted (soft delete)
+    // 1. Mark user profile as archived (soft delete)
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
-        deleted_at: new Date().toISOString(),
+        archived_at: new Date().toISOString(),
         is_active: false,
         email: `deleted_${userId}@deleted.local`, // Anonymize email
       })
@@ -139,23 +139,8 @@ export const softDeleteUser = async (
       return { success: false, message: profileError.message };
     }
 
-    // 2. Anonymize user's addresses (keep for order history)
-    await supabase
-      .from('addresses')
-      .update({
-        address: '[DELETED]',
-        notes: '[DELETED]',
-      })
-      .eq('user_id', userId);
-
-    // 3. Mark loyalty account as inactive (preserve points history for audit)
-    await supabase
-      .from('loyalty_accounts')
-      .update({
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('customer_id', userId);
+    // 2. Loyalty account is linked via FK to profile — deactivation is
+    //    handled by the is_active=false on profiles. No separate update needed.
 
     // 4. Note: Orders are kept for historical/financial records but anonymized customer info
     await supabase
@@ -174,17 +159,26 @@ export const softDeleteUser = async (
     }
 
     // 6. Log the deletion for audit trail
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', deletedBy)
+      .single();
+
     await supabase.from('audit_logs').insert({
       user_id: deletedBy,
+      user_name: adminProfile?.name ?? 'Unknown',
+      user_role: adminProfile?.role ?? 'admin',
       action: 'delete_user',
-      resource_type: 'user',
-      resource_id: userId,
-      details: {
+      entity: 'user',
+      entity_id: userId,
+      details: JSON.stringify({
         deleted_user_email: user.email,
         deleted_user_name: user.name,
         reason: 'Admin deletion',
-      },
-      created_at: new Date().toISOString(),
+      }),
+      ip_address: 'client',
+      timestamp: new Date().toISOString(),
     });
 
     return { success: true, message: 'User deleted successfully' };
@@ -209,22 +203,29 @@ export const hardDeleteUser = async (
     }
 
     // Log the hard deletion BEFORE deleting (for permanent audit trail)
+    const { data: adminProfile } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', deletedBy)
+      .single();
+
     await supabase.from('audit_logs').insert({
       user_id: deletedBy,
+      user_name: adminProfile?.name ?? 'Unknown',
+      user_role: adminProfile?.role ?? 'admin',
       action: 'hard_delete_user',
-      resource_type: 'user',
-      resource_id: userId,
-      details: {
+      entity: 'user',
+      entity_id: userId,
+      details: JSON.stringify({
         deleted_user_email: user.email,
         deleted_user_name: user.name,
         reason,
-        timestamp: new Date().toISOString(),
-      },
-      created_at: new Date().toISOString(),
+      }),
+      ip_address: 'client',
+      timestamp: new Date().toISOString(),
     });
 
     // Delete in order of dependencies
-    await supabase.from('addresses').delete().eq('user_id', userId);
     await supabase.from('loyalty_transactions').delete().eq('customer_id', userId);
     await supabase.from('loyalty_accounts').delete().eq('customer_id', userId);
     await supabase.from('referrals').delete().eq('referrer_id', userId);

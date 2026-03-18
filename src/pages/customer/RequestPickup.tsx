@@ -40,6 +40,10 @@ import {
   type CreateOrderPayload,
   type PickupRequestItem,
 } from '@/services/orderService';
+import { calculateServerPrice } from '@/services/pricingService';
+import { useActiveZones } from '@/hooks/useZones';
+import { PromoCodeInput } from '@/components/checkout/PromoCodeInput';
+import { recordPromotionUsage } from '@/services/promotionService';
 
 const ITEM_TYPES = [
   { value: 'carpet', label: 'Carpet' },
@@ -52,12 +56,6 @@ const ITEM_TYPES = [
   { value: 'other', label: 'Other' },
 ];
 
-const ZONES = [
-  { value: 'Kitengela', label: 'Kitengela', delivery: 'Same Day / Next Business Day' },
-  { value: 'Athi River', label: 'Athi River', delivery: 'Same Day / Next Business Day' },
-  { value: 'Syokimau', label: 'Syokimau', delivery: '1 Business Day' },
-  { value: 'Nairobi', label: 'Greater Nairobi (Westlands, Karen, etc.)', delivery: '2 Business Days (48hrs)' },
-];
 
 interface ItemForm {
   id: string;
@@ -98,6 +96,11 @@ export const RequestPickup = () => {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ItemForm[]>([newItemForm()]);
   const [eta, setEta] = useState<{ label: string; date: string } | null>(null);
+  const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [promotionId, setPromotionId] = useState<string | null>(null);
+
+  // Dynamic zones from DB
+  const { data: activeZones = [] } = useActiveZones();
 
   // Fetch ETA when zone changes
   useEffect(() => {
@@ -158,7 +161,14 @@ export const RequestPickup = () => {
     [calculatedItems]
   );
 
-  const deliveryFee = useMemo(() => zone ? getDeliveryFee(zone) : 0, [zone]);
+  const deliveryFee = useMemo(() => {
+    if (!zone) return 0;
+    const matchedZone = activeZones.find((z) => z.name === zone);
+    if (matchedZone) return matchedZone.base_delivery_fee;
+    // Defensive fallback: zone DB is authoritative, but if not loaded yet use hardcoded values
+    console.warn(`Zone "${zone}" not found in DB, using hardcoded delivery fee`);
+    return getDeliveryFee(zone);
+  }, [zone, activeZones]);
 
   const vatAmount = useMemo(
     () => Math.round((subtotal + deliveryFee) * PRICING.vatRate),
@@ -180,8 +190,6 @@ export const RequestPickup = () => {
     [calculatedItems]
   );
 
-  const z = useMemo(() => zone.toLowerCase(), [zone]);
-
   const handleSubmit = useCallback(async () => {
     if (!user) {
       toast.error('Please sign in to request a pickup');
@@ -197,6 +205,39 @@ export const RequestPickup = () => {
     }
 
     setIsSubmitting(true);
+
+    // Server-side pricing validation
+    let validatedSubtotal = subtotal;
+    let validatedDeliveryFee = deliveryFee;
+    let validatedVat = vatAmount;
+    let validatedTotal = grandTotal;
+    let serverDiscount = 0;
+
+    try {
+      const serverItems = calculatedItems
+        .filter((i) => i.isValid)
+        .map((i) => ({
+          item_type: i.itemType,
+          length_inches: parseFloat(i.lengthInches),
+          width_inches: parseFloat(i.widthInches),
+          quantity: i.quantity,
+        }));
+
+      const serverPrice = await calculateServerPrice(serverItems, zone, promoCode ?? undefined, user.id);
+      validatedSubtotal = serverPrice.subtotal;
+      validatedDeliveryFee = serverPrice.delivery_fee;
+      validatedVat = serverPrice.vat_amount;
+      validatedTotal = serverPrice.total;
+      serverDiscount = serverPrice.discount;
+    } catch {
+      // If a promo code was applied, we must not silently proceed without the discount
+      if (promoCode) {
+        setIsSubmitting(false);
+        toast.error('Unable to validate pricing with your promo code. Please try again.');
+        return;
+      }
+      // Without promo, fall back to frontend pricing is acceptable
+    }
 
     const payload: CreateOrderPayload = {
       customerId: user.id,
@@ -216,27 +257,39 @@ export const RequestPickup = () => {
           unitPrice: i.unitPrice,
           totalPrice: i.totalPrice,
         })),
-      subtotal,
-      deliveryFee,
-      vat: vatAmount,
-      total: grandTotal,
+      subtotal: validatedSubtotal,
+      deliveryFee: validatedDeliveryFee,
+      vat: validatedVat,
+      total: validatedTotal,
       notes: notes || undefined,
+      promoCode: promoCode ?? undefined,
+      promotionId: promotionId ?? undefined,
+      skipServerPricing: true, // Already validated above
     };
 
     const result = await createOrder(payload);
     setIsSubmitting(false);
 
     if (result.success && result.order) {
+      // Record promotion usage if a promo was applied
+      if (promotionId && result.order.id && serverDiscount > 0) {
+        try {
+          await recordPromotionUsage(promotionId, result.order.id, serverDiscount);
+        } catch {
+          // Non-critical, don't block order success
+        }
+      }
+
       setOrderCreated({
         trackingCode: result.order.trackingCode,
         eta: eta?.label ?? 'To be confirmed',
-        total: grandTotal,
+        total: validatedTotal,
       });
       toast.success('Pickup request submitted!');
     } else {
       toast.error(result.error ?? 'Failed to create order');
     }
-  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, vatAmount, notes, eta]);
+  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, vatAmount, notes, eta, promoCode, promotionId]);
 
   // Success state
   if (orderCreated) {
@@ -327,9 +380,10 @@ export const RequestPickup = () => {
                       <SelectValue placeholder="Select your zone" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ZONES.map((z) => (
-                        <SelectItem key={z.value} value={z.value}>
-                          {z.label} - {z.delivery}
+                      {activeZones.map((z) => (
+                        <SelectItem key={z.id} value={z.name}>
+                          {z.name} — KES {z.base_delivery_fee.toLocaleString()}
+                          {z.delivery_policy === 'same_day' ? ' (Same Day)' : ' (48hr)'}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -558,6 +612,15 @@ export const RequestPickup = () => {
                     </div>
                   </div>
 
+                  {/* Promo Code */}
+                  <PromoCodeInput
+                    subtotal={subtotal}
+                    onApply={(code, id) => {
+                      setPromoCode(code);
+                      setPromotionId(id);
+                    }}
+                  />
+
                   <Separator />
 
                   <div className="flex justify-between items-center">
@@ -566,6 +629,11 @@ export const RequestPickup = () => {
                       KES {grandTotal.toLocaleString()}
                     </span>
                   </div>
+                  {promoCode && (
+                    <p className="text-xs text-green-600">
+                      * Final discount will be applied server-side at checkout
+                    </p>
+                  )}
 
                   {/* ETA */}
                   {eta && (
@@ -585,11 +653,14 @@ export const RequestPickup = () => {
                     <p>• Pricing is based on item dimensions (per sq inch)</p>
                     <p>• Final price may vary after driver measures on pickup</p>
                     <p>• Deliveries Monday-Friday only (weekends excluded)</p>
-                    {zone && (z.includes('kitengela') || z.includes('athi river')) && (
-                      <p className="text-primary font-medium">
-                        • Same day delivery available if ordered before 2 PM
-                      </p>
-                    )}
+                    {zone && (() => {
+                      const matchedZone = activeZones.find((az) => az.name === zone);
+                      return matchedZone?.delivery_policy === 'same_day' ? (
+                        <p className="text-primary font-medium">
+                          • Same day delivery available if ordered before cutoff ({matchedZone.cutoff_time?.slice(0, 5) || '12:00'})
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
 
                   <Button

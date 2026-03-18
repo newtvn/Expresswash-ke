@@ -1,10 +1,18 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -12,12 +20,17 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Star, PenLine } from 'lucide-react';
+import { Star, PenLine, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const mockReviews: { id: string; orderId: string; date: string; rating: number; comment: string; status: string }[] = [];
-
-const pendingOrders: { orderId: string; date: string; items: string }[] = [];
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
+import { queryKeys } from '@/config/queryKeys';
+import {
+  getMyReviews,
+  getDeliveredOrdersWithoutReview,
+  submitReview,
+  type Review,
+} from '@/services/reviewService';
 
 function StarRating({ rating, onRate, interactive = false }: { rating: number; onRate?: (r: number) => void; interactive?: boolean }) {
   return (
@@ -37,9 +50,14 @@ function StarRating({ rating, onRate, interactive = false }: { rating: number; o
   );
 }
 
-const columns: Column<(typeof mockReviews)[0]>[] = [
-  { key: 'orderId', header: 'Order #', sortable: true },
-  { key: 'date', header: 'Date', sortable: true },
+const columns: Column<Review>[] = [
+  { key: 'orderNumber', header: 'Order #', sortable: true },
+  {
+    key: 'createdAt',
+    header: 'Date',
+    sortable: true,
+    render: (row) => new Date(row.createdAt).toLocaleDateString('en-KE'),
+  },
   {
     key: 'rating',
     header: 'Rating',
@@ -61,24 +79,68 @@ const columns: Column<(typeof mockReviews)[0]>[] = [
 ];
 
 export const Reviews = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [writeOpen, setWriteOpen] = useState(false);
   const [newRating, setNewRating] = useState(0);
   const [newComment, setNewComment] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [selectedOrderNumber, setSelectedOrderNumber] = useState('');
 
-  const handleSubmitReview = () => {
-    if (!newRating || !newComment || !selectedOrder) return;
-    setWriteOpen(false);
+  const { data: myReviews = [], isLoading: reviewsLoading } = useQuery({
+    queryKey: queryKeys.reviews.myReviews(),
+    queryFn: () => getMyReviews(user?.id ?? ''),
+    enabled: !!user?.id,
+  });
+
+  const { data: pendingOrders = [] } = useQuery({
+    queryKey: ['reviews', 'unreviewed', user?.id],
+    queryFn: () => getDeliveredOrdersWithoutReview(user?.id ?? ''),
+    enabled: !!user?.id,
+  });
+
+  const submitMutation = useMutation({
+    mutationFn: () =>
+      submitReview(
+        {
+          orderId: selectedOrderId,
+          rating: newRating,
+          comment: newComment,
+        },
+        user?.id ?? '',
+      ),
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success('Review submitted! It will appear after moderation.');
+        queryClient.invalidateQueries({ queryKey: queryKeys.reviews.all });
+        queryClient.invalidateQueries({ queryKey: ['reviews', 'unreviewed'] });
+        setWriteOpen(false);
+        setNewRating(0);
+        setNewComment('');
+        setSelectedOrderId('');
+        setSelectedOrderNumber('');
+      } else {
+        toast.error(result.error ?? 'Failed to submit review');
+      }
+    },
+    onError: () => {
+      toast.error('Failed to submit review');
+    },
+  });
+
+  const openWriteDialog = (orderId?: string, orderNumber?: string) => {
+    setSelectedOrderId(orderId ?? (pendingOrders[0]?.id ?? ''));
+    setSelectedOrderNumber(orderNumber ?? (pendingOrders[0]?.trackingCode ?? ''));
     setNewRating(0);
     setNewComment('');
-    setSelectedOrder('');
+    setWriteOpen(true);
   };
 
   return (
     <div className="space-y-6">
       <PageHeader title="My Reviews" description="View and write reviews for completed orders">
         {pendingOrders.length > 0 && (
-          <Button onClick={() => { setSelectedOrder(pendingOrders[0].orderId); setWriteOpen(true); }}>
+          <Button onClick={() => openWriteDialog()}>
             <PenLine className="mr-2 h-4 w-4" />
             Write Review
           </Button>
@@ -99,7 +161,7 @@ export const Reviews = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => { setSelectedOrder(pendingOrders[0].orderId); setWriteOpen(true); }}
+                onClick={() => openWriteDialog()}
               >
                 Review Now
               </Button>
@@ -109,7 +171,7 @@ export const Reviews = () => {
       )}
 
       <DataTable
-        data={mockReviews}
+        data={myReviews}
         columns={columns}
         searchable
         searchPlaceholder="Search reviews..."
@@ -125,7 +187,29 @@ export const Reviews = () => {
           <div className="space-y-4">
             <div>
               <Label>Order</Label>
-              <p className="text-sm font-medium mt-1">{selectedOrder}</p>
+              {pendingOrders.length > 1 ? (
+                <Select
+                  value={selectedOrderId}
+                  onValueChange={(v) => {
+                    setSelectedOrderId(v);
+                    const order = pendingOrders.find((o) => o.id === v);
+                    setSelectedOrderNumber(order?.trackingCode ?? '');
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select an order" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pendingOrders.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.trackingCode}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-sm font-medium mt-1">{selectedOrderNumber}</p>
+              )}
             </div>
             <div>
               <Label>Rating</Label>
@@ -146,7 +230,11 @@ export const Reviews = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setWriteOpen(false)}>Cancel</Button>
-            <Button onClick={handleSubmitReview} disabled={!newRating || !newComment}>
+            <Button
+              onClick={() => submitMutation.mutate()}
+              disabled={!newRating || !newComment || !selectedOrderId || submitMutation.isPending}
+            >
+              {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Submit Review
             </Button>
           </DialogFooter>

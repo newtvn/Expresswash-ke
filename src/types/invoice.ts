@@ -26,20 +26,6 @@ export interface Invoice {
   pdfUrl?: string;
 }
 
-export interface Payment {
-  id: string;
-  invoiceId: string;
-  invoiceNumber: string;
-  amount: number;
-  method: 'mpesa' | 'cash' | 'card' | 'bank_transfer';
-  reference: string;
-  mpesaReceiptNumber?: string;
-  status: 'pending' | 'completed' | 'failed' | 'refunded';
-  recordedBy: string;
-  notes?: string;
-  createdAt: string;
-}
-
 export interface InvoiceFilters {
   status?: string;
   customerId?: string;

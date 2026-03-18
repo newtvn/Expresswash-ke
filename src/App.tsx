@@ -3,7 +3,6 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import BubbleBackground from './components/BubbleBackground';
 import { LazyLoader } from '@/components/shared/LazyLoader';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
@@ -54,6 +53,7 @@ const SystemLogs = lazy(() => import('@/pages/admin/SystemLogs'));
 const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
 const RequestedQuotes = lazy(() => import('@/pages/admin/RequestedQuotes'));
 const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
+const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -113,7 +113,6 @@ const App = () => {
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <BubbleBackground />
       <Sonner />
       <ErrorBoundary>
         <BrowserRouter>
@@ -175,6 +174,14 @@ const App = () => {
                   </ErrorBoundary>
                 }
               />
+              <Route
+                path="orders/:id"
+                element={
+                  <ErrorBoundary>
+                    <OrderDetails />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="drivers" element={<DriverManagement />} />
               <Route path="billing" element={<BillingFinancials />} />
               <Route path="profit-expense" element={<ProfitExpense />} />
@@ -196,6 +203,7 @@ const App = () => {
               <Route path="system-logs" element={<SystemLogs />} />
               <Route path="pricing" element={<PricingManagement />} />
               <Route path="holidays" element={<HolidayCalendar />} />
+              <Route path="promotions" element={<AdminPromotions />} />
             </Route>
 
             {/* Customer Portal */}

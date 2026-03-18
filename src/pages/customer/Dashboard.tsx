@@ -11,6 +11,7 @@ import { ROUTES } from '@/config/routes';
 import { getCustomerOrders } from '@/services/orderService';
 import { getLoyaltyAccount } from '@/services/loyaltyService';
 import { ShoppingCart, Award, Wallet, Plus, MapPin, Gift } from 'lucide-react';
+import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 
 export const Dashboard = () => {
   const { user } = useAuth();
@@ -69,7 +70,7 @@ export const Dashboard = () => {
                     <OrderCard
                       key={order.trackingCode}
                       orderNumber={order.trackingCode}
-                      status={String(order.status)}
+                      status={getOrderStatusBadgeKey(order.status)}
                       itemsCount={order.items.length}
                       date={order.pickupDate}
                       zone={order.zone}

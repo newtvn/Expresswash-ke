@@ -1,6 +1,6 @@
 /**
  * Supabase Edge Function: STK Push
- * Initiates M-Pesa payment prompt to customer's phone
+ * Initiates M-Pesa payment prompt to customer's phone via Credit Bank API
  *
  * Endpoint: POST /functions/v1/stk-push
  * Auth: Requires valid Supabase auth token
@@ -31,14 +31,10 @@ import { checkRateLimit, createRateLimitResponse, RATE_LIMITS } from '../_shared
 // CONFIGURATION
 // ============================================================
 
-const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://api.creditbank.co.ke';
-const BANK_CONSUMER_KEY = Deno.env.get('BANK_CONSUMER_KEY');
-const BANK_CONSUMER_SECRET = Deno.env.get('BANK_CONSUMER_SECRET');
+const BANK_API_URL = Deno.env.get('BANK_API_BASE_URL') || 'https://sandboxkonnectapi.creditbank.co.ke';
+const BANK_APP_ID = Deno.env.get('BANK_APP_ID');
+const BANK_API_KEY = Deno.env.get('BANK_API_KEY');
 const CALLBACK_BASE_URL = Deno.env.get('CALLBACK_BASE_URL');
-
-// Token cache (persists across function invocations in same instance)
-let cachedToken: string | null = null;
-let tokenExpiry: number = 0;
 
 // ============================================================
 // CORS HEADERS
@@ -79,55 +75,8 @@ function isValidPhoneNumber(phone: string): boolean {
 }
 
 /**
- * Get access token from Credit Bank API
- * Uses caching to avoid unnecessary API calls
- */
-async function getAccessToken(): Promise<string> {
-  // Return cached token if still valid
-  if (cachedToken && Date.now() < tokenExpiry) {
-    logger.debug('Using cached access token');
-    return cachedToken;
-  }
-
-  logger.debug('Requesting new access token');
-
-  if (!BANK_CONSUMER_KEY || !BANK_CONSUMER_SECRET) {
-    throw new Error('Bank API credentials not configured');
-  }
-
-  // Create Basic Auth credentials
-  const credentials = btoa(`${BANK_CONSUMER_KEY}:${BANK_CONSUMER_SECRET}`);
-
-  const response = await fetch(`${BANK_API_URL}/oauth/token`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Basic ${credentials}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      grant_type: 'client_credentials',
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    logger.error('Token request failed', { status: response.status, error: errorText });
-    throw new Error(`Failed to get access token: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  // Cache token (with 1-minute buffer before expiry)
-  cachedToken = data.access_token;
-  tokenExpiry = Date.now() + ((data.expires_in - 60) * 1000);
-
-  logger.info('Access token obtained', { expiresIn: data.expires_in });
-
-  return cachedToken;
-}
-
-/**
  * Initiate STK Push with Credit Bank API
+ * Auth: x-app-id + x-api-key headers
  * Endpoint: POST /safaricom-stkpush
  */
 async function initiateSTKPush(
@@ -135,8 +84,10 @@ async function initiateSTKPush(
   amount: number,
   reference: string,
   narration: string,
-): Promise<any> {
-  const accessToken = await getAccessToken();
+): Promise<Record<string, unknown>> {
+  if (!BANK_APP_ID || !BANK_API_KEY) {
+    throw new Error('Bank API credentials not configured (BANK_APP_ID / BANK_API_KEY)');
+  }
 
   const requestBody = {
     phoneNumber: phoneNumber,
@@ -144,22 +95,22 @@ async function initiateSTKPush(
     reference: reference,
     countryCode: 'KE',
     narration: narration,
-    callbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
-    errorCallbackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
+    callBackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
+    errorCallBackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
   };
 
-  // Log with PII masked
   logger.info('Initiating STK Push', {
-    phoneNumber,  // Will be masked automatically
-    amount: requestBody.amount,  // Will be masked automatically
+    phoneNumber,
+    amount: requestBody.amount,
     reference,
   });
 
   const response = await fetch(`${BANK_API_URL}/safaricom-stkpush`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      'x-app-id': BANK_APP_ID,
+      'x-api-key': BANK_API_KEY,
     },
     body: JSON.stringify(requestBody),
   });
@@ -170,10 +121,20 @@ async function initiateSTKPush(
     throw new Error(`STK Push request failed: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  logger.info('STK Push response received', { hasData: !!data });
+  const responseData = await response.json();
+  logger.info('STK Push response received', { hasData: !!responseData });
 
-  return data;
+  // CreditBank wraps the response in a `data` object with PascalCase fields:
+  // { message: "...", data: { MerchantRequestID, CheckoutRequestID, ResponseCode, ... } }
+  const data = responseData.data || responseData;
+
+  return {
+    merchantRequestId: data.MerchantRequestID,
+    checkoutRequestId: data.CheckoutRequestID,
+    responseCode: data.ResponseCode,
+    responseDescription: data.ResponseDescription,
+    customerMessage: data.CustomerMessage,
+  };
 }
 
 // ============================================================

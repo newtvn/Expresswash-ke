@@ -105,21 +105,22 @@ async function main() {
 
     console.log(`\n✅ Found project: ${project.name} (${project.id})`);
 
+    // Read credentials from environment variables (never hardcode)
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      console.error('❌ SUPABASE_URL and SUPABASE_ANON_KEY env vars required');
+      process.exit(1);
+    }
+
     // Set environment variables
     console.log('\n📝 Setting VITE_SUPABASE_URL...');
-    await setEnvVar(
-      project.id,
-      'VITE_SUPABASE_URL',
-      'https://airzodpllaoeuvntzqki.supabase.co'
-    );
+    await setEnvVar(project.id, 'VITE_SUPABASE_URL', SUPABASE_URL);
     console.log('✅ VITE_SUPABASE_URL set successfully');
 
     console.log('\n📝 Setting VITE_SUPABASE_ANON_KEY...');
-    await setEnvVar(
-      project.id,
-      'VITE_SUPABASE_ANON_KEY',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpcnpvZHBsbGFvZXV2bnR6cWtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA2OTgyODgsImV4cCI6MjA4NjI3NDI4OH0.QwImNUC7TxnN7h305fZHQYCgUg2slEPWMKL2XU9RzeI'
-    );
+    await setEnvVar(project.id, 'VITE_SUPABASE_ANON_KEY', SUPABASE_ANON_KEY);
     console.log('✅ VITE_SUPABASE_ANON_KEY set successfully');
 
     console.log('\n🎉 All environment variables set successfully!');

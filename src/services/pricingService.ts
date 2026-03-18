@@ -128,13 +128,22 @@ export async function updatePricingConfig(
     }
 
     // Log the pricing change to audit logs
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, role')
+      .eq('id', userId)
+      .single();
+
     await supabase.from('audit_logs').insert({
       user_id: userId,
+      user_name: profile?.name ?? 'Unknown',
+      user_role: profile?.role ?? 'admin',
       action: 'update_pricing',
-      resource_type: 'system_config',
-      resource_id: 'pricing',
-      details: { config },
-      created_at: new Date().toISOString(),
+      entity: 'system_config',
+      entity_id: 'pricing',
+      details: JSON.stringify({ config }),
+      ip_address: 'client',
+      timestamp: new Date().toISOString(),
     }).catch(() => {
       // Non-critical, log silently
     });
@@ -143,6 +152,63 @@ export async function updatePricingConfig(
   } catch (error) {
     return { success: false, message: 'An unexpected error occurred while updating pricing' };
   }
+}
+
+// ── Server-Side Pricing Validation ───────────────────────────────────
+
+export interface ServerPriceItem {
+  item_type: string;
+  length_inches: number;
+  width_inches: number;
+  quantity: number;
+}
+
+export interface ServerPriceResult {
+  subtotal: number;
+  delivery_fee: number;
+  discount: number;
+  vat_rate: number;
+  vat_amount: number;
+  total: number;
+  zone: string;
+  promo_code: string | null;
+  items: Array<{
+    item_type: string;
+    length_inches: number;
+    width_inches: number;
+    quantity: number;
+    rate: number;
+    sq_inches: number;
+    unit_price: number;
+    total: number;
+  }>;
+}
+
+/**
+ * Call the server-side calculate_order_pricing() function
+ * for authoritative price validation.
+ *
+ * @param customerId - Optional customer UUID for per-customer promo usage checks.
+ *                     When provided, the server enforces usage_per_customer limits.
+ */
+export async function calculateServerPrice(
+  items: ServerPriceItem[],
+  zoneName: string,
+  promoCode?: string,
+  customerId?: string,
+): Promise<ServerPriceResult> {
+  const { data, error } = await supabase.rpc('calculate_order_pricing', {
+    p_items: items,
+    p_zone_name: zoneName,
+    p_promo_code: promoCode ?? null,
+    p_customer_id: customerId ?? null,
+  });
+
+  if (error) {
+    throw new Error(error.message ?? 'Server pricing calculation failed');
+  }
+
+  return data as ServerPriceResult;
 }
 
 /**
@@ -162,9 +228,9 @@ export async function getPricingHistory(limit = 10): Promise<{
     const { data, error } = await retrySupabaseQuery(
       () => supabase
         .from('audit_logs')
-        .select('*, profiles(name)')
+        .select('*')
         .eq('action', 'update_pricing')
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(limit),
       { maxRetries: 2 }
     );
@@ -176,9 +242,9 @@ export async function getPricingHistory(limit = 10): Promise<{
     const history = data.map((log) => ({
       id: log.id as string,
       userId: log.user_id as string,
-      userName: (log.profiles as { name?: string } | null)?.name ?? 'Unknown',
-      timestamp: log.created_at as string,
-      changes: log.details?.config as PricingConfig,
+      userName: (log.user_name as string) ?? 'Unknown',
+      timestamp: log.timestamp as string,
+      changes: (() => { try { return JSON.parse(log.details as string)?.config; } catch { return null; } })() as PricingConfig,
     }));
 
     return { success: true, history };

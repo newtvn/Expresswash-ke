@@ -4,6 +4,7 @@ import { retrySupabaseQuery } from '@/lib/retryUtils';
 import { orderLogger } from '@/lib/logger';
 import { getHolidayDates } from './holidayService';
 import { ORDER_STATUS } from '@/constants/orderStatus';
+import { calculateServerPrice } from './pricingService';
 
 export interface OrderListFilters {
   status?: number;
@@ -37,6 +38,10 @@ export interface CreateOrderPayload {
   vat: number;
   total: number;
   notes?: string;
+  promoCode?: string;
+  promotionId?: string;
+  /** When true, skip server-side pricing — caller already validated via calculateServerPrice */
+  skipServerPricing?: boolean;
 }
 
 // Generate a unique tracking code
@@ -262,6 +267,40 @@ export const createOrder = async (
 
     const eta = await calculateETA(payload.zone);
 
+    // Server-side pricing validation — authoritative amounts
+    // Skip if caller already validated (e.g. RequestPickup does its own server pricing call)
+    let serverSubtotal = payload.subtotal;
+    let serverDeliveryFee = payload.deliveryFee;
+    let serverVat = payload.vat;
+    let serverTotal = payload.total;
+
+    if (!payload.skipServerPricing) {
+      try {
+        const serverItems = payload.items.map((item) => ({
+          item_type: item.itemType,
+          length_inches: item.lengthInches,
+          width_inches: item.widthInches,
+          quantity: item.quantity,
+        }));
+
+        const serverPrice = await calculateServerPrice(serverItems, payload.zone, payload.promoCode, payload.customerId);
+        serverSubtotal = serverPrice.subtotal;
+        serverDeliveryFee = serverPrice.delivery_fee;
+        serverVat = serverPrice.vat_amount;
+        serverTotal = serverPrice.total;
+
+        orderLogger.info('Server pricing applied', {
+          frontendTotal: payload.total,
+          serverTotal: serverPrice.total,
+        });
+      } catch (pricingErr) {
+        // If server pricing fails, fall back to frontend values
+        orderLogger.warn('Server pricing failed, using frontend values', {
+          error: pricingErr instanceof Error ? pricingErr.message : String(pricingErr),
+        });
+      }
+    }
+
     const { data: inserted, error } = await retrySupabaseQuery(
       () => supabase
         .from('orders')
@@ -274,10 +313,10 @@ export const createOrder = async (
           estimated_delivery: eta.date,
           zone: payload.zone,
           pickup_address: payload.pickupAddress,
-          subtotal: payload.subtotal,
-          delivery_fee: payload.deliveryFee,
-          vat: payload.vat,
-          total: payload.total,
+          subtotal: serverSubtotal,
+          delivery_fee: serverDeliveryFee,
+          vat: serverVat,
+          total: serverTotal,
           notes: payload.notes ?? null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),

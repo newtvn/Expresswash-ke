@@ -3,6 +3,7 @@ import { LayoutDashboard, Route, Package, Banknote } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { LayoutHeader } from '@/components/layout/LayoutHeader';
+import { InstallPrompt } from '@/components/driver/InstallPrompt';
 
 const bottomNavItems = [
   { name: 'Dashboard', href: '/driver/dashboard', icon: LayoutDashboard },
@@ -66,6 +67,8 @@ const DriverLayout = () => {
           ))}
         </div>
       </nav>
+
+      <InstallPrompt />
     </div>
   );
 };

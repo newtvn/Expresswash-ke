@@ -1,6 +1,6 @@
 /**
  * Payment type definitions for ExpressWash
- * Supports STK Push (M-Pesa), QR Code, and other payment methods
+ * Unified type supporting both STK Push (order-based) and manual (invoice-based) payments
  */
 
 export type PaymentMethod = 'mpesa' | 'cash' | 'card' | 'bank_transfer' | 'qr_code';
@@ -8,19 +8,26 @@ export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 
 
 export interface Payment {
   id: string;
-  orderId: string;
+  orderId?: string;              // STK Push / order-based payments
+  invoiceId?: string;            // Manual / invoice-based payments
+  invoiceNumber?: string;
   amount: number;
   method: PaymentMethod;
   status: PaymentStatus;
-  phoneNumber?: string; // For M-Pesa
-  transactionId?: string; // M-Pesa transaction ID
-  merchantRequestId?: string; // STK Push merchant request ID
-  checkoutRequestId?: string; // STK Push checkout request ID
-  referenceNumber?: string; // Payment reference
+  phoneNumber?: string;
   customerName?: string;
+  recordedBy?: string;           // Who recorded the payment (manual/cash)
+  merchantRequestId?: string;    // STK Push merchant request ID
+  checkoutRequestId?: string;    // STK Push checkout request ID
+  reference?: string;            // Manual payment reference
+  referenceNumber?: string;      // System-generated reference
+  mpesaReceiptNumber?: string;
+  resultCode?: number;
+  resultDesc?: string;
   failureReason?: string;
+  notes?: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   completedAt?: string;
 }
 
@@ -79,27 +86,6 @@ export interface PaymentQueryResponse {
   resultDesc?: string;
   amount?: number;
   mpesaReceiptNumber?: string;
-  errorMessage?: string;
-}
-
-/**
- * QR Code Request
- */
-export interface QRCodeRequest {
-  amount: number;
-  accountReference: string; // Order ID
-  transactionDesc: string;
-  merchantName?: string;
-}
-
-/**
- * QR Code Response
- */
-export interface QRCodeResponse {
-  success: boolean;
-  qrCode?: string; // Base64 encoded QR code image
-  qrString?: string; // QR code string for manual generation
-  referenceNumber?: string;
   errorMessage?: string;
 }
 

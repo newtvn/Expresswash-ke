@@ -17,8 +17,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 13% 13%;
 
-    /* Brand - Deep teal/turquoise for freshness */
-    --primary: 195 80% 40%;
+    /* Brand – #2e88d1 blue */
+    --primary: 207 64% 50%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary - Soft warm gray */
@@ -45,22 +45,22 @@
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 195 80% 40%;
+    --ring: 207 64% 50%;
 
     --radius: 0.75rem;
 
     /* Sidebar */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 220 13% 26%;
-    --sidebar-primary: 195 80% 40%;
+    --sidebar-primary: 207 64% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 14% 96%;
     --sidebar-accent-foreground: 220 13% 18%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 195 80% 40%;
+    --sidebar-ring: 207 64% 50%;
 
     /* Custom Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(195 80% 40%) 0%, hsl(180 70% 48%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(207 64% 50%) 0%, hsl(207 64% 60%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(220 14% 96%) 0%, hsl(0 0% 100%) 100%);
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(220 14% 98%) 100%);
 
@@ -69,7 +69,7 @@
     --shadow-md: 0 4px 6px -1px hsl(220 13% 13% / 0.05), 0 2px 4px -2px hsl(220 13% 13% / 0.03);
     --shadow-lg: 0 10px 15px -3px hsl(220 13% 13% / 0.08), 0 4px 6px -4px hsl(220 13% 13% / 0.04);
     --shadow-xl: 0 20px 25px -5px hsl(220 13% 13% / 0.1), 0 8px 10px -6px hsl(220 13% 13% / 0.05);
-    --shadow-glow: 0 0 40px hsl(195 80% 40% / 0.15);
+    --shadow-glow: 0 0 40px hsl(207 64% 50% / 0.15);
   }
 
   .dark {
@@ -82,7 +82,7 @@
     --popover: 220 15% 10%;
     --popover-foreground: 220 14% 96%;
 
-    --primary: 195 80% 50%;
+    --primary: 207 64% 55%;
     --primary-foreground: 220 15% 8%;
 
     --secondary: 220 15% 15%;
@@ -99,16 +99,16 @@
 
     --border: 220 15% 20%;
     --input: 220 15% 20%;
-    --ring: 195 80% 50%;
+    --ring: 207 64% 55%;
 
     --sidebar-background: 220 15% 8%;
     --sidebar-foreground: 220 14% 80%;
-    --sidebar-primary: 195 80% 50%;
+    --sidebar-primary: 207 64% 55%;
     --sidebar-primary-foreground: 220 15% 8%;
     --sidebar-accent: 220 15% 15%;
     --sidebar-accent-foreground: 220 14% 96%;
     --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 195 80% 50%;
+    --sidebar-ring: 207 64% 55%;
   }
 }
 
@@ -241,27 +241,95 @@
     opacity: 1;
   }
 
-  /* Bubble Background Effect */
-  .bubble-effect {
-    position: fixed;
-    bottom: -100px;
-    background-color: rgba(59, 130, 246, 0.15); /* Soft blue bubbles */
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 50%;
-    pointer-events: none;
-    box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.3);
-    animation: rise linear infinite;
-    z-index: 0;
+  /* ── Animated Wave-Fill Button ─────────────────────────────────── */
+  .animated-btn {
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    text-align: center;
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: color 0.5s ease, border-color 0.5s ease;
+    color: var(--btn-color);
+    background: var(--btn-bg, transparent);
   }
 
-  @keyframes rise {
-    0% {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-    }
-    100% {
-      transform: translateY(-110vh) scale(1.2);
-      opacity: 0;
-    }
+  .animated-btn.animated-btn--bordered {
+    border: 3px solid var(--btn-color);
   }
+
+  .animated-btn:hover {
+    color: var(--btn-hover-color, #000);
+  }
+
+  .animated-btn:hover.animated-btn--bordered {
+    border-color: var(--btn-fill-color, var(--btn-color));
+  }
+
+  .animated-btn__span {
+    position: absolute;
+    width: 25%;
+    height: 100%;
+    background: var(--btn-fill-color, var(--btn-color));
+    transform: translateY(150%);
+    border-radius: 50%;
+    transition: transform 0.5s ease, border-radius 0.5s ease;
+    z-index: -1;
+    top: 0;
+  }
+
+  .animated-btn__span:nth-child(1) {
+    left: 0%;
+    transition-delay: 0s;
+  }
+  .animated-btn__span:nth-child(2) {
+    left: 25%;
+    transition-delay: 0.1s;
+  }
+  .animated-btn__span:nth-child(3) {
+    left: 50%;
+    transition-delay: 0.2s;
+  }
+  .animated-btn__span:nth-child(4) {
+    left: 75%;
+    transition-delay: 0.3s;
+  }
+
+  .animated-btn:hover .animated-btn__span {
+    transform: translateY(0) scale(2);
+  }
+
+  /* ── Animated Wave-Fill Card ──────────────────────────────────── */
+  .animated-card {
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    cursor: pointer;
+    transition: color 0.5s ease;
+  }
+
+  .animated-card__span {
+    position: absolute;
+    width: 25%;
+    height: 0;
+    padding-bottom: 25%;
+    background: var(--card-fill-color, #2e88d1);
+    transform: translateY(300%);
+    border-radius: 50%;
+    transition: transform 0.5s ease, border-radius 0.5s ease;
+    z-index: -1;
+    bottom: 0;
+  }
+
+  .animated-card__span:nth-child(1) { left: 0%;  transition-delay: 0s; }
+  .animated-card__span:nth-child(2) { left: 25%; transition-delay: 0.1s; }
+  .animated-card__span:nth-child(3) { left: 50%; transition-delay: 0.2s; }
+  .animated-card__span:nth-child(4) { left: 75%; transition-delay: 0.3s; }
+
+  .animated-card:hover .animated-card__span {
+    transform: translateY(0) scale(4);
+  }
+
 }

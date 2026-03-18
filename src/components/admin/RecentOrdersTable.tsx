@@ -9,18 +9,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/shared';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { ORDER_STAGES } from '@/config/constants';
+import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 import type { Order } from '@/types';
 
 interface RecentOrdersTableProps {
   orders: (Order & { amount?: number })[];
 }
-
-const getStatusLabel = (statusNumber: number): string => {
-  const stage = ORDER_STAGES.find((s) => s.id === statusNumber);
-  if (!stage) return 'pending';
-  return stage.name.toLowerCase().replace(/\s+/g, '_');
-};
 
 const getServiceSummary = (items: { name: string; quantity: number }[]): string => {
   if (!items || items.length === 0) return '-';
@@ -74,7 +68,7 @@ export const RecentOrdersTable = ({ orders }: RecentOrdersTableProps) => {
                   {getServiceSummary(order.items)}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={getStatusLabel(order.status)} />
+                  <StatusBadge status={getOrderStatusBadgeKey(order.status)} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDate(order.pickupDate)}

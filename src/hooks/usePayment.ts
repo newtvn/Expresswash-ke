@@ -10,7 +10,6 @@ import {
   queryPaymentStatus,
   verifyPayment,
   getPaymentByOrderId,
-  generateQRCode,
   formatPhoneNumber,
   isValidPhoneNumber,
 } from '@/services/paymentService';
@@ -18,7 +17,6 @@ import type {
   STKPushRequest,
   STKPushResponse,
   PaymentQueryRequest,
-  QRCodeRequest,
 } from '@/types/payment';
 import { useToast } from '@/hooks/use-toast';
 
@@ -109,35 +107,6 @@ export function useOrderPayment(orderId: string | null) {
     },
     enabled: !!orderId,
   });
-}
-
-/**
- * Hook for generating QR Code
- */
-export function useQRCode() {
-  const { toast } = useToast();
-
-  const mutation = useMutation({
-    mutationFn: async (request: QRCodeRequest) => {
-      return generateQRCode(request);
-    },
-    onSuccess: (response) => {
-      if (!response.success) {
-        toast({
-          title: 'QR Code Generation Failed',
-          description: response.errorMessage,
-          variant: 'destructive',
-        });
-      }
-    },
-  });
-
-  return {
-    generateQR: mutation.mutate,
-    isLoading: mutation.isPending,
-    qrCode: mutation.data,
-    error: mutation.error,
-  };
 }
 
 /**

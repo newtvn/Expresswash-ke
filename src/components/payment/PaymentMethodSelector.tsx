@@ -52,9 +52,9 @@ const paymentMethods = [
   {
     value: 'qr_code' as PaymentMethod,
     label: 'QR Code',
-    description: 'Scan to pay with M-Pesa',
+    description: 'Coming soon',
     icon: QrCode,
-    disabled: false,
+    disabled: true,
   },
 ];
 

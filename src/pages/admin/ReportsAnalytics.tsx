@@ -1,153 +1,114 @@
-import { useState, useEffect } from "react";
-import { PageHeader, DataTable, ExportButton, DateRangePicker } from "@/components/shared";
-import type { Column } from "@/components/shared";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { PageHeader, DataTable, ExportButton, DateRangePicker, KPICard } from '@/components/shared';
+import type { Column } from '@/components/shared';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  getSalesData,
-  getZonePerformance,
-  // getDriverPerformance,
-  // getCustomerDemographics,
-  // getRevenueByItemType,
-} from "@/services/reportService";
+  DollarSign,
+  ShoppingCart,
+  Users,
+  Truck,
+  TrendingUp,
+  AlertTriangle,
+} from 'lucide-react';
+import { queryKeys } from '@/config/queryKeys';
+import {
+  getRevenueReport,
+  getOrderReport,
+  getDriverPerformanceReport,
+  getCustomerReport,
+  getFinancialReport,
+} from '@/services/reportService';
 import type {
-  SalesDataPoint,
-  // ZonePerformance,
-  // DriverPerformanceData,
-  // CustomerDemographic,
-  // RevenueByItemType,
-} from "@/types";
+  DriverPerformanceRow,
+  FinancialReportData,
+} from '@/services/reportService';
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const today = new Date();
+const thirtyDaysAgo = new Date(today);
+thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+const fmt = (d: Date) => d.toISOString().split('T')[0];
 
 // ── Column Definitions ───────────────────────────────────────────────
 
-// Temporary type for zone performance data
-type ZonePerformanceRow = {
-  zone: string;
-  orders: number;
-  revenue: number;
-  customerSatisfaction: number;
-  avgDeliveryTime: number;
-  onTimeRate: number;
-};
-
-const salesColumns: Column<SalesDataPoint>[] = [
-  { key: "date", header: "Date", sortable: true },
-  { key: "orders", header: "Orders", sortable: true },
+type PeriodRow = { period: string; payments: number; revenue: number };
+const periodColumns: Column<PeriodRow>[] = [
+  { key: 'period', header: 'Period', sortable: true },
+  { key: 'payments', header: 'Payments', sortable: true },
   {
-    key: "revenue",
-    header: "Revenue",
+    key: 'revenue',
+    header: 'Revenue',
     sortable: true,
-    render: (row) => `KES ${row.revenue.toLocaleString()}`,
+    render: (row) => `KES ${Number(row.revenue).toLocaleString()}`,
   },
 ];
 
-const zoneColumns: Column<ZonePerformanceRow>[] = [
-  { key: "zone", header: "Zone", sortable: true },
-  { key: "orders", header: "Orders", sortable: true },
+type PaymentMethodRow = { method: string; count: number; revenue: number };
+const paymentMethodColumns: Column<PaymentMethodRow>[] = [
+  { key: 'method', header: 'Payment Method', sortable: true, render: (row) => <span className="capitalize">{row.method.replace('_', ' ')}</span> },
+  { key: 'count', header: 'Count', sortable: true },
+  { key: 'revenue', header: 'Revenue', sortable: true, render: (row) => `KES ${Number(row.revenue).toLocaleString()}` },
+];
+
+type ZoneRevenueRow = { zone: string; orders: number; revenue: number };
+const zoneRevenueColumns: Column<ZoneRevenueRow>[] = [
+  { key: 'zone', header: 'Zone', sortable: true },
+  { key: 'orders', header: 'Orders', sortable: true },
+  { key: 'revenue', header: 'Revenue', sortable: true, render: (row) => `KES ${Number(row.revenue).toLocaleString()}` },
+];
+
+const driverColumns: Column<DriverPerformanceRow>[] = [
+  { key: 'name', header: 'Driver', sortable: true },
+  { key: 'deliveries', header: 'Deliveries', sortable: true },
+  { key: 'pickups', header: 'Pickups', sortable: true },
+  { key: 'avg_rating', header: 'Avg Rating', sortable: true },
   {
-    key: "revenue",
-    header: "Revenue",
+    key: 'cash_collected',
+    header: 'Cash Collected',
     sortable: true,
-    render: (row) => `KES ${row.revenue.toLocaleString()}`,
+    render: (row) => `KES ${Number(row.cash_collected).toLocaleString()}`,
   },
   {
-    key: "customerSatisfaction",
-    header: "Satisfaction",
+    key: 'cancellation_rate',
+    header: 'Cancel %',
     sortable: true,
-    render: (row) => `${row.customerSatisfaction}%`,
-  },
-  {
-    key: "avgDeliveryTime",
-    header: "Avg Delivery",
-    sortable: true,
-    render: (row) => `${row.avgDeliveryTime} hrs`,
-  },
-  {
-    key: "onTimeRate",
-    header: "On-Time Rate",
-    sortable: true,
-    render: (row) => `${row.onTimeRate}%`,
+    render: (row) => `${row.cancellation_rate}%`,
   },
 ];
 
-const driverColumns: Column<DriverPerformanceData>[] = [
-  { key: "name", header: "Driver", sortable: true },
-  { key: "deliveries", header: "Total Deliveries", sortable: true },
+type TopCustomerRow = { name: string; order_count: number; total_spent: number };
+const topCustomerColumns: Column<TopCustomerRow>[] = [
+  { key: 'name', header: 'Customer', sortable: true },
+  { key: 'order_count', header: 'Orders', sortable: true },
   {
-    key: "onTimeRate",
-    header: "On-Time Rate",
+    key: 'total_spent',
+    header: 'Total Spent',
     sortable: true,
-    render: (row) => `${row.onTimeRate}%`,
-  },
-  { key: "avgRating", header: "Rating", sortable: true },
-  {
-    key: "fuelCost",
-    header: "Fuel Cost",
-    sortable: true,
-    render: (row) => `KES ${row.fuelCost.toLocaleString()}`,
+    render: (row) => `KES ${Number(row.total_spent).toLocaleString()}`,
   },
 ];
 
-const customerColumns: Column<CustomerDemographic>[] = [
-  { key: "segment", header: "Segment" },
-  { key: "count", header: "Customers", sortable: true },
-  {
-    key: "percentage",
-    header: "Percentage",
-    sortable: true,
-    render: (row) => `${row.percentage}%`,
-  },
-  {
-    key: "avgOrderValue",
-    header: "Avg Order Value",
-    sortable: true,
-    render: (row) => `KES ${row.avgOrderValue.toLocaleString()}`,
-  },
+type ExpenseCategoryRow = { category: string; total: number; count: number };
+const expenseCategoryColumns: Column<ExpenseCategoryRow>[] = [
+  { key: 'category', header: 'Category', sortable: true, render: (row) => <span className="capitalize">{row.category.replace('_', ' ')}</span> },
+  { key: 'count', header: 'Count', sortable: true },
+  { key: 'total', header: 'Total', sortable: true, render: (row) => `KES ${Number(row.total).toLocaleString()}` },
 ];
 
-// ── Loading Skeleton ─────────────────────────────────────────────────
+// ── Loading Skeletons ────────────────────────────────────────────────
 
 const TableSkeleton = () => (
   <Card className="bg-card border-border/50">
-    <CardHeader>
-      <Skeleton className="h-6 w-48" />
-    </CardHeader>
+    <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
     <CardContent className="space-y-3">
-      {/* Header row */}
-      <div className="flex gap-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-4 flex-1" />
-        ))}
-      </div>
-      {/* Data rows */}
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex gap-4">
-          {Array.from({ length: 4 }).map((_, j) => (
-            <Skeleton key={j} className="h-4 flex-1" />
-          ))}
-        </div>
-      ))}
-    </CardContent>
-  </Card>
-);
-
-const RevenueSkeleton = () => (
-  <Card className="bg-card border-border/50">
-    <CardHeader>
-      <Skeleton className="h-6 w-48" />
-    </CardHeader>
-    <CardContent className="space-y-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-4 w-24" />
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-4 w-28" />
-            </div>
-          </div>
-          <Skeleton className="h-2.5 w-full rounded-full" />
+          {Array.from({ length: 4 }).map((_, j) => <Skeleton key={j} className="h-4 flex-1" />)}
         </div>
       ))}
     </CardContent>
@@ -156,95 +117,41 @@ const RevenueSkeleton = () => (
 
 // ── Component ────────────────────────────────────────────────────────
 
-/**
- * Admin Reports & Analytics Page
- * Tabs for Sales, Revenue, Zones, Drivers, and Customers.
- * All data is fetched from Supabase via reportService.
- */
 export const ReportsAnalytics = () => {
-  const [dateRange, setDateRange] = useState({ start: "2024-01-01", end: "2024-12-31" });
+  const [dateRange, setDateRange] = useState({
+    start: fmt(thirtyDaysAgo),
+    end: fmt(today),
+  });
 
-  // Data state
-  const [salesData, setSalesData] = useState<SalesReportData[]>([]);
-  const [zoneData, setZoneData] = useState<ZonePerformance[]>([]);
-  const [driverData, setDriverData] = useState<DriverPerformanceData[]>([]);
-  const [customerData, setCustomerData] = useState<CustomerDemographic[]>([]);
-  const [revenueData, setRevenueData] = useState<RevenueByItemType[]>([]);
+  const { data: revenueData, isLoading: loadingRevenue } = useQuery({
+    queryKey: queryKeys.reports.revenue({ ...dateRange }),
+    queryFn: () => getRevenueReport(dateRange.start, dateRange.end),
+  });
 
-  // Loading state
-  const [loadingSales, setLoadingSales] = useState(true);
-  const [loadingZones, setLoadingZones] = useState(true);
-  const [loadingDrivers, setLoadingDrivers] = useState(true);
-  const [loadingCustomers, setLoadingCustomers] = useState(true);
-  const [loadingRevenue, setLoadingRevenue] = useState(true);
+  const { data: orderData, isLoading: loadingOrders } = useQuery({
+    queryKey: queryKeys.reports.sales({ ...dateRange }),
+    queryFn: () => getOrderReport(dateRange.start, dateRange.end),
+  });
 
-  // Fetch all report data on mount
-  useEffect(() => {
-    const fetchSales = async () => {
-      setLoadingSales(true);
-      try {
-        const data = await getSalesReport();
-        setSalesData(data);
-      } finally {
-        setLoadingSales(false);
-      }
-    };
+  const { data: driverData, isLoading: loadingDrivers } = useQuery({
+    queryKey: queryKeys.reports.drivers({ ...dateRange }),
+    queryFn: () => getDriverPerformanceReport(dateRange.start, dateRange.end),
+  });
 
-    const fetchZones = async () => {
-      setLoadingZones(true);
-      try {
-        const data = await getZonePerformance();
-        setZoneData(data);
-      } finally {
-        setLoadingZones(false);
-      }
-    };
+  const { data: customerData, isLoading: loadingCustomers } = useQuery({
+    queryKey: queryKeys.reports.customers({ ...dateRange }),
+    queryFn: () => getCustomerReport(dateRange.start, dateRange.end),
+  });
 
-    const fetchDrivers = async () => {
-      setLoadingDrivers(true);
-      try {
-        const data = await getDriverPerformance();
-        setDriverData(data);
-      } finally {
-        setLoadingDrivers(false);
-      }
-    };
-
-    const fetchCustomers = async () => {
-      setLoadingCustomers(true);
-      try {
-        const data = await getCustomerDemographics();
-        setCustomerData(data);
-      } finally {
-        setLoadingCustomers(false);
-      }
-    };
-
-    const fetchRevenue = async () => {
-      setLoadingRevenue(true);
-      try {
-        const data = await getRevenueByItemType();
-        setRevenueData(data);
-      } finally {
-        setLoadingRevenue(false);
-      }
-    };
-
-    fetchSales();
-    fetchZones();
-    fetchDrivers();
-    fetchCustomers();
-    fetchRevenue();
-  }, []);
-
-  // Compute the total revenue for percentage bar widths
-  const totalRevenue = revenueData.reduce((sum, item) => sum + item.revenue, 0);
+  const { data: financialData, isLoading: loadingFinancial } = useQuery({
+    queryKey: [...queryKeys.reports.all, 'financial', dateRange],
+    queryFn: () => getFinancialReport(dateRange.start, dateRange.end),
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader title="Reports & Analytics" description="Comprehensive business intelligence and insights" />
 
-      {/* Date Range Picker */}
       <DateRangePicker
         startDate={dateRange.start}
         endDate={dateRange.end}
@@ -252,137 +159,202 @@ export const ReportsAnalytics = () => {
       />
 
       <Tabs defaultValue="sales" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="sales">Sales</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="zones">Zones</TabsTrigger>
           <TabsTrigger value="drivers">Drivers</TabsTrigger>
           <TabsTrigger value="customers">Customers</TabsTrigger>
+          <TabsTrigger value="financial">Financial</TabsTrigger>
         </TabsList>
 
-        {/* Sales Tab */}
+        {/* Sales / Revenue Tab */}
         <TabsContent value="sales" className="space-y-4">
-          <div className="flex justify-end">
-            <ExportButton data={salesData} filename="sales-report" />
-          </div>
-          {loadingSales ? (
-            <TableSkeleton />
-          ) : (
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Monthly Sales</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DataTable data={salesData} columns={salesColumns} searchable={false} pageSize={12} />
-              </CardContent>
-            </Card>
+          {loadingRevenue ? <TableSkeleton /> : revenueData && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <KPICard label="Total Revenue" value={revenueData.summary.total_revenue} format="currency" icon={DollarSign} />
+                <KPICard label="Total Payments" value={revenueData.summary.total_payments} format="number" icon={ShoppingCart} />
+                <KPICard label="Avg Payment" value={Math.round(revenueData.summary.avg_payment)} format="currency" icon={TrendingUp} />
+              </div>
+              <div className="flex justify-end">
+                <ExportButton data={revenueData.by_period} filename="revenue-by-period" />
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Revenue by Period</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable data={revenueData.by_period} columns={periodColumns} searchable={false} pageSize={15} />
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Revenue by Payment Method</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable data={revenueData.by_payment_method} columns={paymentMethodColumns} searchable={false} />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
-        {/* Revenue Tab */}
-        <TabsContent value="revenue" className="space-y-4">
-          <div className="flex justify-end">
-            <ExportButton data={revenueData} filename="revenue-report" />
-          </div>
-          {loadingRevenue ? (
-            <RevenueSkeleton />
-          ) : (
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Revenue by Item Type</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {revenueData.map((item) => {
-                    const pct = totalRevenue > 0 ? Math.round((item.revenue / totalRevenue) * 100) : 0;
-                    return (
-                      <div key={item.itemType} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-foreground">{item.itemType}</span>
-                          <div className="flex items-center gap-4">
-                            <span className="text-muted-foreground">{item.orders} orders</span>
-                            <span className="text-muted-foreground">
-                              Avg KES {item.avgPrice.toLocaleString()}
-                            </span>
-                            <span className="font-medium text-foreground w-32 text-right">
-                              KES {item.revenue.toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="w-full bg-secondary rounded-full h-2.5">
-                          <div
-                            className="h-2.5 rounded-full bg-primary transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
+        {/* Orders Tab */}
+        <TabsContent value="orders" className="space-y-4">
+          {loadingOrders ? <TableSkeleton /> : orderData && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <KPICard label="Total Orders" value={orderData.totals.total_orders} format="number" icon={ShoppingCart} />
+                <KPICard label="Completed" value={orderData.totals.completed} format="number" icon={ShoppingCart} />
+                <KPICard label="In Progress" value={orderData.totals.in_progress} format="number" icon={Truck} />
+                <KPICard label="Cancelled" value={orderData.totals.cancelled} format="number" icon={AlertTriangle} />
+              </div>
+              {orderData.sla_compliance.total_with_sla > 0 && (
+                <Card className="bg-card border-border/50">
+                  <CardHeader><CardTitle className="text-lg font-semibold">SLA Compliance</CardTitle></CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-foreground">{orderData.sla_compliance.total_with_sla}</p>
+                        <p className="text-sm text-muted-foreground">Orders with SLA</p>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{orderData.sla_compliance.met_sla}</p>
+                        <p className="text-sm text-muted-foreground">Met SLA</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-500">{orderData.sla_compliance.breached_sla}</p>
+                        <p className="text-sm text-muted-foreground">Breached SLA</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              <div className="flex justify-end">
+                <ExportButton data={orderData.status_breakdown} filename="order-status-breakdown" />
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Status Breakdown</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable
+                    data={orderData.status_breakdown}
+                    columns={[
+                      { key: 'status_name', header: 'Status', sortable: true },
+                      { key: 'count', header: 'Count', sortable: true },
+                    ]}
+                    searchable={false}
+                  />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
         {/* Zones Tab */}
         <TabsContent value="zones" className="space-y-4">
-          <div className="flex justify-end">
-            <ExportButton data={zoneData} filename="zone-report" />
-          </div>
-          {loadingZones ? (
-            <TableSkeleton />
-          ) : (
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Zone Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DataTable data={zoneData} columns={zoneColumns} searchable={false} />
-              </CardContent>
-            </Card>
+          {loadingRevenue ? <TableSkeleton /> : revenueData && (
+            <>
+              <div className="flex justify-end">
+                <ExportButton data={revenueData.by_zone} filename="zone-revenue" />
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Revenue by Zone</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable data={revenueData.by_zone} columns={zoneRevenueColumns} searchable={false} />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
         {/* Drivers Tab */}
         <TabsContent value="drivers" className="space-y-4">
-          <div className="flex justify-end">
-            <ExportButton data={driverData} filename="driver-report" />
-          </div>
-          {loadingDrivers ? (
-            <TableSkeleton />
-          ) : (
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Driver Performance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DataTable data={driverData} columns={driverColumns} searchable={false} />
-              </CardContent>
-            </Card>
+          {loadingDrivers ? <TableSkeleton /> : (
+            <>
+              <div className="flex justify-end">
+                <ExportButton data={driverData ?? []} filename="driver-performance" />
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Driver Performance</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable data={driverData ?? []} columns={driverColumns} searchable={false} />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
         {/* Customers Tab */}
         <TabsContent value="customers" className="space-y-4">
-          <div className="flex justify-end">
-            <ExportButton data={customerData} filename="customer-report" />
-          </div>
-          {loadingCustomers ? (
-            <TableSkeleton />
-          ) : (
-            <Card className="bg-card border-border/50">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">Customer Segmentation</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <DataTable data={customerData} columns={customerColumns} searchable={false} />
-              </CardContent>
-            </Card>
+          {loadingCustomers ? <TableSkeleton /> : customerData && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <KPICard label="Total Customers" value={customerData.total_customers} format="number" icon={Users} />
+                <KPICard label="New This Period" value={customerData.new_customers_period} format="number" icon={Users} />
+                <KPICard label="Avg Review Rating" value={customerData.avg_review_rating} format="number" icon={TrendingUp} />
+              </div>
+              {customerData.tier_distribution.length > 0 && (
+                <Card className="bg-card border-border/50">
+                  <CardHeader><CardTitle className="text-lg font-semibold">Loyalty Tier Distribution</CardTitle></CardHeader>
+                  <CardContent>
+                    <DataTable
+                      data={customerData.tier_distribution}
+                      columns={[
+                        { key: 'tier', header: 'Tier', sortable: true, render: (row: { tier: string }) => <span className="capitalize">{row.tier}</span> },
+                        { key: 'count', header: 'Customers', sortable: true },
+                      ]}
+                      searchable={false}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+              <div className="flex justify-end">
+                <ExportButton data={customerData.top_customers} filename="top-customers" />
+              </div>
+              <Card className="bg-card border-border/50">
+                <CardHeader><CardTitle className="text-lg font-semibold">Top Customers</CardTitle></CardHeader>
+                <CardContent>
+                  <DataTable data={customerData.top_customers} columns={topCustomerColumns} searchable={false} pageSize={10} />
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* Financial Tab */}
+        <TabsContent value="financial" className="space-y-4">
+          {loadingFinancial ? <TableSkeleton /> : financialData && (
+            <FinancialTab data={financialData} />
           )}
         </TabsContent>
       </Tabs>
     </div>
   );
 };
+
+const FinancialTab = ({ data }: { data: FinancialReportData }) => (
+  <>
+    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <KPICard label="Total Revenue" value={data.total_revenue} format="currency" icon={DollarSign} />
+      <KPICard label="Total Expenses" value={data.total_expenses} format="currency" icon={DollarSign} />
+      <KPICard label="Gross Profit" value={data.gross_profit} format="currency" icon={TrendingUp} />
+      <KPICard label="Profit Margin" value={data.profit_margin} format="percentage" icon={TrendingUp} />
+    </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <KPICard label="Outstanding Receivables" value={data.outstanding_receivables} format="currency" icon={AlertTriangle} />
+      <KPICard label="Overdue Invoices" value={data.overdue_count} format="number" icon={AlertTriangle} />
+    </div>
+    {data.expenses_by_category.length > 0 && (
+      <>
+        <div className="flex justify-end">
+          <ExportButton data={data.expenses_by_category} filename="expenses-by-category" />
+        </div>
+        <Card className="bg-card border-border/50">
+          <CardHeader><CardTitle className="text-lg font-semibold">Expenses by Category</CardTitle></CardHeader>
+          <CardContent>
+            <DataTable data={data.expenses_by_category} columns={expenseCategoryColumns} searchable={false} />
+          </CardContent>
+        </Card>
+      </>
+    )}
+  </>
+);
 
 export default ReportsAnalytics;
