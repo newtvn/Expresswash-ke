@@ -23,6 +23,7 @@ const STATUS_STYLES: Record<string, string> = {
   partially_paid: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   overdue: 'bg-red-100 text-red-800 border-red-200',
   cancelled: 'bg-gray-100 text-gray-600 border-gray-200',
+  refunded: 'bg-orange-100 text-orange-800 border-orange-200',
   unpaid: 'bg-red-100 text-red-800 border-red-200',
 
   // General

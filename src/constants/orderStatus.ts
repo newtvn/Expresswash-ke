@@ -92,6 +92,30 @@ export const ORDER_STATUS_VARIANTS: Record<
 };
 
 /**
+ * Maps numeric status to the snake_case key expected by StatusBadge
+ */
+const ORDER_STATUS_BADGE_KEYS: Record<number, string> = {
+  1: 'pending_quote',
+  2: 'quote_sent',
+  3: 'quote_accepted',
+  4: 'pickup_scheduled',
+  5: 'picked_up',
+  6: 'in_washing',
+  7: 'drying',
+  8: 'quality_check',
+  9: 'ready_for_dispatch',
+  10: 'dispatched',
+  11: 'out_for_delivery',
+  12: 'delivered',
+  13: 'cancelled',
+  14: 'refunded',
+};
+
+export function getOrderStatusBadgeKey(status: number): string {
+  return ORDER_STATUS_BADGE_KEYS[status] ?? 'pending';
+}
+
+/**
  * Helper function to check if order is active (not cancelled, refunded, or delivered)
  */
 export function isActiveOrder(status: number): boolean {

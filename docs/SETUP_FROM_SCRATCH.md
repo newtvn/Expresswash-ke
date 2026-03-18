@@ -282,12 +282,15 @@ SELECT jobname, schedule, active FROM cron.job ORDER BY jobname;
 -- process-notification-queue, sla-monitoring, warehouse-aging
 ```
 
-### WK4 Migrations (025–026)
+### WK4 Migrations (025–027)
 
 | # | File | What it does |
 |---|------|-------------|
 | 025 | `20260319_025_push_subscriptions.sql` | Push notification subscriptions table |
 | 026 | `20260319_026_report_functions.sql` | Report aggregation functions |
+| 027 | `20260316_027_missing_tables.sql` | Creates `holidays` and `notifications` tables (missing from prior migrations), seeds Kenyan public holidays and sample notifications |
+| 028 | `20260316_028_fix_customer_cancel_rls.sql` | Fixes RLS policy so customers can cancel their own orders (status 1–4 → 13) |
+| 029 | `20260316_029_cancelled_order_notification.sql` | Adds "Order Cancelled" SMS + email templates and updates the notification trigger to fire on cancellation |
 
 > **Do NOT run** `MANUAL_post_deploy_pg_cron.sql` — it is superseded by migration 020.
 

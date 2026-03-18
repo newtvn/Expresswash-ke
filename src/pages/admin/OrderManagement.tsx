@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import { OrderTimeline } from '@/components/admin/OrderTimeline';
+import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 
 const STATUS_OPTIONS = [
   { value: '1', label: 'Pending' },
@@ -32,6 +33,8 @@ const STATUS_OPTIONS = [
   { value: '10', label: 'Dispatched' },
   { value: '11', label: 'Out for Delivery' },
   { value: '12', label: 'Delivered' },
+  { value: '13', label: 'Cancelled' },
+  { value: '14', label: 'Refunded' },
 ];
 
 export const OrderManagement = () => {
@@ -166,7 +169,7 @@ export const OrderManagement = () => {
     {
       key: 'status',
       header: 'Status',
-      render: (row) => <StatusBadge status={String(row.status)} />,
+      render: (row) => <StatusBadge status={getOrderStatusBadgeKey(row.status)} />,
     },
     { key: 'zone', header: 'Zone', sortable: true },
     {
@@ -185,7 +188,7 @@ export const OrderManagement = () => {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => navigate(`/portal/orders/${row.trackingCode}`)}
+            onClick={() => navigate(`/admin/orders/${row.trackingCode}`)}
           >
             <Eye className="w-4 h-4" />
           </Button>
@@ -317,7 +320,7 @@ export const OrderManagement = () => {
               <div className="border rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">Order {trackedOrder.trackingCode}</h4>
-                  <StatusBadge status={String(trackedOrder.status)} />
+                  <StatusBadge status={getOrderStatusBadgeKey(trackedOrder.status)} />
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
@@ -360,7 +363,7 @@ export const OrderManagement = () => {
                 <Button
                   className="w-full"
                   onClick={() => {
-                    navigate(`/portal/orders/${trackedOrder.trackingCode}`);
+                    navigate(`/admin/orders/${trackedOrder.trackingCode}`);
                     setTrackDialogOpen(false);
                   }}
                 >

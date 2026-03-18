@@ -689,7 +689,9 @@ CREATE POLICY "Customers can create orders" ON orders
 CREATE POLICY "Admins can create any order" ON orders
   FOR INSERT TO authenticated WITH CHECK (is_admin());
 CREATE POLICY "Customers can update own pending orders" ON orders
-  FOR UPDATE TO authenticated USING (customer_id = auth.uid() AND status IN (1, 2));
+  FOR UPDATE TO authenticated
+  USING (customer_id = auth.uid() AND status IN (1, 2, 3, 4))
+  WITH CHECK (customer_id = auth.uid() AND status IN (1, 2, 3, 4, 13));
 CREATE POLICY "Admins can update any order" ON orders
   FOR UPDATE TO authenticated USING (is_admin());
 CREATE POLICY "Drivers can update assigned orders" ON orders

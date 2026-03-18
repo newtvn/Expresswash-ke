@@ -129,7 +129,7 @@ export const RequestedQuotes = () => {
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => navigate(`/portal/orders/${row.trackingCode}`)}
+            onClick={() => navigate(`/admin/orders/${row.trackingCode}`)}
             title="View details"
           >
             <Eye className="w-4 h-4" />

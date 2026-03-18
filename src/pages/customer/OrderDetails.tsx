@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { PageHeader, StatusBadge, ConfirmDialog } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ROUTES } from '@/config/routes';
-import { getOrderByUUID, cancelOrder } from '@/services/orderService';
+import { getOrderById, getOrderByUUID, cancelOrder } from '@/services/orderService';
 import { initiateSTKPush, isValidPhoneNumber, formatPhoneNumber, verifyPayment } from '@/services/paymentService';
 import { ORDER_STAGES } from '@/config/constants';
 import { Order } from '@/types';
@@ -26,6 +26,7 @@ import {
   CreditCard,
   Loader2,
   Smartphone,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -33,20 +34,27 @@ import {
 } from '@/components/ui/dialog';
 
 const statusToLabel = (status: number): string => {
+  if (status === 13) return 'Cancelled';
+  if (status === 14) return 'Refunded';
   const stage = ORDER_STAGES.find((s) => s.id === status);
   return stage?.name ?? 'Unknown';
 };
 
+const isCancelledOrRefunded = (status: number) => status === 13 || status === 14;
+
 const buildTimeline = (currentStatus: number) => {
   return ORDER_STAGES.map((stage) => {
     const Icon = stage.icon;
+    // For cancelled/refunded orders, don't mark any stage as completed
+    const completed = isCancelledOrRefunded(currentStatus) ? false : currentStatus >= stage.id;
+    const isCurrent = isCancelledOrRefunded(currentStatus) ? false : currentStatus === stage.id;
     return {
       id: stage.id,
       label: stage.name,
       description: stage.description,
       icon: Icon,
-      completed: currentStatus >= stage.id,
-      isCurrent: currentStatus === stage.id,
+      completed,
+      isCurrent,
     };
   });
 };
@@ -54,6 +62,9 @@ const buildTimeline = (currentStatus: number) => {
 export const OrderDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminView = location.pathname.startsWith('/admin');
+  const backRoute = isAdminView ? ROUTES.ADMIN_ORDERS : ROUTES.CUSTOMER_ORDERS;
   const [cancelOpen, setCancelOpen] = useState(false);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +80,7 @@ export const OrderDetails = () => {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    getOrderByUUID(id)
+    getOrderById(id)
       .then((result) => setOrder(result))
       .finally(() => setLoading(false));
   }, [id]);
@@ -102,7 +113,7 @@ export const OrderDetails = () => {
     setPaymentLoading(true);
     const result = await initiateSTKPush({
       phoneNumber: formatPhoneNumber(phoneNumber),
-      amount: order.total ?? 0,
+      amount: import.meta.env.DEV ? 5 : (order.total ?? 0),
       accountReference: order.trackingCode,
       transactionDesc: `Payment for ${order.trackingCode}`,
     });
@@ -155,7 +166,7 @@ export const OrderDetails = () => {
     return (
       <div className="space-y-6">
         <PageHeader title="Order Not Found" description="We couldn't find the order you're looking for">
-          <Button variant="outline" onClick={() => navigate(ROUTES.CUSTOMER_ORDERS)}>
+          <Button variant="outline" onClick={() => navigate(backRoute)}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Orders
           </Button>
@@ -166,12 +177,12 @@ export const OrderDetails = () => {
 
   const timeline = buildTimeline(order.status);
   const canCancel = order.status >= 1 && order.status <= 3;
-  const canPay = order.status >= 1 && order.status <= 12 && order.status !== 13 && order.status !== 14;
+  const canPay = !isAdminView && order.status >= 1 && order.status <= 12 && order.status !== 13 && order.status !== 14;
 
   return (
     <div className="space-y-6">
       <PageHeader title={`Order #${order.trackingCode}`} description={`Placed on ${order.pickupDate ?? order.createdAt?.split('T')[0] ?? ''}`}>
-        <Button variant="outline" onClick={() => navigate(ROUTES.CUSTOMER_ORDERS)}>
+        <Button variant="outline" onClick={() => navigate(backRoute)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Orders
         </Button>
@@ -327,6 +338,20 @@ export const OrderDetails = () => {
               <CardTitle className="text-lg">Order Timeline</CardTitle>
             </CardHeader>
             <CardContent>
+              {isCancelledOrRefunded(order.status) && (
+                <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-destructive/10 text-destructive">
+                  <XCircle className="h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="font-semibold text-sm">{statusToLabel(order.status)}</p>
+                    <p className="text-xs opacity-80">
+                      This order was {order.status === 13 ? 'cancelled' : 'refunded'} on{' '}
+                      {order.updatedAt ? new Date(order.updatedAt).toLocaleDateString('en-KE', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                      }) : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="space-y-1">
                 {timeline.map((step, i) => {
                   const isLast = i === timeline.length - 1;

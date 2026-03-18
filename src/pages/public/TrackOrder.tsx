@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Search, Package } from "lucide-react";
+import { Search, Package, XCircle } from "lucide-react";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import CTA from "@/components/landing/CTA";
 import {
@@ -12,6 +12,7 @@ import {
 import { trackOrder } from "@/services/orderService";
 import { Order } from "@/types";
 import { ORDER_STAGES } from "@/config/constants";
+import { ORDER_STATUS, getOrderStatusLabel, isOrderCancelled } from "@/constants/orderStatus";
 
 /**
  * Public Order Tracking Page
@@ -53,6 +54,7 @@ const TrackOrder = () => {
   const currentStage = order
     ? ORDER_STAGES.find((s) => s.id === order.status)
     : null;
+  const orderIsCancelled = order ? isOrderCancelled(order.status) : false;
 
   return (
     <main className="flex-1 bg-slate-50 pt-24 pb-16">
@@ -119,7 +121,7 @@ const TrackOrder = () => {
         {order && (
           <div className="max-w-4xl mx-auto animate-fade-in">
             {/* Current Status Card */}
-            <div className="relative bg-[#2e88d1] rounded-2xl p-8 mb-8 overflow-hidden text-white">
+            <div className={`relative rounded-2xl p-8 mb-8 overflow-hidden text-white ${orderIsCancelled ? 'bg-gray-700' : 'bg-[#2e88d1]'}`}>
               {/* Decorative bubbles */}
               <div className="absolute top-4 left-6 w-24 h-24 rounded-full bg-white/[0.05]" />
               <div className="absolute bottom-6 right-8 w-32 h-32 rounded-full bg-white/[0.04]" />
@@ -130,13 +132,17 @@ const TrackOrder = () => {
                     Current Status
                   </p>
                   <h2 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
-                    {currentStage && (
+                    {orderIsCancelled ? (
+                      <XCircle className="w-8 h-8" />
+                    ) : currentStage ? (
                       <currentStage.icon className="w-8 h-8" />
-                    )}
-                    {currentStage?.name}
+                    ) : null}
+                    {orderIsCancelled ? getOrderStatusLabel(order!.status) : currentStage?.name}
                   </h2>
                   <p className="text-white/80 mt-1">
-                    {currentStage?.description}
+                    {orderIsCancelled
+                      ? `This order was ${order!.status === ORDER_STATUS.CANCELLED ? 'cancelled' : 'refunded'}`
+                      : currentStage?.description}
                   </p>
                 </div>
                 <div className="text-right">

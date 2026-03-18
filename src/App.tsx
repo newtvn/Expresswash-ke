@@ -174,6 +174,14 @@ const App = () => {
                   </ErrorBoundary>
                 }
               />
+              <Route
+                path="orders/:id"
+                element={
+                  <ErrorBoundary>
+                    <OrderDetails />
+                  </ErrorBoundary>
+                }
+              />
               <Route path="drivers" element={<DriverManagement />} />
               <Route path="billing" element={<BillingFinancials />} />
               <Route path="profit-expense" element={<ProfitExpense />} />

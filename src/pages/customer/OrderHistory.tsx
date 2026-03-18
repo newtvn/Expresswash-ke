@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getCustomerOrders } from '@/services/orderService';
 import { ROUTES } from '@/config/routes';
 import { PlaceOrderDialog } from '@/components/customer/PlaceOrderDialog';
+import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 
 export const OrderHistory = () => {
   const { user } = useAuth();
@@ -34,15 +35,6 @@ export const OrderHistory = () => {
 
   const orders = result?.data ?? [];
 
-  const statusLabel = (status: number): string => {
-    const map: Record<number, string> = {
-      0: 'Cancelled', 1: 'Pending', 2: 'Driver Assigned', 3: 'Accepted',
-      4: 'Pickup Scheduled', 5: 'Picked Up', 6: 'In Washing', 7: 'Drying',
-      8: 'Quality Check', 9: 'Ready', 10: 'Dispatched', 11: 'Out for Delivery', 12: 'Delivered',
-    };
-    return map[status] ?? 'Unknown';
-  };
-
   return (
     <div className="space-y-6">
       <PageHeader title="My Orders" description="Track and manage all your cleaning orders">
@@ -62,7 +54,7 @@ export const OrderHistory = () => {
             <SelectItem value="6">In Washing</SelectItem>
             <SelectItem value="9">Ready</SelectItem>
             <SelectItem value="12">Delivered</SelectItem>
-            <SelectItem value="0">Cancelled</SelectItem>
+            <SelectItem value="13">Cancelled</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -86,7 +78,7 @@ export const OrderHistory = () => {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm">{order.trackingCode}</span>
-                    <StatusBadge status={String(order.status)} />
+                    <StatusBadge status={getOrderStatusBadgeKey(order.status)} />
                   </div>
                   <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{order.pickupDate}</span>

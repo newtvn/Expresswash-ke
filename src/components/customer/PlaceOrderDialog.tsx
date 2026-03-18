@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Plus, Trash2, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { createOrder } from '@/services/orderService';
+import { createOrder, calculateItemPrice, getDeliveryFee, PRICING } from '@/services/orderService';
+import type { PickupRequestItem } from '@/services/orderService';
 
 interface PlaceOrderDialogProps {
   open: boolean;
@@ -26,6 +27,26 @@ const ITEM_TYPES = [
 ];
 
 const ZONES = ['Kitengela', 'Athi River', 'Syokimau', 'Mlolongo'];
+
+const ITEM_DEFAULTS: Record<string, { itemType: string; lengthInches: number; widthInches: number }> = {
+  'Carpet (Small)':    { itemType: 'carpet',   lengthInches: 48,  widthInches: 36 },
+  'Carpet (Medium)':   { itemType: 'carpet',   lengthInches: 72,  widthInches: 48 },
+  'Carpet (Large)':    { itemType: 'carpet',   lengthInches: 120, widthInches: 84 },
+  'Persian Rug':       { itemType: 'rug',      lengthInches: 96,  widthInches: 60 },
+  'Office Rug':        { itemType: 'rug',       lengthInches: 72,  widthInches: 48 },
+  'Sofa (2-Seater)':   { itemType: 'sofa',     lengthInches: 60,  widthInches: 36 },
+  'Sofa (3-Seater)':   { itemType: 'sofa',     lengthInches: 84,  widthInches: 36 },
+  'Sofa (L-Shaped)':   { itemType: 'sofa',     lengthInches: 108, widthInches: 60 },
+  'Mattress (Single)': { itemType: 'mattress',  lengthInches: 75,  widthInches: 39 },
+  'Mattress (Double)': { itemType: 'mattress',  lengthInches: 75,  widthInches: 54 },
+  'Mattress (King)':   { itemType: 'mattress',  lengthInches: 80,  widthInches: 76 },
+  'Curtain Pair':      { itemType: 'curtain',   lengthInches: 84,  widthInches: 54 },
+  'Duvet/Blanket':     { itemType: 'other',     lengthInches: 90,  widthInches: 90 },
+  'Chair':             { itemType: 'chair',     lengthInches: 36,  widthInches: 36 },
+  'Car Seat Covers':   { itemType: 'other',     lengthInches: 48,  widthInches: 24 },
+  'Pillow':            { itemType: 'pillow',    lengthInches: 26,  widthInches: 20 },
+  'Other':             { itemType: 'other',     lengthInches: 48,  widthInches: 36 },
+};
 
 export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) => {
   const { user } = useAuth();
@@ -48,6 +69,30 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
   const updateItem = (i: number, field: 'name' | 'quantity', value: string | number) =>
     setForm({ ...form, items: form.items.map((item, idx) => idx === i ? { ...item, [field]: value } : item) });
 
+  // Compute pricing from selected items and zone
+  const pricing = useMemo(() => {
+    const validItems = form.items.filter((i) => i.name.trim() !== '');
+    const pricedItems: PickupRequestItem[] = validItems.map((item) => {
+      const defaults = ITEM_DEFAULTS[item.name] ?? ITEM_DEFAULTS['Other'];
+      const calc = calculateItemPrice(defaults.itemType, defaults.lengthInches, defaults.widthInches, item.quantity);
+      return {
+        name: item.name,
+        itemType: defaults.itemType,
+        quantity: item.quantity,
+        lengthInches: defaults.lengthInches,
+        widthInches: defaults.widthInches,
+        pricePerSqInch: calc.pricePerSqInch,
+        unitPrice: calc.unitPrice,
+        totalPrice: calc.totalPrice,
+      };
+    });
+    const subtotal = pricedItems.reduce((sum, i) => sum + i.totalPrice, 0);
+    const deliveryFee = form.zone ? getDeliveryFee(form.zone) : 0;
+    const vat = Math.round((subtotal + deliveryFee) * PRICING.vatRate);
+    const total = subtotal + deliveryFee + vat;
+    return { pricedItems, subtotal, deliveryFee, vat, total };
+  }, [form.items, form.zone]);
+
   const mutation = useMutation({
     mutationFn: () =>
       createOrder({
@@ -57,7 +102,11 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
         pickupDate: form.pickupDate,
         pickupAddress: form.pickupAddress,
         notes: form.notes || undefined,
-        items: form.items.filter((i) => i.name.trim() !== ''),
+        items: pricing.pricedItems,
+        subtotal: pricing.subtotal,
+        deliveryFee: pricing.deliveryFee,
+        vat: pricing.vat,
+        total: pricing.total,
       }),
     onSuccess: (data) => {
       if (data.success && data.order) {
@@ -165,6 +214,36 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
                 ))}
               </div>
             </div>
+
+            {pricing.pricedItems.length > 0 && (
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                <Label className="text-xs text-muted-foreground">Estimated Pricing</Label>
+                {pricing.pricedItems.map((item, i) => (
+                  <div key={i} className="flex justify-between">
+                    <span>{item.quantity}x {item.name}</span>
+                    <span className="font-medium">KES {item.totalPrice.toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="border-t pt-1 mt-1 space-y-1 text-xs text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Subtotal</span>
+                    <span>KES {pricing.subtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Delivery ({form.zone || '—'})</span>
+                    <span>KES {pricing.deliveryFee.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>VAT (16%)</span>
+                    <span>KES {pricing.vat.toLocaleString()}</span>
+                  </div>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                  <span>Estimated Total</span>
+                  <span>KES {pricing.total.toLocaleString()}</span>
+                </div>
+              </div>
+            )}
 
             <div>
               <Label htmlFor="order-zone">Service Zone *</Label>

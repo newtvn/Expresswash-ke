@@ -1,5 +1,6 @@
 import { CheckCircle2 } from "lucide-react";
 import { ORDER_STAGES } from "@/config/constants";
+import { isOrderCancelled } from "@/constants/orderStatus";
 
 interface OrderTimelineProps {
   currentStatus: number;
@@ -9,12 +10,14 @@ interface OrderTimelineProps {
  * Reusable component to display the order progress timeline
  */
 export const OrderTimeline = ({ currentStatus }: OrderTimelineProps) => {
+  const cancelled = isOrderCancelled(currentStatus);
+
   return (
     <div className="relative">
       {ORDER_STAGES.map((stage, index) => {
-        const isCompleted = stage.id < currentStatus;
-        const isCurrent = stage.id === currentStatus;
-        const isPending = stage.id > currentStatus;
+        const isCompleted = cancelled ? false : stage.id < currentStatus;
+        const isCurrent = cancelled ? false : stage.id === currentStatus;
+        const isPending = cancelled ? true : stage.id > currentStatus;
         const StageIcon = stage.icon;
 
         return (
