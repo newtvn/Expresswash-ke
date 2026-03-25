@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { Sparkles, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ROUTES } from "@/config/routes";
-import { COMPANY_INFO } from "@/config/constants";
+import Logo from "@/components/shared/Logo";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -45,14 +45,8 @@ export const AuthLayout = ({
       <div className="w-full max-w-md relative">
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-8 md:p-10">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-glow">
-              <Sparkles className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold text-foreground tracking-tight">
-              {COMPANY_INFO.name.split("Wash")[0]}
-              <span className="text-primary">Wash</span>
-            </span>
+          <div className="flex items-center justify-center mb-8">
+            <Logo size="lg" />
           </div>
 
           {/* Header */}

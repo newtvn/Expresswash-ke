@@ -52,7 +52,7 @@ const CTA = () => {
               Ready for Fresh, Clean Fabrics?
             </h2>
             <p className="text-lg text-white/80 mb-10 max-w-xl mx-auto leading-relaxed">
-              Schedule your first pickup today and experience the ExpressWash difference.
+              Schedule your first pickup today and experience the Express Carpets &amp; Upholstery difference.
               Free pickup, expert cleaning, timely delivery.
             </p>
 

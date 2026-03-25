@@ -44,7 +44,7 @@ export const SystemConfig = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Company Name</Label>
-                  <Input defaultValue="ExpressWash" />
+                  <Input defaultValue="Express Carpets &amp; Upholstery" />
                 </div>
                 <div className="space-y-2">
                   <Label>Tagline</Label>
@@ -56,7 +56,7 @@ export const SystemConfig = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input defaultValue="info@expresswash.co.ke" />
+                  <Input defaultValue="info@expresscarpets.co.ke" />
                 </div>
               </div>
               <div className="space-y-2">

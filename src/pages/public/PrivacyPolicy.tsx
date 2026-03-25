@@ -20,7 +20,7 @@ const PrivacyPolicy = () => {
           <section>
             <h2 className="text-xl font-semibold text-foreground">1. Information We Collect</h2>
             <p>
-              When you use ExpressWash, we collect information you provide directly, including your name, email address,
+              When you use Express Carpets &amp; Upholstery, we collect information you provide directly, including your name, email address,
               phone number, service zone, and pickup/delivery addresses. We also collect order details such as item types,
               dimensions, and payment information processed through M-Pesa.
             </p>
@@ -89,8 +89,8 @@ const PrivacyPolicy = () => {
             <h2 className="text-xl font-semibold text-foreground">8. Contact Us</h2>
             <p>
               If you have questions about this privacy policy or how we handle your data, please contact us at{' '}
-              <a href="mailto:privacy@expresswash.co.ke" className="text-primary hover:underline">
-                privacy@expresswash.co.ke
+              <a href="mailto:privacy@expresscarpets.co.ke" className="text-primary hover:underline">
+                privacy@expresscarpets.co.ke
               </a>{' '}
               or call us at +254 700 000 000.
             </p>

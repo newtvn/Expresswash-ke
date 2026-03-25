@@ -59,7 +59,7 @@ export const InstallPrompt = () => {
           <Download className="w-5 h-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground">Install Expresswash</p>
+          <p className="text-sm font-semibold text-foreground">Install Express Carpets</p>
           <p className="text-xs text-muted-foreground">Quick access from your home screen</p>
         </div>
         <Button size="sm" onClick={handleInstall}>
