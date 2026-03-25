@@ -79,10 +79,19 @@ export const OrderDetails = () => {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
-    getOrderById(id)
-      .then((result) => setOrder(result))
-      .finally(() => setLoading(false));
+
+    let cancelled = false;
+
+    const fetchOrder = (showSpinner = false) => {
+      if (showSpinner) setLoading(true);
+      getOrderById(id)
+        .then((result) => { if (!cancelled && result) setOrder(result); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    };
+
+    fetchOrder(true);
+    const interval = setInterval(() => fetchOrder(false), 20000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [id]);
 
   const handleCancel = async () => {

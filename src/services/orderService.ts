@@ -646,14 +646,15 @@ export const updateOrderStatus = async (
 export const bulkUpdateOrderStatus = async (
   orderIds: string[],
   newStatus: number,
-): Promise<{ success: boolean; updated: number }> => {
-  const { error, count } = await supabase
+): Promise<{ success: boolean; updated: number; error?: string }> => {
+  const { data: updated, error } = await supabase
     .from('orders')
     .update({ status: newStatus, updated_at: new Date().toISOString() })
-    .in('id', orderIds);
+    .in('id', orderIds)
+    .select('id');
 
-  if (error) return { success: false, updated: 0 };
-  return { success: true, updated: count ?? orderIds.length };
+  if (error) return { success: false, updated: 0, error: error.message };
+  return { success: true, updated: updated?.length ?? orderIds.length };
 };
 
 export const assignDriverToOrder = async (
