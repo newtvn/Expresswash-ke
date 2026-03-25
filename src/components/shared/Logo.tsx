@@ -1,12 +1,12 @@
 /**
  * Express Carpets & Upholstery Logo Component
  *
- * - Full logo (showText=true, default): uses /logo.svg (or /logo-white.svg on dark bg)
+ * - Full logo (showText=true, default): uses /logo.png (official brand PNG)
  * - Icon only (showText=false): uses inline SVG icon for compact spaces (sidebars, etc.)
  *
  * Brand guidelines:
- *  - White/light background  → full-color logo  (/logo.svg)
- *  - Dark/colored background → white logo        (/logo-white.svg)  use invert=true
+ *  - White/light background  → full-color logo (/logo.png)
+ *  - Dark/colored background → use invert=true  (logo-white.svg fallback)
  */
 
 interface LogoProps {
@@ -37,9 +37,9 @@ const heightMap = { sm: 32, md: 40, lg: 56 };
 
 const Logo = ({ size = 'md', showText = true, className = '', invert = false }: LogoProps) => {
   const h = heightMap[size];
-  const src = invert ? '/logo-white.svg' : '/logo.svg';
 
   if (!showText) {
+    // Icon-only mode: inline SVG (works at any size, any background)
     return (
       <div className={className}>
         <LogoIcon px={h} invert={invert} />
@@ -47,10 +47,11 @@ const Logo = ({ size = 'md', showText = true, className = '', invert = false }: 
     );
   }
 
+  // Full logo: use the official brand PNG
   return (
     <div className={`inline-flex items-center ${className}`}>
       <img
-        src={src}
+        src="/logo.png"
         alt="Express Carpet & Upholstery Cleaning"
         style={{ height: h * 1.9, width: 'auto' }}
         className="object-contain"
