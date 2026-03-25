@@ -1,7 +1,7 @@
 {
-  "name": "ExpressWash Driver",
-  "short_name": "EW Driver",
-  "description": "ExpressWash driver app — manage pickups, deliveries, and cash collection",
+  "name": "Express Carpets Driver",
+  "short_name": "EC Driver",
+  "description": "Express Carpets & Upholstery driver app — manage pickups, deliveries, and cash collection",
   "start_url": "/driver",
   "scope": "/",
   "display": "standalone",

@@ -28,6 +28,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import Logo from '@/components/shared/Logo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,11 +106,9 @@ export function CustomerSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/portal">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
-                </div>
+                <Logo size="sm" showText={false} />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">ExpressWash</span>
+                  <span className="truncate font-semibold">Express Carpets</span>
                   <span className="truncate text-xs text-muted-foreground">My Account</span>
                 </div>
               </Link>

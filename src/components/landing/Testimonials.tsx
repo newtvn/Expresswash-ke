@@ -6,7 +6,7 @@ const testimonials = [
     name: "Grace Wanjiku",
     location: "Kitengela",
     rating: 5,
-    text: "ExpressWash transformed my old Persian rug! ",
+    text: "Express Carpets &amp; Upholstery transformed my old Persian rug! ",
     highlight: "It looks brand new.",
     textAfter: " The pickup and delivery was so convenient.",
     avatar: "GW",

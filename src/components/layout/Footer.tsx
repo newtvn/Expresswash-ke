@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Sparkles, MapPin, Phone, Mail, ShieldCheck } from "lucide-react";
+import { MapPin, Phone, Mail, ShieldCheck } from "lucide-react";
+import Logo from "@/components/shared/Logo";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -11,13 +12,8 @@ const Footer = () => {
 
           {/* Brand */}
           <div>
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-[#2e88d1] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-slate-900">
-                Express<span className="text-[#2e88d1]">Wash</span>
-              </span>
+            <Link to="/" className="flex items-center mb-4">
+              <Logo size="md" />
             </Link>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
               Professional carpet and fabric cleaning services.
@@ -28,9 +24,9 @@ const Footer = () => {
                 <Phone className="w-4 h-4 shrink-0" />
                 +254 700 000 000
               </a>
-              <a href="mailto:hello@expresswash.co.ke" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
+              <a href="mailto:hello@expresscarpets.co.ke" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
                 <Mail className="w-4 h-4 shrink-0" />
-                hello@expresswash.co.ke
+                hello@expresscarpets.co.ke
               </a>
             </div>
           </div>
@@ -95,7 +91,7 @@ const Footer = () => {
         <div className="border-t border-slate-200 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4">
             <p className="text-sm text-slate-400">
-              &copy; {currentYear} ExpressWash. All rights reserved.
+              &copy; {currentYear} Express Carpets &amp; Upholstery. All rights reserved.
             </p>
             <div className="flex gap-4">
               <Link to="/privacy" className="text-sm text-slate-400 hover:text-[#2e88d1] transition-colors">

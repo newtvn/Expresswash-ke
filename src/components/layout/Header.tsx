@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, LayoutDashboard } from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { getDefaultRouteForRole } from "@/config/permissions";
 import { ROUTES } from "@/config/routes";
+import Logo from "@/components/shared/Logo";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -77,13 +78,8 @@ const Header = () => {
         <div className="container mx-auto">
           <nav className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 relative z-50">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-glow">
-                <Sparkles className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold text-foreground tracking-tight">
-                Express<span className="text-primary">Wash</span>
-              </span>
+            <Link to="/" className="flex items-center relative z-50">
+              <Logo size="md" />
             </Link>
 
             {/* Desktop Navigation */}

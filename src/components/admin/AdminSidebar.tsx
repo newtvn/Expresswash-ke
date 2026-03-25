@@ -35,6 +35,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
+import Logo from '@/components/shared/Logo';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,11 +130,9 @@ export function AdminSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/admin">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
-                </div>
+                <Logo size="sm" showText={false} />
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">ExpressWash</span>
+                  <span className="truncate font-semibold">Express Carpets</span>
                   <span className="truncate text-xs text-muted-foreground">Admin Portal</span>
                 </div>
               </Link>
@@ -191,7 +190,7 @@ export function AdminSidebar() {
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">{user?.name ?? 'Admin'}</span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {user?.email ?? 'admin@expresswash.co.ke'}
+                      {user?.email ?? 'admin@expresscarpets.co.ke'}
                     </span>
                   </div>
                   <ChevronUp className="ml-auto size-4" />

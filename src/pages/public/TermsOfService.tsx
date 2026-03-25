@@ -20,7 +20,7 @@ const TermsOfService = () => {
           <section>
             <h2 className="text-xl font-semibold text-foreground">1. Service Overview</h2>
             <p>
-              ExpressWash provides professional carpet, rug, curtain, sofa, mattress, and upholstery cleaning services
+              Express Carpets &amp; Upholstery provides professional carpet, rug, curtain, sofa, mattress, and upholstery cleaning services
               in the Kitengela, Athi River, Syokimau, and Greater Nairobi areas. By using our platform and services, you
               agree to these terms.
             </p>
@@ -115,8 +115,8 @@ const TermsOfService = () => {
             <h2 className="text-xl font-semibold text-foreground">10. Contact</h2>
             <p>
               For questions about these terms, contact us at{' '}
-              <a href="mailto:legal@expresswash.co.ke" className="text-primary hover:underline">
-                legal@expresswash.co.ke
+              <a href="mailto:legal@expresscarpets.co.ke" className="text-primary hover:underline">
+                legal@expresscarpets.co.ke
               </a>{' '}
               or call +254 700 000 000.
             </p>

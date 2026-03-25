@@ -101,9 +101,9 @@ export const SERVICE_ZONES = [
  * Company information
  */
 export const COMPANY_INFO = {
-  name: "ExpressWash",
-  tagline: "Professional Carpet & Fabric Care",
+  name: "Express Carpets & Upholstery",
+  tagline: "Professional Carpet & Upholstery Cleaning",
   phone: "+254 712 345 678",
-  email: "info@expresswash.co.ke",
+  email: "info@expresscarpets.co.ke",
   address: "Kitengela, Kenya",
 } as const;

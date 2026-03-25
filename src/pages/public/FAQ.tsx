@@ -11,7 +11,7 @@ import { HelpCircle } from "lucide-react";
 
 const faqs = [
   {
-    question: "How does ExpressWash work?",
+    question: "How does Express Carpets & Upholstery work?",
     answer:
       "It is simple: schedule a pickup online or by phone, our driver collects your items, we clean them at our facility, and deliver them back fresh and clean. You can track your order in real-time using your tracking code.",
   },
