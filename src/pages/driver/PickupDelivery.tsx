@@ -43,6 +43,7 @@ export const PickupDelivery = () => {
     queryKey: ['driver', 'routes', user?.id, today],
     queryFn: () => getDriverRoutes(user!.id, today),
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   /**
