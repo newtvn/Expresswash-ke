@@ -11,7 +11,7 @@ import { ROUTES } from '@/config/routes';
 import { Truck, Wallet, Star, Clock, MapPin, Phone, User, Navigation, Package, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { getDriverRoutes, updateDriverStatus, getDriverPerformance } from '@/services/driverService';
+import { getDriverRoutes, getDriverById, updateDriverStatus, getDriverPerformance } from '@/services/driverService';
 import { toast } from 'sonner';
 
 export const Dashboard = () => {
@@ -26,12 +26,14 @@ export const Dashboard = () => {
     queryKey: ['driver', 'routes', user?.id, today],
     queryFn: () => getDriverRoutes(user!.id, today),
     enabled: !!user?.id,
+    refetchInterval: 15000,
   });
 
   const { data: performance } = useQuery({
     queryKey: ['driver', 'performance', user?.id],
     queryFn: () => getDriverPerformance(user!.id),
     enabled: !!user?.id,
+    refetchInterval: 60000,
   });
 
   const statusMutation = useMutation({
@@ -47,6 +49,20 @@ export const Dashboard = () => {
     setIsOnline(checked);
     statusMutation.mutate(checked);
   };
+
+  // Auto-set driver online when they log in
+  useEffect(() => {
+    if (!user?.id) return;
+    // Read current DB status and auto-set online
+    getDriverById(user.id).then((driver) => {
+      const alreadyOnline = driver?.isOnline ?? false;
+      setIsOnline(true);
+      if (!alreadyOnline) {
+        updateDriverStatus(user.id, 'available');
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const activeRoute = routes.find((r) => r.status === 'in_progress');
   const allStops = routes.flatMap((r) => r.stops);

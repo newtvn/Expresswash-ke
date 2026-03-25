@@ -662,13 +662,14 @@ export const assignDriverToOrder = async (
   driverName: string,
   driverPhone: string,
 ): Promise<{ success: boolean; error?: string }> => {
+  // 1. Update the order with driver info and correct status
   const { error } = await supabase
     .from('orders')
     .update({
       driver_id: driverId,
       driver_name: driverName,
       driver_phone: driverPhone,
-      status: ORDER_STATUS.CONFIRMED,
+      status: ORDER_STATUS.DRIVER_ASSIGNED,
       updated_at: new Date().toISOString(),
     })
     .eq('id', orderId);
@@ -679,6 +680,68 @@ export const assignDriverToOrder = async (
       error: `Failed to assign driver: ${error.message}. Please try again.`,
     };
   }
+
+  // 2. Fetch order details to create the driver route stop
+  const { data: order } = await supabase
+    .from('orders')
+    .select('customer_name, pickup_address, zone, pickup_date')
+    .eq('id', orderId)
+    .single();
+
+  if (order) {
+    const today = new Date().toISOString().split('T')[0];
+
+    // 3. Find or create a driver_route for this driver today
+    let { data: route } = await supabase
+      .from('driver_routes')
+      .select('id')
+      .eq('driver_id', driverId)
+      .eq('date', today)
+      .maybeSingle();
+
+    if (!route) {
+      const { data: newRoute } = await supabase
+        .from('driver_routes')
+        .insert({
+          driver_id: driverId,
+          date: today,
+          zone: (order.zone as string) ?? '',
+          status: 'planned',
+        })
+        .select('id')
+        .single();
+      route = newRoute;
+    }
+
+    if (route) {
+      // 4. Insert route stop only if it doesn't already exist for this order
+      const { data: existingStop } = await supabase
+        .from('route_stops')
+        .select('id')
+        .eq('route_id', route.id)
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (!existingStop) {
+        const { count } = await supabase
+          .from('route_stops')
+          .select('id', { count: 'exact', head: true })
+          .eq('route_id', route.id);
+
+        await supabase.from('route_stops').insert({
+          route_id: route.id,
+          order_id: orderId,
+          customer_name: (order.customer_name as string) ?? '',
+          address: (order.pickup_address as string) ?? '',
+          type: 'pickup',
+          scheduled_time: (order.pickup_date as string) ?? today,
+          status: 'pending',
+          sort_order: count ?? 0,
+        });
+      }
+    }
+  }
+
   return { success: true };
 };
 
