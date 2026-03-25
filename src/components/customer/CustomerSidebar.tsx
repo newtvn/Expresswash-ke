@@ -106,11 +106,9 @@ export function CustomerSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/portal">
-                <Logo size="sm" showText={false} />
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Express Carpets</span>
-                  <span className="truncate text-xs text-muted-foreground">My Account</span>
-                </div>
+                <img src="/logo.png" alt="Express Carpets" className="h-8 w-auto object-contain group-data-[collapsible=icon]:hidden" />
+                <Logo size="sm" showText={false} className="hidden group-data-[collapsible=icon]:block" />
+                <span className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">My Account</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
