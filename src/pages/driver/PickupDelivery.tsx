@@ -9,12 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { MapPin, Clock, CheckCircle, Package, Navigation, Phone, Ruler, Truck } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, Package, Navigation, Ruler, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
-import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING } from '@/services/orderService';
-import { ORDER_STATUS } from '@/constants/orderStatus';
+import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
+import { ORDER_STATUS, getOrderStatusLabel } from '@/constants/orderStatus';
+import { Order } from '@/types';
 
 interface MeasurementDialogData {
   stopId: string;
@@ -39,12 +40,22 @@ export const PickupDelivery = () => {
   const [measurementDialog, setMeasurementDialog] = useState<MeasurementDialogData | null>(null);
   const [submittingMeasurements, setSubmittingMeasurements] = useState(false);
 
-  const { data: routes = [], isLoading } = useQuery({
+  const { data: routes = [], isLoading: routesLoading } = useQuery({
     queryKey: ['driver', 'routes', user?.id, today],
     queryFn: () => getDriverRoutes(user!.id, today),
     enabled: !!user?.id,
     refetchInterval: 15000,
   });
+
+  // Direct orders assigned to this driver (primary source)
+  const { data: assignedOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['driver', 'assigned-orders', user?.id],
+    queryFn: () => getDriverAssignedOrders(user!.id),
+    enabled: !!user?.id,
+    refetchInterval: 15000,
+  });
+
+  const isLoading = routesLoading || ordersLoading;
 
   /**
    * Driver-allowed status transitions:
@@ -221,12 +232,61 @@ export const PickupDelivery = () => {
     setMeasurementDialog({ ...measurementDialog, items: updatedItems });
   };
 
+  // IDs of orders that already have a route stop so we don't duplicate
+  const routeStopOrderIds = new Set(
+    routes.flatMap((r) => r.stops.map((s) => s.orderId))
+  );
+
+  // Orders assigned directly (admin) that don't yet have a route stop
+  const directPickups = assignedOrders.filter(
+    (o) => o.id && !routeStopOrderIds.has(o.id)
+  );
+
   const allStops = routes.flatMap((r) =>
     r.stops.map((s) => ({ ...s, routeId: r.id, routeDate: r.date }))
   );
-
-  const pickupStops = allStops.filter((s) => s.type === 'pickup');
   const deliveryStops = allStops.filter((s) => s.type === 'delivery');
+  const totalPickups = directPickups.length + allStops.filter((s) => s.type === 'pickup').length;
+  const totalDeliveries = deliveryStops.length;
+
+  // Card for direct order assignments
+  const OrderCard = ({ order }: { order: Order }) => (
+    <Card>
+      <CardContent className="py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-sm">#{order.trackingCode}</span>
+              <Badge variant="default" className="text-xs">{getOrderStatusLabel(order.status)}</Badge>
+            </div>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <div className="flex items-center gap-1"><Package className="h-3 w-3" />{order.customerName}</div>
+              {order.pickupAddress && <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{order.pickupAddress}</div>}
+              <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{order.pickupDate ?? 'TBD'}</div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            {order.pickupAddress && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(order.pickupAddress!)}`)}
+              >
+                <Navigation className="h-3 w-3 mr-1" /> Navigate
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => handleCompletePickup(order.id!, order.id!)}
+              disabled={completeMutation.isPending}
+            >
+              <Ruler className="h-3 w-3 mr-1" /> Measure & Pick Up
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const StopCard = ({ stop }: { stop: typeof allStops[0] }) => (
     <Card className={stop.status === 'completed' ? 'opacity-60' : ''}>
@@ -313,17 +373,22 @@ export const PickupDelivery = () => {
       ) : (
         <Tabs defaultValue="pickups">
           <TabsList>
-            <TabsTrigger value="pickups">Pickups ({pickupStops.filter((s) => s.status === 'pending').length} pending)</TabsTrigger>
-            <TabsTrigger value="deliveries">Deliveries ({deliveryStops.filter((s) => s.status === 'pending').length} pending)</TabsTrigger>
+            <TabsTrigger value="pickups">Pickups ({totalPickups} pending)</TabsTrigger>
+            <TabsTrigger value="deliveries">Deliveries ({totalDeliveries} pending)</TabsTrigger>
           </TabsList>
           <TabsContent value="pickups" className="mt-4 space-y-3">
-            {pickupStops.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No pickups scheduled today</p>
-            ) : pickupStops.map((s, i) => <StopCard key={s.id ?? i} stop={s} />)}
+            {directPickups.length === 0 && allStops.filter((s) => s.type === 'pickup').length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No pickups assigned</p>
+            ) : (
+              <>
+                {directPickups.map((o) => <OrderCard key={o.id} order={o} />)}
+                {allStops.filter((s) => s.type === 'pickup').map((s, i) => <StopCard key={s.id ?? i} stop={s} />)}
+              </>
+            )}
           </TabsContent>
           <TabsContent value="deliveries" className="mt-4 space-y-3">
             {deliveryStops.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No deliveries scheduled today</p>
+              <p className="text-center text-muted-foreground py-8">No deliveries scheduled</p>
             ) : deliveryStops.map((s, i) => <StopCard key={s.id ?? i} stop={s} />)}
           </TabsContent>
         </Tabs>
