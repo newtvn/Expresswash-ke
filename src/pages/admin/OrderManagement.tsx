@@ -387,7 +387,7 @@ export const OrderManagement = () => {
                 <SelectValue placeholder="Select a driver..." />
               </SelectTrigger>
               <SelectContent>
-                {drivers.filter((d) => d.isOnline || d.status === 'available').map((d) => (
+                {drivers.map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.name} — {d.zone} ({d.status})
                   </SelectItem>
