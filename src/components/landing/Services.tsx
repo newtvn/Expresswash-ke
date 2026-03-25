@@ -153,10 +153,10 @@ const Services = () => {
           {/* Header */}
           <div className="mb-16">
             <div className="flex items-center gap-3 mb-3">
-              <span className="text-sm font-semibold text-[#2e88d1] uppercase tracking-wider">
+              <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">
                 Our Services
               </span>
-              <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
+              <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
               What We Clean
@@ -185,11 +185,11 @@ const Services = () => {
                     <div className="absolute top-1 -right-2 w-4 h-4 bg-slate-200 group-hover:bg-white/50 rounded-full animate-subtle-float transition-colors duration-300"></div>
                     <div className="absolute bottom-2 -left-2 w-3 h-3 bg-slate-200 group-hover:bg-white/50 rounded-full animate-subtle-float-reverse transition-colors duration-300" style={{ animationDelay: '1.5s' }}></div>
                     <div className="absolute inset-2 bg-slate-100 group-hover:bg-white group-hover:shadow-lg animate-blob-shape transition-all duration-300"></div>
-                    <Icon className="relative z-10 w-10 h-10 stroke-[1.5px] text-slate-800 group-hover:text-[#2e88d1] transition-colors duration-300" />
+                    <Icon className="relative z-10 w-10 h-10 stroke-[1.5px] text-slate-800 group-hover:text-[#007AF4] transition-colors duration-300" />
                   </div>
 
                   {/* Text Content */}
-                  <h3 className="text-xl font-bold mb-3 text-[#2e88d1] group-hover:text-white transition-colors duration-500 z-10">
+                  <h3 className="text-xl font-bold mb-3 text-[#007AF4] group-hover:text-white transition-colors duration-500 z-10">
                     {service.title}
                   </h3>
                   <p className="mb-8 flex-grow leading-relaxed text-slate-500 group-hover:text-white group-hover:font-medium text-sm transition-all duration-500 z-10">
@@ -197,7 +197,7 @@ const Services = () => {
                   </p>
 
                   {/* Action Button */}
-                  <button className="relative w-full py-2.5 rounded-[5px] font-semibold bg-transparent group-hover:bg-white border border-[#2e88d1] group-hover:border-white text-[#2e88d1] transition-colors duration-500 z-10">
+                  <button className="relative w-full py-2.5 rounded-[5px] font-semibold bg-transparent group-hover:bg-white border border-[#007AF4] group-hover:border-white text-[#007AF4] transition-colors duration-500 z-10">
                     {service.price}
                   </button>
                 </div>

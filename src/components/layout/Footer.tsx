@@ -20,11 +20,11 @@ const Footer = () => {
               We pick up, clean, and deliver with care.
             </p>
             <div className="space-y-1">
-              <a href="tel:+254700000000" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
+              <a href="tel:+254700000000" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                 <Phone className="w-4 h-4 shrink-0" />
                 +254 700 000 000
               </a>
-              <a href="mailto:hello@expresscarpets.co.ke" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
+              <a href="mailto:hello@expresscarpets.co.ke" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                 <Mail className="w-4 h-4 shrink-0" />
                 hello@expresscarpets.co.ke
               </a>
@@ -37,7 +37,7 @@ const Footer = () => {
             <ul className="space-y-0.5">
               {["Carpets", "Sofas", "Curtains", "Rugs", "Mattresses", "Chairs"].map((item) => (
                 <li key={item}>
-                  <a href="#services" className="inline-block text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
+                  <a href="#services" className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                     {item} Cleaning
                   </a>
                 </li>
@@ -58,7 +58,7 @@ const Footer = () => {
                 { name: "Contact", href: "#" },
               ].map((item) => (
                 <li key={item.name}>
-                  <a href={item.href} className="inline-block text-sm text-slate-500 hover:text-[#2e88d1] hover:translate-x-1 transition-all duration-200 py-1.5">
+                  <a href={item.href} className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                     {item.name}
                   </a>
                 </li>
@@ -76,7 +76,7 @@ const Footer = () => {
                 { name: "Greater Nairobi", delivery: "48 Hours" },
               ].map((zone) => (
                 <li key={zone.name} className="flex items-start gap-2">
-                  <MapPin className="w-4 h-4 text-[#2e88d1] mt-0.5" />
+                  <MapPin className="w-4 h-4 text-[#007AF4] mt-0.5" />
                   <div>
                     <p className="text-sm text-slate-700">{zone.name}</p>
                     <p className="text-xs text-slate-400">{zone.delivery} Delivery</p>
@@ -94,10 +94,10 @@ const Footer = () => {
               &copy; {currentYear} Express Carpets &amp; Upholstery. All rights reserved.
             </p>
             <div className="flex gap-4">
-              <Link to="/privacy" className="text-sm text-slate-400 hover:text-[#2e88d1] transition-colors">
+              <Link to="/privacy" className="text-sm text-slate-400 hover:text-[#007AF4] transition-colors">
                 Privacy Policy
               </Link>
-              <Link to="/terms" className="text-sm text-slate-400 hover:text-[#2e88d1] transition-colors">
+              <Link to="/terms" className="text-sm text-slate-400 hover:text-[#007AF4] transition-colors">
                 Terms of Service
               </Link>
             </div>

@@ -208,7 +208,7 @@ const Hero = () => {
                 color="#fff"
                 hoverColor="#fff"
                 fillColor="#000000"
-                bg="#d97706"
+                bg="#F4743B"
                 bordered={false}
                 className="text-lg py-5"
                 asChild

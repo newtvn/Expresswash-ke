@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 380" fill="none">
+  <!-- Brand circle icon -->
+  <circle cx="250" cy="128" r="108" fill="#007AF4"/>
+
+  <!-- Swirl arcs connecting the sparkles -->
+  <path d="M212,93 Q250,68 288,93"    fill="none" stroke="white" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <path d="M288,93 Q313,128 288,163"  fill="none" stroke="white" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <path d="M288,163 Q250,188 212,163" fill="none" stroke="white" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+  <path d="M212,163 Q187,128 212,93"  fill="none" stroke="white" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- 4-pointed sparkle stars -->
+  <!-- Top-left @ (212, 93) -->
+  <path d="M212,73 C215,83 215,83 225,87 C215,91 215,91 212,101 C209,91 209,91 199,87 C209,83 209,83 212,73Z" fill="white"/>
+  <!-- Top-right @ (288, 93) -->
+  <path d="M288,73 C291,83 291,83 301,87 C291,91 291,91 288,101 C285,91 285,91 275,87 C285,83 285,83 288,73Z" fill="white"/>
+  <!-- Bottom-left @ (212, 163) -->
+  <path d="M212,143 C215,153 215,153 225,157 C215,161 215,161 212,171 C209,161 209,161 199,157 C209,153 209,153 212,143Z" fill="white"/>
+  <!-- Bottom-right @ (288, 163) -->
+  <path d="M288,143 C291,153 291,153 301,157 C291,161 291,161 288,171 C285,161 285,161 275,157 C285,153 285,153 288,143Z" fill="white"/>
+
+  <!-- "Express" wordmark -->
+  <text
+    x="250"
+    y="282"
+    font-family="'TT Fors','DM Sans','Nunito','Inter',sans-serif"
+    font-size="96"
+    font-weight="800"
+    fill="#0E2F60"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="-1">Express</text>
+
+  <!-- Subtitle -->
+  <text
+    x="250"
+    y="326"
+    font-family="'TT Fors','DM Sans','Nunito','Inter',sans-serif"
+    font-size="26"
+    font-weight="400"
+    fill="#0E2F60"
+    text-anchor="middle"
+    dominant-baseline="auto"
+    letter-spacing="0.3">Carpet &amp; Upholstery Cleaning</text>
+</svg>

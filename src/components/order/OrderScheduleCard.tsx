@@ -19,8 +19,8 @@ export const OrderScheduleCard = ({
       <h3 className="text-lg font-semibold text-slate-900 mb-4">Schedule</h3>
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#2e88d1]/10 flex items-center justify-center">
-            <Package className="w-5 h-5 text-[#2e88d1]" />
+          <div className="w-10 h-10 rounded-xl bg-[#007AF4]/10 flex items-center justify-center">
+            <Package className="w-5 h-5 text-[#007AF4]" />
           </div>
           <div>
             <p className="text-xs text-slate-400">Pickup Date</p>
@@ -28,8 +28,8 @@ export const OrderScheduleCard = ({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#2e88d1]/10 flex items-center justify-center">
-            <Truck className="w-5 h-5 text-[#2e88d1]" />
+          <div className="w-10 h-10 rounded-xl bg-[#007AF4]/10 flex items-center justify-center">
+            <Truck className="w-5 h-5 text-[#007AF4]" />
           </div>
           <div>
             <p className="text-xs text-slate-400">Estimated Delivery</p>
@@ -39,8 +39,8 @@ export const OrderScheduleCard = ({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#2e88d1]/10 flex items-center justify-center">
-            <MapPin className="w-5 h-5 text-[#2e88d1]" />
+          <div className="w-10 h-10 rounded-xl bg-[#007AF4]/10 flex items-center justify-center">
+            <MapPin className="w-5 h-5 text-[#007AF4]" />
           </div>
           <div>
             <p className="text-xs text-slate-400">Delivery Zone</p>
