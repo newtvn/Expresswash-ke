@@ -111,11 +111,11 @@ const FAQ = () => {
         {/* Header */}
         <div className="mb-16 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
-            <span className="text-sm font-semibold text-[#2e88d1] uppercase tracking-wider">
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
+            <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">
               FAQ
             </span>
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Got Questions? We've Got Answers.
@@ -137,7 +137,7 @@ const FAQ = () => {
             }}
           >
             {/* Blue banner with text */}
-            <div className="relative bg-[#2e88d1] px-8 pt-10 pb-8 text-center overflow-hidden">
+            <div className="relative bg-[#007AF4] px-8 pt-10 pb-8 text-center overflow-hidden">
               {/* Floating morphing bubbles */}
               <div className="faq-bubble-1 absolute top-4 left-6 w-16 h-16 bg-white/[0.07]" style={{ animationDelay: "0s" }} />
               <div className="faq-bubble-2 absolute top-8 right-6 w-12 h-12 bg-white/[0.06]" style={{ animationDelay: "1.5s" }} />

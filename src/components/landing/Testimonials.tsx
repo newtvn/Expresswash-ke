@@ -76,11 +76,11 @@ const Testimonials = () => {
         {/* Header — centered, matching other sections */}
         <div className="mb-16 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
-            <span className="text-sm font-semibold text-[#2e88d1] uppercase tracking-wider">
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
+            <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">
               Testimonials
             </span>
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             What Our Customers Say
@@ -103,7 +103,7 @@ const Testimonials = () => {
               }}
             >
               {/* Giant watermark quote */}
-              <Quote className="absolute -bottom-3 right-4 w-24 h-24 text-[#2e88d1]/[0.07] pointer-events-none rotate-180" />
+              <Quote className="absolute -bottom-3 right-4 w-24 h-24 text-[#007AF4]/[0.07] pointer-events-none rotate-180" />
 
               {/* Rating */}
               <div className="flex gap-1 mb-4">
@@ -113,12 +113,12 @@ const Testimonials = () => {
               </div>
 
               <p className="relative z-10 text-slate-500 text-sm mb-6 leading-relaxed">
-                &ldquo;{testimonial.text}<span className="font-semibold text-[#2e88d1]">{testimonial.highlight}</span>{testimonial.textAfter}&rdquo;
+                &ldquo;{testimonial.text}<span className="font-semibold text-[#007AF4]">{testimonial.highlight}</span>{testimonial.textAfter}&rdquo;
               </p>
 
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#2e88d1]/10 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-[#2e88d1]">
+                <div className="w-10 h-10 rounded-full bg-[#007AF4]/10 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-[#007AF4]">
                     {testimonial.avatar}
                   </span>
                 </div>
@@ -155,7 +155,7 @@ const Testimonials = () => {
                 transitionDelay: `${index * 100}ms`,
               }}
             >
-              <p className="text-3xl md:text-4xl font-bold text-[#2e88d1] mb-1">
+              <p className="text-3xl md:text-4xl font-bold text-[#007AF4] mb-1">
                 {stat.value}
               </p>
               <p className="text-sm text-slate-500">{stat.label}</p>

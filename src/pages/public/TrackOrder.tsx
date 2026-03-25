@@ -63,11 +63,11 @@ const TrackOrder = () => {
         {/* Page Header — matching landing page pattern */}
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
-            <span className="text-sm font-semibold text-[#2e88d1] uppercase tracking-wider">
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
+            <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">
               Order Tracking
             </span>
-            <span className="block w-16 h-[2px] bg-[#2e88d1]/40" />
+            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight mt-3 mb-4">
             Track Your Order
@@ -84,14 +84,14 @@ const TrackOrder = () => {
               placeholder="Enter tracking code (e.g., EW-2024-00123)"
               value={trackingCode}
               onChange={(e) => setTrackingCode(e.target.value)}
-              className="h-12 text-base rounded-xl border-slate-200 focus:border-[#2e88d1] focus:ring-[#2e88d1]/20"
+              className="h-12 text-base rounded-xl border-slate-200 focus:border-[#007AF4] focus:ring-[#007AF4]/20"
               onKeyDown={(e) => e.key === "Enter" && handleTrack()}
             />
             <AnimatedButton
               color="#fff"
               hoverColor="#fff"
               fillColor="#000000"
-              bg="#2e88d1"
+              bg="#007AF4"
               bordered={false}
               className="h-12 px-6 text-base shrink-0"
               onClick={handleTrack}
@@ -121,7 +121,7 @@ const TrackOrder = () => {
         {order && (
           <div className="max-w-4xl mx-auto animate-fade-in">
             {/* Current Status Card */}
-            <div className={`relative rounded-2xl p-8 mb-8 overflow-hidden text-white ${orderIsCancelled ? 'bg-gray-700' : 'bg-[#2e88d1]'}`}>
+            <div className={`relative rounded-2xl p-8 mb-8 overflow-hidden text-white ${orderIsCancelled ? 'bg-gray-700' : 'bg-[#007AF4]'}`}>
               {/* Decorative bubbles */}
               <div className="absolute top-4 left-6 w-24 h-24 rounded-full bg-white/[0.05]" />
               <div className="absolute bottom-6 right-8 w-32 h-32 rounded-full bg-white/[0.04]" />
@@ -188,8 +188,8 @@ const TrackOrder = () => {
         {/* Empty State */}
         {!order && !error && (
           <div className="text-center py-16">
-            <div className="w-20 h-20 rounded-full bg-[#2e88d1]/10 mx-auto mb-6 flex items-center justify-center">
-              <Package className="w-10 h-10 text-[#2e88d1]" />
+            <div className="w-20 h-20 rounded-full bg-[#007AF4]/10 mx-auto mb-6 flex items-center justify-center">
+              <Package className="w-10 h-10 text-[#007AF4]" />
             </div>
             <p className="text-slate-500">
               Enter your tracking code above to view order status

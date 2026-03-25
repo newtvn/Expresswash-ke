@@ -35,7 +35,7 @@ const CTA = () => {
     <section className="relative z-20 bg-slate-50 px-6 pb-0 pt-8">
       <BubbleStyles />
       <div className="container mx-auto max-w-7xl">
-        <div className="relative bg-[#2e88d1] rounded-t-2xl px-8 py-14 md:px-16 md:py-16 overflow-hidden text-center">
+        <div className="relative bg-[#007AF4] rounded-t-2xl px-8 py-14 md:px-16 md:py-16 overflow-hidden text-center">
 
           {/* Floating foam bubbles */}
           <div className="bubble-1 absolute top-8 left-[6%] w-20 h-20 rounded-full bg-white/[0.06]" />
@@ -61,7 +61,7 @@ const CTA = () => {
                 color="#fff"
                 hoverColor="#fff"
                 fillColor="#000000"
-                bg="#d97706"
+                bg="#F4743B"
                 bordered={false}
                 className="text-base py-4"
                 asChild
@@ -74,7 +74,7 @@ const CTA = () => {
 
               <AnimatedButton
                 color="#fff"
-                hoverColor="#2e88d1"
+                hoverColor="#007AF4"
                 fillColor="#ffffff"
                 bordered={true}
                 className="text-base py-4"
@@ -103,7 +103,7 @@ const CTA = () => {
             xmlns="http://www.w3.org/2000/svg"
           >
             {/* Blue base connecting to card */}
-            <rect y="-60" width="1440" height="150" fill="#2e88d1" />
+            <rect y="-60" width="1440" height="150" fill="#007AF4" />
 
             {/* Main cloud humps in background color */}
             <circle cx="0"    cy="100" r="40"  fill="#f8fafc" />
