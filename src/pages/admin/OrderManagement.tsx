@@ -22,15 +22,15 @@ import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 
 const STATUS_OPTIONS = [
   { value: '1', label: 'Pending' },
-  { value: '2', label: 'Driver Assigned' },
-  { value: '3', label: 'Quote Accepted' },
+  { value: '2', label: 'Confirmed' },
+  { value: '3', label: 'Driver Assigned' },
   { value: '4', label: 'Pickup Scheduled' },
   { value: '5', label: 'Picked Up' },
-  { value: '6', label: 'In Washing' },
-  { value: '7', label: 'Drying' },
+  { value: '6', label: 'In Processing' },
+  { value: '7', label: 'Processing Complete' },
   { value: '8', label: 'Quality Check' },
-  { value: '9', label: 'Ready for Dispatch' },
-  { value: '10', label: 'Dispatched' },
+  { value: '9', label: 'Quality Approved' },
+  { value: '10', label: 'Ready for Delivery' },
   { value: '11', label: 'Out for Delivery' },
   { value: '12', label: 'Delivered' },
   { value: '13', label: 'Cancelled' },
@@ -75,11 +75,16 @@ export const OrderManagement = () => {
       bulkUpdateOrderStatus(ids, status),
     onSuccess: (data) => {
       if (data.success) {
-        toast.success(`Updated ${data.updated} orders`);
+        toast.success(`Updated ${data.updated} order${data.updated !== 1 ? 's' : ''}`);
         setSelectedIds(new Set());
         setBulkStatus('');
         qc.invalidateQueries({ queryKey: ['admin', 'orders'] });
+      } else {
+        toast.error('Failed to update orders', { description: data.error ?? 'Please try again' });
       }
+    },
+    onError: (err: Error) => {
+      toast.error('Failed to update orders', { description: err.message });
     },
   });
 

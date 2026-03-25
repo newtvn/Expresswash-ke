@@ -39,6 +39,18 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // Auto-reload when a JS chunk is missing after a new deployment
+    const isChunkError =
+      error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('Loading chunk') ||
+      error.message.includes('Importing a module script failed') ||
+      error.name === 'ChunkLoadError';
+
+    if (isChunkError) {
+      window.location.reload();
+      return;
+    }
+
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
