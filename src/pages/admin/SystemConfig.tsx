@@ -52,7 +52,7 @@ export const SystemConfig = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Phone</Label>
-                  <Input defaultValue="+254 712 345 678" />
+                  <Input defaultValue="0746 747 481" />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>

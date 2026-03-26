@@ -20,9 +20,9 @@ const Footer = () => {
               We pick up, clean, and deliver with care.
             </p>
             <div className="space-y-1">
-              <a href="tel:+254700000000" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
+              <a href="tel:+254746747481" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                 <Phone className="w-4 h-4 shrink-0" />
-                +254 700 000 000
+                0746 747 481
               </a>
               <a href="mailto:hello@expresscarpets.co.ke" className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                 <Mail className="w-4 h-4 shrink-0" />

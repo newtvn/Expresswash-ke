@@ -92,7 +92,7 @@ const PrivacyPolicy = () => {
               <a href="mailto:privacy@expresscarpets.co.ke" className="text-primary hover:underline">
                 privacy@expresscarpets.co.ke
               </a>{' '}
-              or call us at +254 700 000 000.
+              or call us at 0746 747 481.
             </p>
           </section>
         </div>

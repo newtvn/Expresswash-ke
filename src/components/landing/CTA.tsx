@@ -80,7 +80,7 @@ const CTA = () => {
                 className="text-base py-4"
                 asChild
               >
-                <a href="tel:+254700000000">
+                <a href="tel:+254746747481">
                   <Phone className="w-5 h-5 mr-1" />
                   Call Us Now
                 </a>

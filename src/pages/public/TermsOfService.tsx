@@ -118,7 +118,7 @@ const TermsOfService = () => {
               <a href="mailto:legal@expresscarpets.co.ke" className="text-primary hover:underline">
                 legal@expresscarpets.co.ke
               </a>{' '}
-              or call +254 700 000 000.
+              or call 0746 747 481.
             </p>
           </section>
         </div>
