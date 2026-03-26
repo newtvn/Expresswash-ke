@@ -5,6 +5,20 @@ import { validateEnvironmentOrThrow } from "./lib/envValidation";
 import { registerServiceWorker, reportWebVitals } from "./utils/performance";
 import { initSentry } from "./lib/sentry";
 
+// Auto-reload when a stale JS chunk is requested after a new deployment.
+// Dynamic imports throw an unhandled rejection with this message pattern.
+window.addEventListener('unhandledrejection', (event) => {
+  const msg = event.reason?.message ?? '';
+  if (
+    msg.includes('Failed to fetch dynamically imported module') ||
+    msg.includes('Loading chunk') ||
+    msg.includes('Importing a module script failed')
+  ) {
+    event.preventDefault();
+    window.location.reload();
+  }
+});
+
 // Initialize Sentry error monitoring (before anything else)
 initSentry();
 

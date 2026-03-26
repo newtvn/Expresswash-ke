@@ -803,3 +803,23 @@ export const getOrderStats = async (): Promise<{
     byStatus,
   };
 };
+
+/**
+ * Fetch all active orders assigned to a specific driver directly from the orders table.
+ * This is the primary data source for the driver dashboard/pickup pages.
+ */
+export const getDriverAssignedOrders = async (driverId: string): Promise<Order[]> => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('driver_id', driverId)
+    .not('status', 'in', `(${ORDER_STATUS.CANCELLED},${ORDER_STATUS.DELIVERED},${ORDER_STATUS.REFUNDED})`)
+    .order('created_at', { ascending: false });
+
+  if (error || !data) return [];
+
+  return data.map((orderData) => {
+    const { order_items, ...order } = orderData as Record<string, unknown> & { order_items: Record<string, unknown>[] };
+    return mapOrder(order, order_items ?? []);
+  });
+};

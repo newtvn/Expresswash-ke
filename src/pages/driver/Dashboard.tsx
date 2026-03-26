@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ROUTES } from '@/config/routes';
-import { Truck, Wallet, Star, Clock, MapPin, Phone, User, Navigation, Package, ArrowRight } from 'lucide-react';
+import { Truck, Star, Clock, MapPin, User, Navigation, Package, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { getDriverRoutes, getDriverById, updateDriverStatus, getDriverPerformance } from '@/services/driverService';
+import { getDriverById, updateDriverStatus, getDriverPerformance } from '@/services/driverService';
+import { getDriverAssignedOrders } from '@/services/orderService';
+import { getOrderStatusLabel } from '@/constants/orderStatus';
 import { toast } from 'sonner';
 
 export const Dashboard = () => {
@@ -20,11 +22,9 @@ export const Dashboard = () => {
   const qc = useQueryClient();
   const [isOnline, setIsOnline] = useState(false);
 
-  const today = new Date().toISOString().split('T')[0];
-
-  const { data: routes = [], isLoading: routesLoading } = useQuery({
-    queryKey: ['driver', 'routes', user?.id, today],
-    queryFn: () => getDriverRoutes(user!.id, today),
+  const { data: assignedOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['driver', 'assigned-orders', user?.id],
+    queryFn: () => getDriverAssignedOrders(user!.id),
     enabled: !!user?.id,
     refetchInterval: 15000,
   });
@@ -53,7 +53,6 @@ export const Dashboard = () => {
   // Auto-set driver online when they log in
   useEffect(() => {
     if (!user?.id) return;
-    // Read current DB status and auto-set online
     getDriverById(user.id).then((driver) => {
       const alreadyOnline = driver?.isOnline ?? false;
       setIsOnline(true);
@@ -64,10 +63,7 @@ export const Dashboard = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const activeRoute = routes.find((r) => r.status === 'in_progress');
-  const allStops = routes.flatMap((r) => r.stops);
-  const pendingStops = allStops.filter((s) => s.status === 'pending');
-  const activeStop = pendingStops[0];
+  const activeOrder = assignedOrders[0];
 
   return (
     <div className="space-y-6">
@@ -81,7 +77,7 @@ export const Dashboard = () => {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Deliveries Today" value={allStops.filter((s) => s.status === 'completed').length} icon={Truck} />
+        <KPICard label="Assigned Orders" value={assignedOrders.length} icon={Truck} />
         <KPICard label="Avg Rating" value={performance?.avgRating ?? 0} icon={Star} />
         <KPICard label="On-Time %" value={performance?.onTimeRate ?? 0} format="percentage" icon={Clock} />
         <KPICard label="Total Deliveries" value={performance?.totalDeliveries ?? 0} icon={Package} />
@@ -89,34 +85,38 @@ export const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          {routesLoading ? (
+          {ordersLoading ? (
             <Skeleton className="h-48 rounded-xl" />
-          ) : activeStop ? (
+          ) : activeOrder ? (
             <Card className="border-primary/20">
               <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <CardTitle className="text-lg">Active Task</CardTitle>
-                <Badge variant={activeStop.type === 'pickup' ? 'default' : 'secondary'} className="capitalize">{activeStop.type}</Badge>
+                <CardTitle className="text-lg">Active Assignment</CardTitle>
+                <Badge variant="default" className="capitalize">Pickup</Badge>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-3">
                     <div className="flex items-center gap-2 text-sm">
                       <Package className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">#{activeStop.orderId}</span>
+                      <span className="font-medium">#{activeOrder.trackingCode}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <User className="h-4 w-4 text-muted-foreground" />
-                      <span>{activeStop.customerName}</span>
+                      <span>{activeOrder.customerName}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{activeStop.scheduledTime}</span>
+                      <span>{activeOrder.pickupDate ?? 'TBD'}</span>
                     </div>
                   </div>
                   <div className="space-y-3">
                     <div className="flex items-start gap-2 text-sm">
                       <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                      <span>{activeStop.address}</span>
+                      <span>{activeOrder.pickupAddress ?? activeOrder.zone}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-muted-foreground">Status:</span>
+                      <span className="font-medium">{getOrderStatusLabel(activeOrder.status)}</span>
                     </div>
                   </div>
                 </div>
@@ -125,7 +125,7 @@ export const Dashboard = () => {
                     <Navigation className="mr-2 h-4 w-4" /> Navigate
                   </Button>
                   <Button variant="outline" onClick={() => navigate(ROUTES.DRIVER_PICKUP_DELIVERY)}>
-                    View Details <ArrowRight className="ml-2 h-4 w-4" />
+                    View All Orders <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>
@@ -165,24 +165,23 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Upcoming Stops */}
-      {pendingStops.length > 0 && (
+      {/* All Assigned Orders */}
+      {assignedOrders.length > 1 && (
         <Card>
-          <CardHeader><CardTitle className="text-lg">Today's Schedule ({pendingStops.length} pending)</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">All Assignments ({assignedOrders.length})</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {pendingStops.map((stop) => (
-                <div key={stop.id ?? stop.orderId} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+              {assignedOrders.map((order) => (
+                <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                   <div className="flex items-center gap-3">
-                    <Badge variant={stop.type === 'pickup' ? 'default' : 'secondary'} className="capitalize">{stop.type}</Badge>
+                    <Badge variant="default" className="capitalize shrink-0">Pickup</Badge>
                     <div>
-                      <p className="text-sm font-medium">{stop.customerName}</p>
-                      <p className="text-xs text-muted-foreground">#{stop.orderId} — {stop.address}</p>
+                      <p className="text-sm font-medium">{order.customerName}</p>
+                      <p className="text-xs text-muted-foreground">#{order.trackingCode} — {order.pickupAddress ?? order.zone}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>{stop.scheduledTime}</span>
+                    <span className="text-xs font-medium">{getOrderStatusLabel(order.status)}</span>
                   </div>
                 </div>
               ))}
