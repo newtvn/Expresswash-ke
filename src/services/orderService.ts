@@ -663,7 +663,27 @@ export const assignDriverToOrder = async (
   driverName: string,
   driverPhone: string,
 ): Promise<{ success: boolean; error?: string }> => {
-  // 1. Update the order with driver info and correct status
+  // The DB trigger enforces step-by-step transitions: 1→2→3.
+  // If the order is still PENDING (1), confirm it first (1→2), then assign (2→3).
+  const { data: current } = await supabase
+    .from('orders')
+    .select('status')
+    .eq('id', orderId)
+    .single();
+
+  const currentStatus = (current?.status as number) ?? 0;
+
+  if (currentStatus === ORDER_STATUS.PENDING) {
+    const { error: confirmErr } = await supabase
+      .from('orders')
+      .update({ status: ORDER_STATUS.CONFIRMED, updated_at: new Date().toISOString() })
+      .eq('id', orderId);
+    if (confirmErr) {
+      return { success: false, error: `Failed to confirm order: ${confirmErr.message}` };
+    }
+  }
+
+  // 1. Assign driver and advance to DRIVER_ASSIGNED (valid from CONFIRMED=2)
   const { error } = await supabase
     .from('orders')
     .update({
