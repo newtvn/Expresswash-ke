@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ROUTES } from '@/config/routes';
 import { getOrderById, getOrderByUUID, cancelOrder } from '@/services/orderService';
-import { initiateSTKPush, isValidPhoneNumber, formatPhoneNumber, verifyPayment } from '@/services/paymentService';
+import { initiateSTKPush, isValidPhoneNumber, formatPhoneNumber, verifyPayment, getPaymentByOrderId } from '@/services/paymentService';
 import { ORDER_STAGES } from '@/config/constants';
 import { Order } from '@/types';
 import { toast } from 'sonner';
@@ -76,6 +76,7 @@ export const OrderDetails = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSent, setPaymentSent] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [paymentComplete, setPaymentComplete] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -85,7 +86,16 @@ export const OrderDetails = () => {
     const fetchOrder = (showSpinner = false) => {
       if (showSpinner) setLoading(true);
       getOrderById(id)
-        .then((result) => { if (!cancelled && result) setOrder(result); })
+        .then((result) => {
+          if (!cancelled && result) {
+            setOrder(result);
+            if (result.id) {
+              getPaymentByOrderId(result.id).then((payment) => {
+                if (!cancelled && payment?.status === 'completed') setPaymentComplete(true);
+              });
+            }
+          }
+        })
         .finally(() => { if (!cancelled) setLoading(false); });
     };
 
@@ -122,8 +132,8 @@ export const OrderDetails = () => {
     setPaymentLoading(true);
     const result = await initiateSTKPush({
       phoneNumber: formatPhoneNumber(phoneNumber),
-      amount: import.meta.env.DEV ? 5 : (order.total ?? 0),
-      accountReference: order.trackingCode,
+      amount: import.meta.env.DEV ? 10 : (order.total ?? 0),
+      accountReference: order.id,
       transactionDesc: `Payment for ${order.trackingCode}`,
     });
     setPaymentLoading(false);
@@ -186,7 +196,7 @@ export const OrderDetails = () => {
 
   const timeline = buildTimeline(order.status);
   const canCancel = order.status >= 1 && order.status <= 3;
-  const canPay = !isAdminView && order.status >= 1 && order.status <= 12 && order.status !== 13 && order.status !== 14;
+  const canPay = !isAdminView && !paymentComplete && order.status >= 1 && order.status <= 12 && order.status !== 13 && order.status !== 14;
 
   return (
     <div className="space-y-6">

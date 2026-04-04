@@ -1,12 +1,6 @@
--- ============================================================
--- Fix loyalty points: flat 50 → 1 point per 100 KES spent
---
--- Tier thresholds:
---   Bronze:   0 - 499 points
---   Silver:   500 - 1,999 points
---   Gold:     2,000 - 4,999 points
---   Platinum: 5,000+ points
--- ============================================================
+-- Fix: change new_tier variable from TEXT to loyalty_tier enum
+-- This fixes the "column tier is of type loyalty_tier but expression is of type text" error
+-- that blocks order delivery (status 11→12)
 
 CREATE OR REPLACE FUNCTION award_loyalty_points_on_delivery()
 RETURNS trigger AS $$
@@ -37,7 +31,7 @@ BEGIN
   -- Create loyalty account if it doesn't exist
   IF NOT account_exists THEN
     INSERT INTO loyalty_accounts (customer_id, customer_name, points, tier, tier_progress, lifetime_points)
-    SELECT NEW.customer_id, COALESCE(p.name, 'Customer'), 0, 'bronze', 0, 0
+    SELECT NEW.customer_id, COALESCE(p.name, 'Customer'), 0, 'bronze'::loyalty_tier, 0, 0
     FROM profiles p WHERE p.id = NEW.customer_id
     ON CONFLICT (customer_id) DO NOTHING;
   END IF;
@@ -76,10 +70,10 @@ BEGIN
 
   -- Recalculate tier
   new_tier := CASE
-    WHEN COALESCE(new_balance, 0) >= 5000 THEN 'platinum'
-    WHEN COALESCE(new_balance, 0) >= 2000 THEN 'gold'
-    WHEN COALESCE(new_balance, 0) >= 500 THEN 'silver'
-    ELSE 'bronze'
+    WHEN COALESCE(new_balance, 0) >= 5000 THEN 'platinum'::loyalty_tier
+    WHEN COALESCE(new_balance, 0) >= 2000 THEN 'gold'::loyalty_tier
+    WHEN COALESCE(new_balance, 0) >= 500 THEN 'silver'::loyalty_tier
+    ELSE 'bronze'::loyalty_tier
   END;
 
   UPDATE loyalty_accounts
@@ -94,11 +88,3 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Re-bind trigger
-DROP TRIGGER IF EXISTS award_loyalty_on_delivery ON orders;
-
-CREATE TRIGGER award_loyalty_on_delivery
-  AFTER UPDATE OF status ON orders
-  FOR EACH ROW
-  EXECUTE FUNCTION award_loyalty_points_on_delivery();

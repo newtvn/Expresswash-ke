@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:integration:watch": "vitest --config vitest.integration.config.ts",
     "performance:check": "npm run build && node scripts/check-bundle-size.js",
     "pwa:test": "npm run build && npx serve dist"
   },

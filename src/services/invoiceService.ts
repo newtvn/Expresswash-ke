@@ -39,11 +39,12 @@ function mapInvoice(row: Record<string, unknown>, items: Record<string, unknown>
 }
 
 function mapPayment(row: Record<string, unknown>): Payment {
+  const orders = row.orders as Record<string, unknown> | null;
   return {
     id: row.id as string,
     orderId: (row.order_id as string) ?? undefined,
     invoiceId: (row.invoice_id as string) ?? undefined,
-    invoiceNumber: (row.invoice_number as string) ?? undefined,
+    invoiceNumber: (row.invoice_number as string) ?? (orders?.tracking_code as string) ?? undefined,
     amount: row.amount as number,
     method: row.method as Payment['method'],
     status: row.status as Payment['status'],
@@ -143,7 +144,7 @@ export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null>
 export const getPayments = async (
   invoiceId?: string,
 ): Promise<Payment[]> => {
-  let query = supabase.from('payments').select('*').order('created_at', { ascending: false });
+  let query = supabase.from('payments').select('*, orders:order_id(tracking_code)').order('created_at', { ascending: false });
 
   if (invoiceId) {
     query = query.eq('invoice_id', invoiceId);

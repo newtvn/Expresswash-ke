@@ -368,7 +368,7 @@ BEGIN
       ) t
     ), '[]'::JSONB),
     'outstanding_receivables', (
-      SELECT COALESCE(SUM(i.total_amount - COALESCE(paid.total_paid, 0)), 0)
+      SELECT COALESCE(SUM(i.total - COALESCE(paid.total_paid, 0)), 0)
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(amount) AS total_paid
@@ -428,7 +428,7 @@ BEGIN
       SELECT COUNT(*) FROM invoices WHERE status IN ('sent', 'overdue', 'partially_paid')
     ),
     'outstanding_amount', (
-      SELECT COALESCE(SUM(i.total_amount - COALESCE(paid.total_paid, 0)), 0)
+      SELECT COALESCE(SUM(i.total - COALESCE(paid.total_paid, 0)), 0)
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(amount) AS total_paid
