@@ -1,29 +1,11 @@
 -- ============================================================
--- WK4: Report aggregation functions
--- Replaces static/seed report data with real DB queries
---
--- SECURITY: All functions use SECURITY DEFINER to bypass RLS
--- for aggregation, but include an explicit admin role check
--- so only admin/super_admin users can invoke them.
+-- Fix: Column name bugs in report functions
+-- Problem: get_revenue_report uses p.payment_method (should be p.method)
+--          get_driver_performance_report uses pay.payment_method (should be pay.method)
+--          get_financial_report and get_dashboard_kpis use i.total_amount (should be i.total)
 -- ============================================================
 
--- Helper: reusable admin check (raises exception if not admin)
-CREATE OR REPLACE FUNCTION _assert_admin()
-RETURNS VOID AS $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid()
-      AND role IN ('admin', 'super_admin')
-  ) THEN
-    RAISE EXCEPTION 'Unauthorized: admin access required';
-  END IF;
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
-
-
--- 1. REVENUE REPORT
--- Returns: {summary, by_period[], by_payment_method[], by_zone[]}
+-- Fix get_revenue_report: p.payment_method -> p.method
 CREATE OR REPLACE FUNCTION get_revenue_report(
   p_start_date DATE DEFAULT (CURRENT_DATE - INTERVAL '30 days')::DATE,
   p_end_date DATE DEFAULT CURRENT_DATE,
@@ -102,100 +84,7 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
--- 2. ORDER REPORT
--- Returns: {status_breakdown[], daily_orders[], totals, sla_compliance}
-CREATE OR REPLACE FUNCTION get_order_report(
-  p_start_date DATE DEFAULT (CURRENT_DATE - INTERVAL '30 days')::DATE,
-  p_end_date DATE DEFAULT CURRENT_DATE
-)
-RETURNS JSONB AS $$
-DECLARE
-  result JSONB;
-BEGIN
-  PERFORM _assert_admin();
-
-  SELECT jsonb_build_object(
-    'totals', (
-      SELECT jsonb_build_object(
-        'total_orders', COUNT(*),
-        'completed', COUNT(*) FILTER (WHERE status = 12),
-        'cancelled', COUNT(*) FILTER (WHERE status = 13),
-        'in_progress', COUNT(*) FILTER (WHERE status BETWEEN 1 AND 11)
-      )
-      FROM orders
-      WHERE created_at::DATE BETWEEN p_start_date AND p_end_date
-    ),
-    'status_breakdown', COALESCE((
-      SELECT jsonb_agg(row_to_json(t)::JSONB)
-      FROM (
-        SELECT
-          status,
-          CASE status
-            WHEN 1 THEN 'Pending'
-            WHEN 2 THEN 'Confirmed'
-            WHEN 3 THEN 'Driver Assigned'
-            WHEN 4 THEN 'Pickup Scheduled'
-            WHEN 5 THEN 'Picked Up'
-            WHEN 6 THEN 'In Processing'
-            WHEN 7 THEN 'Processing Complete'
-            WHEN 8 THEN 'Quality Check'
-            WHEN 9 THEN 'Quality Approved'
-            WHEN 10 THEN 'Ready for Delivery'
-            WHEN 11 THEN 'Out for Delivery'
-            WHEN 12 THEN 'Delivered'
-            WHEN 13 THEN 'Cancelled'
-            WHEN 14 THEN 'Refunded'
-            ELSE 'Unknown'
-          END AS status_name,
-          COUNT(*) AS count
-        FROM orders
-        WHERE created_at::DATE BETWEEN p_start_date AND p_end_date
-        GROUP BY 1
-        ORDER BY 1
-      ) t
-    ), '[]'::JSONB),
-    'daily_orders', COALESCE((
-      SELECT jsonb_agg(row_to_json(t)::JSONB ORDER BY t.date)
-      FROM (
-        SELECT
-          created_at::DATE AS date,
-          COUNT(*) AS orders,
-          COUNT(*) FILTER (WHERE status = 12) AS completed,
-          COUNT(*) FILTER (WHERE status = 13) AS cancelled
-        FROM orders
-        WHERE created_at::DATE BETWEEN p_start_date AND p_end_date
-        GROUP BY 1
-      ) t
-    ), '[]'::JSONB),
-    'sla_compliance', (
-      SELECT jsonb_build_object(
-        'total_with_sla', COUNT(*) FILTER (WHERE sla_deadline IS NOT NULL),
-        'met_sla', COUNT(*) FILTER (
-          WHERE sla_deadline IS NOT NULL
-            AND status = 12
-            AND updated_at <= sla_deadline
-        ),
-        'breached_sla', COUNT(*) FILTER (
-          WHERE sla_deadline IS NOT NULL
-            AND status NOT IN (13, 14)
-            AND (
-              (status = 12 AND updated_at > sla_deadline)
-              OR (status BETWEEN 1 AND 11 AND NOW() > sla_deadline)
-            )
-        )
-      )
-      FROM orders
-      WHERE created_at::DATE BETWEEN p_start_date AND p_end_date
-    )
-  ) INTO result;
-
-  RETURN result;
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
-
-
--- 3. DRIVER PERFORMANCE REPORT
--- Returns JSONB array of per-driver metrics
+-- Fix get_driver_performance_report: pay.payment_method -> pay.method
 CREATE OR REPLACE FUNCTION get_driver_performance_report(
   p_start_date DATE DEFAULT (CURRENT_DATE - INTERVAL '30 days')::DATE,
   p_end_date DATE DEFAULT CURRENT_DATE
@@ -237,92 +126,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
-
--- 4. CUSTOMER REPORT
--- Returns: {total_customers, new_customers_period, tier_distribution[], top_customers[], zone_distribution[], avg_review_rating}
-CREATE OR REPLACE FUNCTION get_customer_report(
-  p_start_date DATE DEFAULT (CURRENT_DATE - INTERVAL '30 days')::DATE,
-  p_end_date DATE DEFAULT CURRENT_DATE
-)
-RETURNS JSONB AS $$
-DECLARE
-  result JSONB;
-BEGIN
-  PERFORM _assert_admin();
-
-  SELECT jsonb_build_object(
-    'total_customers', (
-      SELECT COUNT(*) FROM profiles WHERE role = 'customer'
-    ),
-    'new_customers_period', (
-      SELECT COUNT(*) FROM profiles
-      WHERE role = 'customer'
-        AND created_at::DATE BETWEEN p_start_date AND p_end_date
-    ),
-    'tier_distribution', COALESCE((
-      SELECT jsonb_agg(row_to_json(t)::JSONB)
-      FROM (
-        SELECT
-          COALESCE(la.tier, 'bronze') AS tier,
-          COUNT(*) AS count
-        FROM profiles p
-        LEFT JOIN loyalty_accounts la ON la.customer_id = p.id
-        WHERE p.role = 'customer'
-        GROUP BY 1
-        ORDER BY
-          CASE COALESCE(la.tier, 'bronze')
-            WHEN 'bronze' THEN 1
-            WHEN 'silver' THEN 2
-            WHEN 'gold' THEN 3
-            WHEN 'platinum' THEN 4
-            ELSE 5
-          END
-      ) t
-    ), '[]'::JSONB),
-    'top_customers', COALESCE((
-      SELECT jsonb_agg(row_to_json(t)::JSONB)
-      FROM (
-        SELECT
-          p.name,
-          COUNT(o.id) AS order_count,
-          COALESCE(SUM(o.total), 0) AS total_spent
-        FROM profiles p
-        JOIN orders o ON o.customer_id = p.id
-        WHERE p.role = 'customer'
-          AND o.created_at::DATE BETWEEN p_start_date AND p_end_date
-          AND o.status NOT IN (13, 14)
-        GROUP BY p.id, p.name
-        ORDER BY total_spent DESC
-        LIMIT 20
-      ) t
-    ), '[]'::JSONB),
-    'zone_distribution', COALESCE((
-      SELECT jsonb_agg(row_to_json(t)::JSONB)
-      FROM (
-        SELECT
-          COALESCE(p.zone, 'Unknown') AS zone,
-          COUNT(*) AS count
-        FROM profiles p
-        WHERE p.role = 'customer'
-        GROUP BY 1
-        ORDER BY count DESC
-      ) t
-    ), '[]'::JSONB),
-    'avg_review_rating', (
-      SELECT COALESCE(ROUND(AVG(overall_rating), 1), 0)
-      FROM reviews
-      WHERE status = 'approved'
-        AND created_at::DATE BETWEEN p_start_date AND p_end_date
-    )
-  ) INTO result;
-
-  RETURN result;
-END;
-$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION get_driver_performance_report(DATE, DATE) TO authenticated;
 
 
--- 5. FINANCIAL REPORT
--- Returns: {total_revenue, total_expenses, gross_profit, profit_margin, expenses_by_category[], outstanding_receivables, overdue_count}
+-- Fix get_financial_report: i.total_amount -> i.total
 CREATE OR REPLACE FUNCTION get_financial_report(
   p_start_date DATE DEFAULT (CURRENT_DATE - INTERVAL '30 days')::DATE,
   p_end_date DATE DEFAULT CURRENT_DATE
@@ -390,11 +197,7 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 
--- 6. ENHANCED DASHBOARD KPIs (replaces old TABLE-returning version)
--- NOTE: Also admin-only since it exposes revenue/financial data.
--- For a future public KPI endpoint, create a separate limited function.
-DROP FUNCTION IF EXISTS get_dashboard_kpis();
-
+-- Fix get_dashboard_kpis: i.total_amount -> i.total
 CREATE OR REPLACE FUNCTION get_dashboard_kpis()
 RETURNS JSONB AS $$
 DECLARE
@@ -461,12 +264,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
-
--- Grant execute to authenticated users (functions self-enforce admin role internally)
-GRANT EXECUTE ON FUNCTION _assert_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION get_revenue_report(DATE, DATE, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_order_report(DATE, DATE) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_driver_performance_report(DATE, DATE) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_customer_report(DATE, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_financial_report(DATE, DATE) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_dashboard_kpis() TO authenticated;

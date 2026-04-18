@@ -36,6 +36,7 @@ export const ROUTES = {
   ADMIN_DASHBOARD: '/admin/dashboard',
   ADMIN_QUOTES: '/admin/quotes',
   ADMIN_USERS: '/admin/users',
+  ADMIN_USER_DETAIL: '/admin/users/:id',
   ADMIN_ORDERS: '/admin/orders',
   ADMIN_ORDER_DETAILS: '/admin/orders/:id',
   ADMIN_DRIVERS: '/admin/drivers',
@@ -50,6 +51,7 @@ export const ROUTES = {
   ADMIN_SYSTEM_CONFIG: '/admin/system-config',
   ADMIN_AUDIT_LOGS: '/admin/audit-logs',
   ADMIN_SYSTEM_LOGS: '/admin/system-logs',
+  ADMIN_NOTIFICATIONS: '/admin/notifications',
 
   // Driver Portal
   DRIVER_DASHBOARD: '/driver/dashboard',

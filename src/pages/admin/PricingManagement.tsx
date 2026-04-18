@@ -21,8 +21,8 @@ const PricingManagement = () => {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
 
-  // Check if user is super_admin
-  const isSuperAdmin = user?.role === 'super_admin';
+  // Check if user can edit pricing (admin or super_admin)
+  const canEditPricing = user?.role === 'super_admin' || user?.role === 'admin';
 
   // Fetch current pricing from backend
   const { data: pricingData, isLoading, refetch } = useQuery({
@@ -123,7 +123,7 @@ const PricingManagement = () => {
   };
 
   const handleSaveCatalog = async () => {
-    if (!isSuperAdmin || !user) {
+    if (!canEditPricing || !user) {
       toast.error('Only super admins can update the service catalog');
       return;
     }
@@ -159,9 +159,9 @@ const PricingManagement = () => {
   }, [pricingData]);
 
   const handleSaveAll = async () => {
-    if (!isSuperAdmin) {
+    if (!canEditPricing) {
       toast.error('Unauthorized', {
-        description: 'Only super admins can modify pricing configuration',
+        description: 'Only admins can modify pricing configuration',
       });
       return;
     }
@@ -221,7 +221,7 @@ const PricingManagement = () => {
         title="Pricing Management"
         description="Configure pricing for items, delivery, and system-wide settings"
       >
-        {isSuperAdmin && (
+        {canEditPricing && (
           <Button onClick={handleSaveAll} disabled={saving} className="gap-2">
             {saving ? (
               <>
@@ -238,7 +238,7 @@ const PricingManagement = () => {
         )}
       </PageHeader>
 
-      {!isSuperAdmin && (
+      {!canEditPricing && (
         <Alert variant="destructive">
           <Shield className="h-4 w-4" />
           <AlertDescription>
@@ -300,12 +300,12 @@ const PricingManagement = () => {
                         setItemPrices({ ...itemPrices, [key]: parseFloat(e.target.value) || 0 })
                       }
                       className="font-mono"
-                      disabled={!isSuperAdmin}
+                      disabled={!canEditPricing}
                     />
                   </div>
                 ))}
               </div>
-              {!isSuperAdmin && (
+              {!canEditPricing && (
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   Read-only: Only super admins can modify prices
@@ -344,12 +344,12 @@ const PricingManagement = () => {
                         setDeliveryFees({ ...deliveryFees, [key]: parseFloat(e.target.value) || 0 })
                       }
                       className="font-mono"
-                      disabled={!isSuperAdmin}
+                      disabled={!canEditPricing}
                     />
                   </div>
                 ))}
               </div>
-              {!isSuperAdmin && (
+              {!canEditPricing && (
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   Read-only: Only super admins can modify delivery fees
@@ -381,7 +381,7 @@ const PricingManagement = () => {
                     value={vatRate}
                     onChange={(e) => setVatRate(parseFloat(e.target.value) || 0)}
                     className="font-mono"
-                    disabled={!isSuperAdmin}
+                    disabled={!canEditPricing}
                   />
                   <p className="text-xs text-muted-foreground">
                     Currently: {vatRate}% VAT will be added to orders
@@ -408,7 +408,7 @@ const PricingManagement = () => {
                     value={minimumOrder}
                     onChange={(e) => setMinimumOrder(parseFloat(e.target.value) || 0)}
                     className="font-mono"
-                    disabled={!isSuperAdmin}
+                    disabled={!canEditPricing}
                   />
                   <p className="text-xs text-muted-foreground">
                     Orders below KES {minimumOrder.toLocaleString()} will be rejected
@@ -418,7 +418,7 @@ const PricingManagement = () => {
             </Card>
           </div>
 
-          {!isSuperAdmin && (
+          {!canEditPricing && (
             <p className="text-sm text-muted-foreground flex items-center gap-2">
               <AlertCircle className="w-4 h-4" />
               Read-only: Only super admins can modify settings
@@ -445,7 +445,7 @@ const PricingManagement = () => {
                     Add descriptions and photos for each item type. These appear on the pricing page and customer portal.
                   </CardDescription>
                 </div>
-                {isSuperAdmin && (
+                {canEditPricing && (
                   <Button onClick={handleSaveCatalog} disabled={saving} size="sm" className="gap-2">
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Catalog
@@ -478,7 +478,7 @@ const PricingManagement = () => {
                           }))
                         }
                         rows={3}
-                        disabled={!isSuperAdmin}
+                        disabled={!canEditPricing}
                       />
                     </div>
 
@@ -493,7 +493,7 @@ const PricingManagement = () => {
                               alt={key}
                               className="w-full h-32 object-cover rounded-lg"
                             />
-                            {isSuperAdmin && (
+                            {canEditPricing && (
                               <Button
                                 variant="secondary"
                                 size="sm"
@@ -514,7 +514,7 @@ const PricingManagement = () => {
                           <>
                             <ImageIcon className="w-8 h-8 mx-auto text-muted-foreground" />
                             <p className="text-xs text-muted-foreground">No photo uploaded</p>
-                            {isSuperAdmin && (
+                            {canEditPricing && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -547,7 +547,7 @@ const PricingManagement = () => {
                 </div>
               ))}
 
-              {!isSuperAdmin && (
+              {!canEditPricing && (
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   Read-only: Only super admins can modify the service catalog

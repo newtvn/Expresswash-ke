@@ -31,7 +31,6 @@ const resendApiKey = Deno.env.get('RESEND_API_KEY')!;
 const atApiKey = Deno.env.get('AFRICASTALKING_API_KEY')!;
 const atUsername = Deno.env.get('AFRICASTALKING_USERNAME')!;
 const atSenderId = Deno.env.get('AFRICASTALKING_SENDER_ID') || '';
-const resendFromEmail = Deno.env.get('RESEND_FROM_EMAIL') || 'ExpressWash <onboarding@resend.dev>';
 
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
@@ -226,7 +225,7 @@ async function sendEmail(to: string, subject: string, htmlContent: string): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: resendFromEmail,
+      from: 'ExpressWash <notifications@expresswash.co.ke>',
       to: [to],
       subject: subject,
       html: htmlContent,

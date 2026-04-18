@@ -14,19 +14,19 @@
 
 -- ── Orders ──────────────────────────────────────────────────
 
-INSERT INTO orders (id, tracking_code, customer_name, status, pickup_date, estimated_delivery, zone, driver_name, driver_phone, created_at) VALUES
-  (gen_random_uuid(), 'EW-2024-00123', 'Grace Wanjiku', 9, '2024-01-20', '2024-01-22', 'Kitengela', 'Joseph Mwangi', '+254712345678', '2024-01-20T08:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00124', 'John Kamau', 7, '2024-01-25', '2024-01-28', 'Athi River', 'Alex Mutua', '+254723456789', '2024-01-25T09:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00125', 'Mary Akinyi', 5, '2024-01-26', '2024-01-29', 'Syokimau', NULL, NULL, '2024-01-26T10:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00126', 'Peter Odhiambo', 3, '2024-01-28', '2024-01-31', 'Mlolongo', 'Joseph Mwangi', '+254712345678', '2024-01-28T07:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00127', 'Faith Muthoni', 9, '2024-01-15', '2024-01-17', 'Kitengela', 'David Kipchoge', '+254734567890', '2024-01-15T08:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00128', 'Hassan Abdullahi', 1, '2024-01-31', '2024-02-03', 'Mavoko', NULL, NULL, '2024-01-31T11:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00130', 'Angela Wairimu', 4, '2024-01-30', '2024-02-02', 'Athi River', 'Mike Otieno', '+254745678901', '2024-01-30T09:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00131', 'Esther Nyambura', 9, '2024-01-22', '2024-01-24', 'Syokimau', 'David Kipchoge', '+254734567890', '2024-01-22T07:30:00Z'),
-  (gen_random_uuid(), 'EW-2024-00132', 'William Mutiso', 6, '2024-01-29', '2024-02-01', 'Athi River', NULL, NULL, '2024-01-29T10:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00133', 'Mercy Njoki', 8, '2024-01-27', '2024-01-30', 'Kitengela', 'Brian Wekesa', '+254756789012', '2024-01-27T08:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00135', 'Samuel Njoroge', 2, '2024-01-31', '2024-02-03', 'Athi River', 'Joseph Mwangi', '+254712345678', '2024-01-31T08:00:00Z'),
-  (gen_random_uuid(), 'EW-2024-00138', 'Grace Wanjiku', 3, '2024-02-01', '2024-02-04', 'Kitengela', 'Alex Mutua', '+254723456789', '2024-01-31T11:30:00Z');
+INSERT INTO orders (id, tracking_code, customer_name, status, pickup_date, estimated_delivery, zone, driver_name, driver_phone, subtotal, delivery_fee, vat, total, created_at) VALUES
+  (gen_random_uuid(), 'EW-2024-00123', 'Grace Wanjiku', 9, '2024-01-20', '2024-01-22', 'Kitengela', 'Joseph Mwangi', '+254712345678', 15070, 1500, 2651.20, 19221.20, '2024-01-20T08:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00124', 'John Kamau', 7, '2024-01-25', '2024-01-28', 'Athi River', 'Alex Mutua', '+254723456789', NULL, NULL, NULL, NULL, '2024-01-25T09:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00125', 'Mary Akinyi', 5, '2024-01-26', '2024-01-29', 'Syokimau', NULL, NULL, NULL, NULL, NULL, NULL, '2024-01-26T10:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00126', 'Peter Odhiambo', 3, '2024-01-28', '2024-01-31', 'Mlolongo', 'Joseph Mwangi', '+254712345678', NULL, NULL, NULL, NULL, '2024-01-28T07:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00127', 'Faith Muthoni', 9, '2024-01-15', '2024-01-17', 'Kitengela', 'David Kipchoge', '+254734567890', 11000, 0, 1760, 12260, '2024-01-15T08:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00128', 'Hassan Abdullahi', 1, '2024-01-31', '2024-02-03', 'Mavoko', NULL, NULL, NULL, NULL, NULL, NULL, '2024-01-31T11:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00130', 'Angela Wairimu', 4, '2024-01-30', '2024-02-02', 'Athi River', 'Mike Otieno', '+254745678901', 14000, 1500, 2480, 17980, '2024-01-30T09:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00131', 'Esther Nyambura', 9, '2024-01-22', '2024-01-24', 'Syokimau', 'David Kipchoge', '+254734567890', 22425, 1500, 3828, 27753, '2024-01-22T07:30:00Z'),
+  (gen_random_uuid(), 'EW-2024-00132', 'William Mutiso', 6, '2024-01-29', '2024-02-01', 'Athi River', NULL, NULL, NULL, NULL, NULL, NULL, '2024-01-29T10:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00133', 'Mercy Njoki', 8, '2024-01-27', '2024-01-30', 'Kitengela', 'Brian Wekesa', '+254756789012', NULL, NULL, NULL, NULL, '2024-01-27T08:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00135', 'Samuel Njoroge', 2, '2024-01-31', '2024-02-03', 'Athi River', 'Joseph Mwangi', '+254712345678', NULL, NULL, NULL, NULL, '2024-01-31T08:00:00Z'),
+  (gen_random_uuid(), 'EW-2024-00138', 'Grace Wanjiku', 3, '2024-02-01', '2024-02-04', 'Kitengela', 'Alex Mutua', '+254723456789', 10500, 1500, 1920, 13920, '2024-01-31T11:30:00Z');
 
 -- Order items (we need to look up the order IDs)
 DO $$
@@ -34,7 +34,7 @@ DECLARE
   oid UUID;
 BEGIN
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00123';
-  INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Large)', 2), (oid, 'Carpet (Medium)', 1);
+  INSERT INTO order_items (order_id, name, quantity, unit_price, total_price) VALUES (oid, 'Carpet (Large)', 2, 5000, 10000), (oid, 'Carpet (Medium)', 1, 3500, 3500);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00124';
   INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Sofa Set', 1), (oid, 'Cushions', 4);
@@ -46,16 +46,16 @@ BEGIN
   INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Curtain Pair', 2), (oid, 'Duvet', 1);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00127';
-  INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Large)', 1), (oid, 'Rug (Persian)', 1);
+  INSERT INTO order_items (order_id, name, quantity, unit_price, total_price) VALUES (oid, 'Carpet (Large)', 1, 5000, 5000), (oid, 'Rug (Persian)', 1, 6000, 6000);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00128';
   INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Small)', 2);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00130';
-  INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Large)', 1), (oid, 'Carpet (Medium)', 2);
+  INSERT INTO order_items (order_id, name, quantity, unit_price, total_price) VALUES (oid, 'Carpet (Large)', 1, 5000, 5000), (oid, 'Carpet (Medium)', 2, 3500, 7000);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00131';
-  INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Sofa Set', 1);
+  INSERT INTO order_items (order_id, name, quantity, unit_price, total_price) VALUES (oid, 'Sofa Set', 1, 7000, 7000);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00132';
   INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Large)', 2), (oid, 'Carpet (Medium)', 1), (oid, 'Cushions', 4);
@@ -67,7 +67,7 @@ BEGIN
   INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Small)', 1);
 
   SELECT id INTO oid FROM orders WHERE tracking_code = 'EW-2024-00138';
-  INSERT INTO order_items (order_id, name, quantity) VALUES (oid, 'Carpet (Large)', 1), (oid, 'Duvet', 2);
+  INSERT INTO order_items (order_id, name, quantity, unit_price, total_price) VALUES (oid, 'Carpet (Large)', 1, 5000, 5000), (oid, 'Duvet', 2, 2500, 5000);
 END $$;
 
 -- ── Warehouse Stats ─────────────────────────────────────────

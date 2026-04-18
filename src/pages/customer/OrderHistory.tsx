@@ -14,26 +14,30 @@ import { ROUTES } from '@/config/routes';
 import { PlaceOrderDialog } from '@/components/customer/PlaceOrderDialog';
 import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 
+const ORDERS_PER_PAGE = 10;
+
 export const OrderHistory = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [placeOrderOpen, setPlaceOrderOpen] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ['customer', 'orders', user?.id, search, statusFilter],
+    queryKey: ['customer', 'orders', user?.id, search, statusFilter, page],
     queryFn: () =>
       getCustomerOrders(user!.id, {
         search: search || undefined,
         status: statusFilter !== 'all' ? Number(statusFilter) : undefined,
-        page: 1,
-        limit: 50,
+        page,
+        limit: ORDERS_PER_PAGE,
       }),
     enabled: !!user?.id,
   });
 
   const orders = result?.data ?? [];
+  const totalPages = result?.totalPages ?? 0;
 
   return (
     <div className="space-y-6">
@@ -44,8 +48,8 @@ export const OrderHistory = () => {
       </PageHeader>
 
       <div className="flex flex-wrap gap-3">
-        <SearchInput onSearch={useCallback((v: string) => setSearch(v), [])} placeholder="Search by tracking code..." className="w-64" />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SearchInput onSearch={useCallback((v: string) => { setSearch(v); setPage(1); }, [])} placeholder="Search by tracking code..." className="w-64" />
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
           <SelectTrigger className="w-44"><SelectValue placeholder="All Statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
@@ -92,6 +96,36 @@ export const OrderHistory = () => {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!isLoading && result && totalPages > 1 && (
+        <div className="flex items-center justify-between border-t pt-4">
+          <p className="text-sm text-muted-foreground">
+            Showing {((page - 1) * ORDERS_PER_PAGE) + 1} to {Math.min(page * ORDERS_PER_PAGE, result.total)} of {result.total} orders
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-2 px-3">
+              <span className="text-sm">Page {page} of {totalPages}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(p => p + 1)}
+              disabled={page >= totalPages}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 

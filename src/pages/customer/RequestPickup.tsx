@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, LocationPickerModal } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +30,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/config/routes';
+import { getAddresses, extractZoneFromAddress, type Address } from '@/services/addressService';
 import {
   createOrder,
   calculateItemPrice,
@@ -90,6 +92,9 @@ export const RequestPickup = () => {
   // Form state
   const [zone, setZone] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupLat, setPickupLat] = useState<number | undefined>(undefined);
+  const [pickupLng, setPickupLng] = useState<number | undefined>(undefined);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -101,6 +106,26 @@ export const RequestPickup = () => {
 
   // Dynamic zones from DB
   const { data: activeZones = [] } = useActiveZones();
+
+  // Saved addresses
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ['addresses', user?.id],
+    queryFn: () => getAddresses(user!.id),
+    enabled: !!user?.id,
+  });
+
+  // Auto-fill from default address on load
+  useEffect(() => {
+    if (savedAddresses.length > 0 && !pickupAddress) {
+      const defaultAddr = savedAddresses.find((a: Address) => a.isDefault) ?? savedAddresses[0];
+      if (defaultAddr) {
+        setPickupAddress(defaultAddr.addressLine);
+        setZone(defaultAddr.zone);
+        setPickupLat(defaultAddr.latitude);
+        setPickupLng(defaultAddr.longitude);
+      }
+    }
+  }, [savedAddresses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch ETA when zone changes
   useEffect(() => {
@@ -399,13 +424,52 @@ export const RequestPickup = () => {
                   />
                 </div>
               </div>
+              {savedAddresses.length > 0 && (
+                <div>
+                  <Label>Saved Addresses</Label>
+                  <Select
+                    value=""
+                    onValueChange={(addrId) => {
+                      const addr = savedAddresses.find((a: Address) => a.id === addrId);
+                      if (addr) {
+                        setPickupAddress(addr.addressLine);
+                        setZone(addr.zone);
+                        setPickupLat(addr.latitude);
+                        setPickupLng(addr.longitude);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose from saved addresses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedAddresses.map((addr: Address) => (
+                        <SelectItem key={addr.id} value={addr.id}>
+                          {addr.label} — {addr.addressLine} ({addr.zone})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label>Pickup Address *</Label>
-                <Input
-                  value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
-                  placeholder="e.g. 45 Namanga Road, Kitengela"
-                />
+                <div className="relative">
+                  <Input
+                    value={pickupAddress}
+                    onChange={(e) => setPickupAddress(e.target.value)}
+                    placeholder="e.g. 45 Namanga Road, Kitengela"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => setMapPickerOpen(true)}
+                    title="Pick on map"
+                  >
+                    <MapPin className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <Label>Notes (optional)</Label>
@@ -694,6 +758,22 @@ export const RequestPickup = () => {
           </Card>
         </div>
       </div>
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        open={mapPickerOpen}
+        onOpenChange={setMapPickerOpen}
+        onSelect={({ address, lat, lng }) => {
+          setPickupAddress(address);
+          setPickupLat(lat);
+          setPickupLng(lng);
+          // Try to extract zone from the address
+          const matchedZone = extractZoneFromAddress(address);
+          if (matchedZone) setZone(matchedZone);
+        }}
+        initialCenter={pickupLat && pickupLng ? { lat: pickupLat, lng: pickupLng } : undefined}
+        initialAddress={pickupAddress}
+      />
     </div>
   );
 };

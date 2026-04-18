@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PageHeader, KPICard, DataTable, StatusBadge, ExportButton } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +17,7 @@ interface InvoiceRow {
   id: string;
   invoiceId: string;
   pdfUrl?: string;
+  orderNumber: string;
   customer: string;
   amount: number;
   status: string;
@@ -29,6 +31,7 @@ function toRow(inv: Invoice): InvoiceRow {
     id: inv.invoiceNumber,
     invoiceId: inv.id,
     pdfUrl: inv.pdfUrl,
+    orderNumber: inv.orderNumber || '--',
     customer: inv.customerName,
     amount: inv.total,
     status: inv.status,
@@ -64,7 +67,6 @@ function computeKPIs(invoices: Invoice[]): KPIData {
         overdue += inv.total;
         break;
       case 'sent':
-      case 'draft':
       case 'partially_paid':
         outstanding += inv.total;
         break;
@@ -80,6 +82,7 @@ function computeKPIs(invoices: Invoice[]): KPIData {
 
 const invoiceColumns: Column<InvoiceRow>[] = [
   { key: 'id', header: 'Invoice #', sortable: true },
+  { key: 'orderNumber', header: 'Order #', sortable: true },
   { key: 'customer', header: 'Customer', sortable: true },
   {
     key: 'amount',
@@ -155,6 +158,9 @@ function TableSkeleton() {
  * tabbed views: All Invoices, Pending, Paid, Overdue.
  */
 export const BillingFinancials = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'all';
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -262,7 +268,7 @@ export const BillingFinancials = () => {
       {loading ? (
         <TableSkeleton />
       ) : (
-        <Tabs defaultValue="all" className="space-y-4">
+        <Tabs defaultValue={initialTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="all">All Invoices ({allRows.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({pendingRows.length})</TabsTrigger>
@@ -271,19 +277,19 @@ export const BillingFinancials = () => {
           </TabsList>
 
           <TabsContent value="all">
-            <DataTable data={allRows} columns={invoiceColumns} searchPlaceholder="Search invoices..." />
+            <DataTable data={allRows} columns={invoiceColumns} searchPlaceholder="Search invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
           </TabsContent>
 
           <TabsContent value="pending">
-            <DataTable data={pendingRows} columns={invoiceColumns} searchPlaceholder="Search pending invoices..." />
+            <DataTable data={pendingRows} columns={invoiceColumns} searchPlaceholder="Search pending invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
           </TabsContent>
 
           <TabsContent value="paid">
-            <DataTable data={paidRows} columns={invoiceColumns} searchPlaceholder="Search paid invoices..." />
+            <DataTable data={paidRows} columns={invoiceColumns} searchPlaceholder="Search paid invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
           </TabsContent>
 
           <TabsContent value="overdue">
-            <DataTable data={overdueRows} columns={invoiceColumns} searchPlaceholder="Search overdue invoices..." />
+            <DataTable data={overdueRows} columns={invoiceColumns} searchPlaceholder="Search overdue invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
           </TabsContent>
         </Tabs>
       )}

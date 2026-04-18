@@ -290,6 +290,36 @@ export const OrderDetails = () => {
             </CardContent>
           </Card>
 
+          {/* Customer Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Customer Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <span className="text-muted-foreground block">Name</span>
+                    {isAdminView && order.customerId ? (
+                      <button
+                        className="font-medium text-primary hover:underline text-left"
+                        onClick={() => navigate(`/admin/users/${order.customerId}`)}
+                      >
+                        {order.customerName}
+                      </button>
+                    ) : (
+                      <span className="font-medium">{order.customerName}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Driver Info */}
           {order.driverName && (
             <Card>
@@ -305,7 +335,16 @@ export const OrderDetails = () => {
                     <User className="h-4 w-4 text-muted-foreground" />
                     <div>
                       <span className="text-muted-foreground block">Name</span>
-                      <span className="font-medium">{order.driverName}</span>
+                      {isAdminView && order.driverId ? (
+                        <button
+                          className="font-medium text-primary hover:underline text-left"
+                          onClick={() => navigate(`/admin/users/${order.driverId}`)}
+                        >
+                          {order.driverName}
+                        </button>
+                      ) : (
+                        <span className="font-medium">{order.driverName}</span>
+                      )}
                     </div>
                   </div>
                   {order.driverPhone && (

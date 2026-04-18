@@ -1,3 +1,6 @@
+# Design references
+design/
+
 # Environment variables
 .env
 .env.local

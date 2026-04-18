@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -258,22 +259,29 @@ export const Profile = () => {
                   {([
                     { key: 'smsEnabled' as const, label: 'SMS Notifications', desc: 'Receive order updates via SMS' },
                     { key: 'emailEnabled' as const, label: 'Email Notifications', desc: 'Receive invoices and updates via email' },
-                    { key: 'whatsappEnabled' as const, label: 'WhatsApp Notifications', desc: 'Receive updates on WhatsApp' },
+                    { key: 'whatsappEnabled' as const, label: 'WhatsApp Notifications', desc: 'Receive updates on WhatsApp', comingSoon: true },
                     { key: 'marketingOptIn' as const, label: 'Marketing Messages', desc: 'Promotions and special offers' },
                     { key: 'orderUpdates' as const, label: 'Order Updates', desc: 'Status changes for your orders' },
                     { key: 'paymentReminders' as const, label: 'Payment Reminders', desc: 'Reminders for pending invoices' },
-                  ]).map((item, i) => (
+                  ] as { key: keyof typeof notifPrefs; label: string; desc: string; comingSoon?: boolean }[]).map((item, i) => (
                     <div key={item.key}>
                       {i > 0 && <Separator className="mb-4" />}
                       <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <p className="text-sm font-medium">
+                              {item.label}
+                              {item.comingSoon && (
+                                <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1.5 align-middle">Coming Soon</Badge>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{item.desc}</p>
+                          </div>
                         </div>
                         <Switch
-                          checked={notifPrefs[item.key]}
+                          checked={item.comingSoon ? false : notifPrefs[item.key]}
                           onCheckedChange={(v) => handleNotifToggle(item.key, v)}
-                          disabled={notifMutation.isPending}
+                          disabled={notifMutation.isPending || item.comingSoon}
                         />
                       </div>
                     </div>

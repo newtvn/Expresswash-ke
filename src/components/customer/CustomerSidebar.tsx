@@ -12,7 +12,6 @@ import {
   Star,
   UserCircle,
   Bell,
-  Sparkles,
   ChevronUp,
 } from 'lucide-react';
 import {

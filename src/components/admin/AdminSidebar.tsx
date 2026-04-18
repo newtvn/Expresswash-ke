@@ -16,7 +16,6 @@ import {
   Shield,
   FileText,
   ClipboardList,
-  Sparkles,
   ChevronUp,
   DollarSign,
   Calendar,

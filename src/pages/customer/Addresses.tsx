@@ -1,28 +1,32 @@
 import { useState } from 'react';
-import { PageHeader, ConfirmDialog } from '@/components/shared';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PageHeader, ConfirmDialog, LocationPickerModal } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { MapPin, Plus, Pencil, Trash2, Home, Building, MoreHorizontal } from 'lucide-react';
-
-interface AddressItem {
-  id: string;
-  label: string;
-  addressLine: string;
-  zone: string;
-  isDefault: boolean;
-}
+import { MapPin, Plus, Pencil, Trash2, Home, Building, MoreHorizontal, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuthStore } from '@/stores/authStore';
+import {
+  getAddresses,
+  createAddress,
+  updateAddress,
+  deleteAddress,
+  type Address,
+} from '@/services/addressService';
 
 const labelIcons: Record<string, React.ElementType> = {
   Home: Home,
@@ -30,16 +34,77 @@ const labelIcons: Record<string, React.ElementType> = {
   Other: MoreHorizontal,
 };
 
-const initialAddresses: AddressItem[] = [];
-
-const emptyForm = { label: '', addressLine: '', zone: '', isDefault: false };
+const emptyForm = { label: '', addressLine: '', zone: '', isDefault: false, latitude: undefined as number | undefined, longitude: undefined as number | undefined };
 
 export const Addresses = () => {
-  const [addresses, setAddresses] = useState<AddressItem[]>(initialAddresses);
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+
+  const { data: addresses = [], isLoading } = useQuery({
+    queryKey: ['addresses', user?.id],
+    queryFn: () => getAddresses(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: { customerId: string; label: string; addressLine: string; zone: string; isDefault: boolean }) =>
+      createAddress(data),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
+        toast.success('Address added');
+        setDialogOpen(false);
+        setForm(emptyForm);
+      } else {
+        toast.error('Failed to add address');
+      }
+    },
+    onError: () => {
+      toast.error('Failed to add address');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAddress>[1] }) =>
+      updateAddress(id, data),
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
+        toast.success('Address updated');
+        setDialogOpen(false);
+        setForm(emptyForm);
+        setEditId(null);
+      } else {
+        toast.error('Failed to update address');
+      }
+    },
+    onError: () => {
+      toast.error('Failed to update address');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteAddress,
+    onSuccess: (result) => {
+      if (result.success) {
+        queryClient.invalidateQueries({ queryKey: ['addresses'] });
+        toast.success('Address deleted');
+      } else {
+        toast.error('Failed to delete address');
+      }
+      setDeleteId(null);
+    },
+    onError: () => {
+      toast.error('Failed to delete address');
+      setDeleteId(null);
+    },
+  });
 
   const openAdd = () => {
     setEditId(null);
@@ -47,41 +112,40 @@ export const Addresses = () => {
     setDialogOpen(true);
   };
 
-  const openEdit = (addr: AddressItem) => {
+  const openEdit = (addr: Address) => {
     setEditId(addr.id);
-    setForm({ label: addr.label, addressLine: addr.addressLine, zone: addr.zone, isDefault: addr.isDefault });
+    setForm({ label: addr.label, addressLine: addr.addressLine, zone: addr.zone, isDefault: addr.isDefault, latitude: addr.latitude, longitude: addr.longitude });
     setDialogOpen(true);
   };
 
   const handleSave = () => {
-    if (!form.label || !form.addressLine || !form.zone) return;
+    if (!form.label || !form.addressLine || !form.zone || !user) return;
 
-    setAddresses((prev) => {
-      let updated = [...prev];
-
-      if (form.isDefault) {
-        updated = updated.map((a) => ({ ...a, isDefault: false }));
-      }
-
-      if (editId) {
-        return updated.map((a) =>
-          a.id === editId ? { ...a, ...form } : a
-        );
-      }
-      return [...updated, { id: String(Date.now()), ...form }];
-    });
-
-    setDialogOpen(false);
-    setForm(emptyForm);
-    setEditId(null);
+    if (editId) {
+      updateMutation.mutate({
+        id: editId,
+        data: { customerId: user.id, label: form.label, addressLine: form.addressLine, zone: form.zone, isDefault: form.isDefault, latitude: form.latitude, longitude: form.longitude },
+      });
+    } else {
+      createMutation.mutate({
+        customerId: user.id,
+        label: form.label,
+        addressLine: form.addressLine,
+        zone: form.zone,
+        isDefault: form.isDefault,
+        latitude: form.latitude,
+        longitude: form.longitude,
+      });
+    }
   };
 
   const handleDelete = () => {
     if (deleteId) {
-      setAddresses((prev) => prev.filter((a) => a.id !== deleteId));
-      setDeleteId(null);
+      deleteMutation.mutate(deleteId);
     }
   };
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -92,7 +156,30 @@ export const Addresses = () => {
         </Button>
       </PageHeader>
 
-      {addresses.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="w-8 h-8 rounded-lg" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-24" />
+                  <div className="flex gap-2 pt-2">
+                    <Skeleton className="h-8 flex-1" />
+                    <Skeleton className="h-8 w-8" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : addresses.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <MapPin className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No addresses yet. Add your first pickup address!</p>
@@ -151,6 +238,7 @@ export const Addresses = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editId ? 'Edit Address' : 'Add New Address'}</DialogTitle>
+            <DialogDescription className="sr-only">Enter your address details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -168,12 +256,23 @@ export const Addresses = () => {
             </div>
             <div>
               <Label htmlFor="addr-line">Address</Label>
-              <Input
-                id="addr-line"
-                value={form.addressLine}
-                onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
-                placeholder="Full address"
-              />
+              <div className="relative">
+                <Input
+                  id="addr-line"
+                  value={form.addressLine}
+                  onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
+                  placeholder="Full address"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => setMapPickerOpen(true)}
+                  title="Pick on map"
+                >
+                  <MapPin className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div>
               <Label htmlFor="addr-zone">Zone</Label>
@@ -201,7 +300,16 @@ export const Addresses = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave}>{editId ? 'Save Changes' : 'Add Address'}</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                editId ? 'Save Changes' : 'Add Address'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -215,6 +323,17 @@ export const Addresses = () => {
         confirmLabel="Delete"
         onConfirm={handleDelete}
         variant="destructive"
+      />
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        open={mapPickerOpen}
+        onOpenChange={setMapPickerOpen}
+        onSelect={({ address, lat, lng }) => {
+          setForm((prev) => ({ ...prev, addressLine: address, latitude: lat, longitude: lng }));
+        }}
+        initialCenter={form.latitude && form.longitude ? { lat: form.latitude, lng: form.longitude } : undefined}
+        initialAddress={form.addressLine}
       />
     </div>
   );

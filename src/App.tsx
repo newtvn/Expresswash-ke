@@ -54,6 +54,8 @@ const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
 const RequestedQuotes = lazy(() => import('@/pages/admin/RequestedQuotes'));
 const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
 const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
+const UserDetail = lazy(() => import('@/pages/admin/UserDetail'));
+const NotificationCenter = lazy(() => import('@/pages/admin/NotificationCenter'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -115,7 +117,7 @@ const App = () => {
     <TooltipProvider>
       <Sonner />
       <ErrorBoundary>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <SessionTimeoutWarning />
           <LazyLoader>
             <Routes>
@@ -166,6 +168,7 @@ const App = () => {
               />
               <Route path="quotes" element={<RequestedQuotes />} />
               <Route path="users" element={<UserManagement />} />
+              <Route path="users/:id" element={<UserDetail />} />
               <Route
                 path="orders"
                 element={
@@ -201,6 +204,7 @@ const App = () => {
               <Route path="system-config" element={<SystemConfig />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="system-logs" element={<SystemLogs />} />
+              <Route path="notifications" element={<NotificationCenter />} />
               <Route path="pricing" element={<PricingManagement />} />
               <Route path="holidays" element={<HolidayCalendar />} />
               <Route path="promotions" element={<AdminPromotions />} />

@@ -134,19 +134,22 @@ export async function updatePricingConfig(
       .eq('id', userId)
       .single();
 
-    await supabase.from('audit_logs').insert({
-      user_id: userId,
-      user_name: profile?.name ?? 'Unknown',
-      user_role: profile?.role ?? 'admin',
-      action: 'update_pricing',
-      entity: 'system_config',
-      entity_id: 'pricing',
-      details: JSON.stringify({ config }),
-      ip_address: 'client',
-      timestamp: new Date().toISOString(),
-    }).catch(() => {
-      // Non-critical, log silently
-    });
+    // Non-critical audit log - don't let it break the save
+    try {
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        user_name: profile?.name ?? 'Unknown',
+        user_role: profile?.role ?? 'admin',
+        action: 'update_pricing',
+        entity: 'system_config',
+        entity_id: 'pricing',
+        details: JSON.stringify({ config }),
+        ip_address: 'client',
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      // Audit log failure is non-critical
+    }
 
     return { success: true, message: 'Pricing configuration updated successfully' };
   } catch (error) {

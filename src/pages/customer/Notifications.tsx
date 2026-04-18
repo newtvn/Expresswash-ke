@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Bell,
@@ -14,56 +16,74 @@ import {
   CheckCircle,
   Tag,
   Check,
+  Settings,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface Notification {
-  id: string;
-  type: 'order' | 'delivery' | 'loyalty' | 'promo' | 'alert' | 'payment';
-  title: string;
-  message: string;
-  timestamp: string;
-  read: boolean;
-}
+import { useAuthStore } from '@/stores/authStore';
+import {
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllAsRead as markAllAsReadService,
+} from '@/services/notificationService';
+import type { Notification } from '@/services/notificationService';
+import { formatDistanceToNow } from 'date-fns';
 
 const iconMap: Record<string, React.ElementType> = {
-  order: Package,
-  delivery: Truck,
-  loyalty: Award,
-  promo: Gift,
-  alert: AlertCircle,
-  payment: CheckCircle,
+  order_created: Package,
+  driver_assigned: Truck,
+  pickup_scheduled: Package,
+  picked_up: Package,
+  in_processing: Settings,
+  ready_for_delivery: CheckCircle,
+  out_for_delivery: Truck,
+  delivered: CheckCircle,
+  price_updated: Tag,
+  general: Bell,
 };
 
-const initialNotifications: Notification[] = [];
-
 export const Notifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState('all');
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-
-  const filtered = notifications.filter((n) => {
-    if (filter === 'unread') return !n.read;
-    return true;
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ['notifications', user?.id, filter],
+    queryFn: () => getUserNotifications(user!.id, filter === 'unread'),
+    enabled: !!user?.id,
   });
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-  };
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const markAllMutation = useMutation({
+    mutationFn: () => markAllAsReadService(user!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Notifications" description={`You have ${unreadCount} unread notification(s)`}>
         {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllAsRead}>
-            <Check className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => markAllMutation.mutate()}
+            disabled={markAllMutation.isPending}
+          >
+            {markAllMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="mr-2 h-4 w-4" />
+            )}
             Mark All as Read
           </Button>
         )}
@@ -81,14 +101,20 @@ export const Notifications = () => {
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Bell className="h-10 w-10 mx-auto mb-3 opacity-40" />
-          <p className="text-sm">No notifications yet</p>
+          <p className="text-sm">{filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}</p>
         </div>
       ) : (
       <div className="space-y-3">
-        {filtered.map((notification) => {
+        {notifications.map((notification) => {
           const Icon = iconMap[notification.type] ?? Bell;
           return (
             <Card
@@ -97,7 +123,11 @@ export const Notifications = () => {
                 'transition-colors cursor-pointer hover:shadow-sm',
                 !notification.read && 'border-primary/30 bg-primary/5'
               )}
-              onClick={() => markAsRead(notification.id)}
+              onClick={() => {
+                if (!notification.read) {
+                  markReadMutation.mutate(notification.id);
+                }
+              }}
             >
               <CardContent className="py-4">
                 <div className="flex items-start gap-3">
@@ -118,7 +148,9 @@ export const Notifications = () => {
                         {!notification.read && (
                           <Badge variant="default" className="text-xs h-5">New</Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">{notification.timestamp}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        </span>
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
