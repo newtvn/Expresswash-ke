@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader, DataTable, KPICard, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { getReferrals, createReferral } from '@/services/loyaltyService';
-import { Users, UserPlus, Award, Copy, Send } from 'lucide-react';
+import { getReferrals, createReferral, resendReferralInvite } from '@/services/loyaltyService';
+import { Users, UserPlus, Award, Copy, Send, Check, RefreshCw } from 'lucide-react';
 
 interface ReferralRow {
   id: string;
@@ -20,92 +20,125 @@ interface ReferralRow {
   date: string;
 }
 
-const columns: Column<ReferralRow>[] = [
-  { key: 'name', header: 'Name', sortable: true },
-  { key: 'email', header: 'Email' },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (row) => <StatusBadge status={row.status} />,
-  },
-  {
-    key: 'pointsEarned',
-    header: 'Points Earned',
-    sortable: true,
-    render: (row) => (
-      <span className="font-medium">
-        {row.pointsEarned > 0 ? `+${row.pointsEarned}` : '---'}
-      </span>
-    ),
-  },
-  { key: 'date', header: 'Date', sortable: true },
-];
+// columns defined inside component to access resend handler
 
 export const Referrals = () => {
-  const { toast } = useToast();
   const { user } = useAuth();
   const [inviteEmail, setInviteEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [referrals, setReferrals] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
-  // Generate referral code from user's name
-  const referralCode = useMemo(() => {
-    if (!user?.name) return 'EWASH-REF';
-    const firstName = user.name.split(' ')[0].toUpperCase();
-    return `EWASH-${firstName}${new Date().getFullYear().toString().slice(-2)}`;
-  }, [user?.name]);
+  const loadReferrals = useCallback(async (userId: string) => {
+    const data = await getReferrals(userId);
+    const rows = data.map((r) => ({
+      id: r.id,
+      name: r.refereeName ?? r.refereeEmail,
+      email: r.refereeEmail,
+      status: r.status,
+      pointsEarned: r.pointsEarned,
+      date: r.createdAt?.split('T')[0] ?? '',
+    }));
+    setReferrals(rows);
+    // Use the referral code from the most recent referral if available
+    if (data.length > 0 && data[0].referralCode) {
+      setReferralCode(data[0].referralCode);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
-    getReferrals(user.id)
-      .then((data) => {
-        setReferrals(
-          data.map((r) => ({
-            id: r.id,
-            name: r.refereeName ?? r.refereeEmail,
-            email: r.refereeEmail,
-            status: r.status,
-            pointsEarned: r.pointsEarned,
-            date: r.createdAt?.split('T')[0] ?? '',
-          }))
-        );
-      })
-      .finally(() => setLoading(false));
-  }, [user?.id]);
+    loadReferrals(user.id).finally(() => setLoading(false));
+  }, [user?.id, loadReferrals]);
+
+  const handleResend = async (referralId: string) => {
+    if (!user?.id) return;
+    const result = await resendReferralInvite(user.id, referralId);
+    if (result.success) {
+      toast.success(result.message);
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const columns: Column<ReferralRow>[] = [
+    { key: 'email', header: 'Email' },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (row) => <StatusBadge status={row.status} />,
+    },
+    {
+      key: 'pointsEarned',
+      header: 'Points Earned',
+      sortable: true,
+      render: (row) => (
+        <span className="font-medium">
+          {row.pointsEarned > 0 ? `+${row.pointsEarned}` : '---'}
+        </span>
+      ),
+    },
+    { key: 'date', header: 'Date', sortable: true },
+    {
+      key: 'id',
+      header: '',
+      render: (row) => row.status === 'pending' ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs gap-1 text-primary"
+          onClick={(e) => { e.stopPropagation(); handleResend(row.id); }}
+        >
+          <RefreshCw className="w-3 h-3" />
+          Resend
+        </Button>
+      ) : null,
+    },
+  ];
 
   const totalReferrals = referrals.length;
   const successfulReferrals = referrals.filter((r) => r.status === 'completed').length;
   const totalPointsEarned = referrals.reduce((sum, r) => sum + r.pointsEarned, 0);
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(referralCode);
-    toast({ title: 'Copied!', description: 'Referral code copied to clipboard' });
+  const handleCopyCode = async () => {
+    if (!referralCode) return;
+    try {
+      await navigator.clipboard.writeText(referralCode);
+      setCopied(true);
+      toast.success('Referral code copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy to clipboard');
+    }
   };
 
   const handleInvite = async () => {
     if (!inviteEmail || !user?.id) return;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
     setSending(true);
-    const result = await createReferral(user.id, inviteEmail);
-    setSending(false);
-    if (result.success) {
-      toast({ title: 'Invitation Sent', description: result.message });
-      setInviteEmail('');
-      // Refresh referrals
-      const updated = await getReferrals(user.id);
-      setReferrals(
-        updated.map((r) => ({
-          id: r.id,
-          name: r.refereeName ?? r.refereeEmail,
-          email: r.refereeEmail,
-          status: r.status,
-          pointsEarned: r.pointsEarned,
-          date: r.createdAt?.split('T')[0] ?? '',
-        }))
-      );
-    } else {
-      toast({ title: 'Error', description: result.message, variant: 'destructive' });
+    try {
+      const result = await createReferral(user.id, inviteEmail);
+      if (result.success) {
+        toast.success(result.message);
+        setInviteEmail('');
+        if (result.referralCode) {
+          setReferralCode(result.referralCode);
+        }
+        await loadReferrals(user.id);
+      } else {
+        toast.error(result.message);
+      }
+    } catch {
+      toast.error('Failed to send invitation. Please try again.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -126,10 +159,10 @@ export const Referrals = () => {
               </p>
               <div className="flex items-center gap-2">
                 <div className="px-4 py-2 bg-muted rounded-lg font-mono text-lg font-bold tracking-wider">
-                  {referralCode}
+                  {referralCode ?? 'Send your first invite to get a code'}
                 </div>
-                <Button variant="outline" size="icon" onClick={handleCopyCode}>
-                  <Copy className="h-4 w-4" />
+                <Button variant="outline" size="icon" onClick={handleCopyCode} disabled={!referralCode}>
+                  {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
             </div>

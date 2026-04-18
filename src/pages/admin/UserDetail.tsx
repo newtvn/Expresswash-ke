@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Save, X, Edit, Star, ShoppingCart, DollarSign, Award, Copy, ShieldOff, ShieldCheck } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ArrowLeft, Save, X, Edit, Star, ShoppingCart, DollarSign, Award, Copy, ShieldOff, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,7 @@ interface ReviewRow {
   id: string;
   rating: number;
   comment: string;
+  status: string;
   created_at: string;
   order_tracking_code: string;
 }
@@ -100,6 +102,7 @@ export const UserDetail = () => {
   const [isEditingDriver, setIsEditingDriver] = useState(false);
   const [driverForm, setDriverForm] = useState({ vehiclePlate: '', vehicleType: '', licenseNumber: '' });
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<ReviewRow | null>(null);
 
   // ── Fetch user profile ───────────────────────────────────────────
   const { data: user, isLoading: userLoading } = useQuery({
@@ -164,6 +167,7 @@ export const UserDetail = () => {
         id: r.id as string,
         rating: (r.overall_rating as number) ?? 0,
         comment: (r.review_text as string) ?? '',
+        status: (r.status as string) ?? 'pending',
         created_at: r.created_at as string,
         order_tracking_code:
           (r.orders as Record<string, unknown> | null)?.tracking_code as string ?? 'N/A',
@@ -372,8 +376,10 @@ export const UserDetail = () => {
     {
       key: 'comment',
       header: 'Comment',
-      render: (row) => (
-        <p className="text-sm text-muted-foreground max-w-md truncate">{row.comment || '-'}</p>
+      render: (row) => row.comment ? (
+        <p className="text-xs italic text-muted-foreground line-clamp-2 max-w-xs">&ldquo;{row.comment}&rdquo;</p>
+      ) : (
+        <span className="text-xs text-muted-foreground">-</span>
       ),
     },
     {
@@ -838,6 +844,7 @@ export const UserDetail = () => {
               columns={reviewColumns}
               searchPlaceholder="Search reviews..."
               emptyMessage="No reviews found for this user"
+              onRowClick={(row) => setSelectedReview(row)}
             />
           )}
         </TabsContent>
@@ -965,6 +972,73 @@ export const UserDetail = () => {
         onConfirm={() => toggleStatusMutation.mutate()}
         variant={user.isActive ? 'destructive' : 'default'}
       />
+
+      {/* Review Detail Dialog */}
+      <Dialog open={!!selectedReview} onOpenChange={(open) => { if (!open) setSelectedReview(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review Details</DialogTitle>
+          </DialogHeader>
+          {selectedReview && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Order</p>
+                <p className="text-sm font-medium">{selectedReview.order_tracking_code}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Rating</p>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${i < selectedReview.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+                    />
+                  ))}
+                  <span className="font-medium ml-2 text-sm">{selectedReview.rating}/5</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Comment</p>
+                <div className="bg-muted/40 rounded-lg px-4 py-3 border border-border/50">
+                  <p className="text-sm italic leading-relaxed">&ldquo;{selectedReview.comment || 'No comment'}&rdquo;</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Date</p>
+                <p className="text-sm font-medium">
+                  {new Date(selectedReview.created_at).toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+              {selectedReview.status === 'pending' && (
+                <div className="flex items-center gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="text-emerald-600 border-emerald-300 hover:bg-emerald-50"
+                    onClick={() => {
+                      toast.success('Review approved');
+                      setSelectedReview(null);
+                    }}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="text-red-600 border-red-300 hover:bg-red-50"
+                    onClick={() => {
+                      toast.success('Review rejected');
+                      setSelectedReview(null);
+                    }}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -199,12 +199,14 @@ export async function calculateServerPrice(
   zoneName: string,
   promoCode?: string,
   customerId?: string,
+  serviceType?: string,
 ): Promise<ServerPriceResult> {
   const { data, error } = await supabase.rpc('calculate_order_pricing', {
     p_items: items,
     p_zone_name: zoneName,
     p_promo_code: promoCode ?? null,
     p_customer_id: customerId ?? null,
+    p_service_type: serviceType ?? null,
   });
 
   if (error) {

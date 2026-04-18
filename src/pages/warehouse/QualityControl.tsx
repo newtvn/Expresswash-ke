@@ -12,7 +12,7 @@ import {
   AlertTriangle,
   Package,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 const qcItems = [
   {
@@ -46,7 +46,7 @@ const checklistItems = [
  * QC checklist for items that completed washing and drying.
  */
 const QualityControl = () => {
-  const { toast } = useToast();
+  // toast from sonner is imported at module level
   const [selectedItem, setSelectedItem] = useState<string | null>(
     qcItems.length > 0 ? qcItems[0].id : null
   );
@@ -63,25 +63,16 @@ const QualityControl = () => {
 
   const handleApprove = () => {
     if (!allChecked) {
-      toast({
-        title: "Incomplete checklist",
-        description: "Please complete all checklist items before approving",
-        variant: "destructive",
-      });
+      toast.error("Incomplete checklist", { description: "Please complete all checklist items before approving" });
       return;
     }
-    toast({
-      title: "Item approved!",
-      description: `${currentItem?.id} passed quality control and is ready for dispatch`,
-    });
+    toast.success(`${currentItem?.id} passed quality control and is ready for dispatch`);
     setChecklist({});
     setNotes("");
   };
 
   const handleReject = () => {
-    toast({
-      title: "Item flagged for re-processing",
-      description: `${currentItem?.id} will be sent back for cleaning`,
+    toast.error(`${currentItem?.id} flagged for re-processing`, { description: "Will be sent back for cleaning" });
       variant: "destructive",
     });
     setChecklist({});

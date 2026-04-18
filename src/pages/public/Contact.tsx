@@ -14,14 +14,14 @@ import {
   Loader2,
 } from "lucide-react";
 import { COMPANY_INFO } from "@/config/constants";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 /**
  * Contact Page
  * Contact form on the left, company info card on the right.
  */
 const Contact = () => {
-  const { toast } = useToast();
+  // toast imported from sonner at module level
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [formData, setFormData] = useState({
@@ -46,10 +46,7 @@ const Contact = () => {
 
     setIsSubmitting(false);
     setSubmitted(true);
-    toast({
-      title: "Message sent!",
-      description: "We will get back to you within 24 hours.",
-    });
+    toast.success("Message sent! We will get back to you within 24 hours.");
   };
 
   return (

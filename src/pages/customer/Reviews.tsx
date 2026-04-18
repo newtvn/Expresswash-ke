@@ -67,8 +67,10 @@ const columns: Column<Review>[] = [
   {
     key: 'comment',
     header: 'Comment',
-    render: (row) => (
-      <span className="text-sm line-clamp-2 max-w-xs">{row.comment}</span>
+    render: (row) => row.comment ? (
+      <p className="text-xs italic text-muted-foreground line-clamp-2 max-w-xs">&ldquo;{row.comment}&rdquo;</p>
+    ) : (
+      <span className="text-xs text-muted-foreground">-</span>
     ),
   },
   {
@@ -82,6 +84,7 @@ export const Reviews = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [writeOpen, setWriteOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<Review | null>(null);
   const [newRating, setNewRating] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
@@ -176,7 +179,56 @@ export const Reviews = () => {
         searchable
         searchPlaceholder="Search reviews..."
         pageSize={10}
+        onRowClick={(row) => setSelectedReview(row)}
       />
+
+      {/* Review Detail Dialog */}
+      <Dialog open={!!selectedReview} onOpenChange={(open) => { if (!open) setSelectedReview(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Review Details</DialogTitle>
+          </DialogHeader>
+          {selectedReview && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Order</p>
+                <p className="text-sm font-medium">{selectedReview.orderNumber}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Rating</p>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Star
+                      key={star}
+                      className={cn(
+                        'w-5 h-5',
+                        star <= selectedReview.rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'
+                      )}
+                    />
+                  ))}
+                  <span className="font-medium ml-2 text-sm">{selectedReview.rating}/5</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Comment</p>
+                <div className="bg-muted/40 rounded-lg px-4 py-3 border border-border/50">
+                  <p className="text-sm italic leading-relaxed">&ldquo;{selectedReview.comment || 'No comment'}&rdquo;</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Date</p>
+                <p className="text-sm font-medium">
+                  {new Date(selectedReview.createdAt).toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Status</p>
+                <StatusBadge status={selectedReview.status} />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Write Review Dialog */}
       <Dialog open={writeOpen} onOpenChange={setWriteOpen}>

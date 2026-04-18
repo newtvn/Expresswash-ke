@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Mail, Lock, User, Eye, EyeOff, Phone, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Phone, AlertCircle, Gift } from 'lucide-react';
 import { AuthLayout, SocialAuthButtons } from '@/components/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/config/routes';
@@ -65,14 +65,18 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
  */
 export const SignUp = () => {
   const { register: registerUser, isLoading } = useAuth();
+  const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
+
+  const refCode = searchParams.get('ref') ?? '';
+  const prefillEmail = searchParams.get('email') ?? '';
 
   const form = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       fullName: '',
-      email: '',
+      email: prefillEmail,
       phone: '',
       password: '',
       confirmPassword: '',
@@ -80,6 +84,18 @@ export const SignUp = () => {
       acceptTerms: false as unknown as true,
     },
   });
+
+  // If we have a ref code but no email param, look up the email from the referral
+  useEffect(() => {
+    if (refCode && !prefillEmail) {
+      import('@/lib/supabase').then(({ supabase }) => {
+        supabase.rpc('get_referral_email', { p_code: refCode })
+          .then(({ data }) => {
+            if (data) form.setValue('email', data as string);
+          });
+      });
+    }
+  }, [refCode, prefillEmail, form]);
 
   const onSubmit = async (values: SignUpFormValues) => {
     setServerError('');
@@ -93,6 +109,15 @@ export const SignUp = () => {
     });
     if (!result.success) {
       setServerError(result.error || 'Failed to create account');
+    } else if (refCode && result.user?.id) {
+      // Link the referral via RPC (bypasses RLS)
+      import('@/lib/supabase').then(({ supabase }) => {
+        supabase.rpc('link_referral_signup', {
+          p_referral_code: refCode,
+          p_user_id: result.user!.id,
+          p_user_name: values.fullName,
+        });
+      });
     }
   };
 
@@ -101,6 +126,13 @@ export const SignUp = () => {
       title="Create your account"
       subtitle="Join thousands of satisfied customers"
     >
+      {refCode && (
+        <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+          <Gift className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>You've been referred! Sign up and you'll both earn <strong>200 loyalty points</strong> on your first order.</span>
+        </div>
+      )}
+
       {serverError && (
         <div className="flex items-center gap-2 p-3 mb-4 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />

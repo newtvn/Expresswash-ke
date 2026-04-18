@@ -30,7 +30,7 @@ export const TEST_ACCOUNTS = {
     zone: 'kitengela',
   },
   admin: {
-    email: 'ngethenan768@gmail.com',
+    email: 'ngethenan768+admin@gmail.com',
     password: 'TestExpressWash2026!',
     id: 'ca2e02b3-aa10-4787-942a-fd707511d1e1',
     name: 'Nathan Ngethe',

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { PageHeader, LocationPickerModal } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import {
   Package,
   ArrowRight,
   Loader2,
+  Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
@@ -38,6 +40,8 @@ import {
   calculateItemPrice,
   calculateETA,
   getDeliveryFee,
+  getExpressSurcharge,
+  EXPRESS_SURCHARGE,
   PRICING,
   type CreateOrderPayload,
   type PickupRequestItem,
@@ -89,7 +93,10 @@ export const RequestPickup = () => {
     total: number;
   } | null>(null);
 
+  const loyaltyTier = user?.loyaltyTier;
+
   // Form state
+  const [serviceType, setServiceType] = useState<'standard' | 'express'>('standard');
   const [zone, setZone] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupLat, setPickupLat] = useState<number | undefined>(undefined);
@@ -188,21 +195,27 @@ export const RequestPickup = () => {
 
   const deliveryFee = useMemo(() => {
     if (!zone) return 0;
+    if (loyaltyTier === 'gold' || loyaltyTier === 'platinum') return 0;
     const matchedZone = activeZones.find((z) => z.name === zone);
     if (matchedZone) return matchedZone.base_delivery_fee;
     // Defensive fallback: zone DB is authoritative, but if not loaded yet use hardcoded values
     console.warn(`Zone "${zone}" not found in DB, using hardcoded delivery fee`);
-    return getDeliveryFee(zone);
-  }, [zone, activeZones]);
+    return getDeliveryFee(zone, loyaltyTier);
+  }, [zone, activeZones, loyaltyTier]);
+
+  const expressSurcharge = useMemo(
+    () => getExpressSurcharge(serviceType, loyaltyTier),
+    [serviceType, loyaltyTier]
+  );
 
   const vatAmount = useMemo(
-    () => Math.round((subtotal + deliveryFee) * PRICING.vatRate),
-    [subtotal, deliveryFee]
+    () => Math.round((subtotal + deliveryFee + expressSurcharge) * PRICING.vatRate),
+    [subtotal, deliveryFee, expressSurcharge]
   );
 
   const grandTotal = useMemo(
-    () => subtotal + deliveryFee + vatAmount,
-    [subtotal, deliveryFee, vatAmount]
+    () => subtotal + deliveryFee + expressSurcharge + vatAmount,
+    [subtotal, deliveryFee, expressSurcharge, vatAmount]
   );
 
   const allValid = useMemo(
@@ -314,7 +327,7 @@ export const RequestPickup = () => {
     } else {
       toast.error(result.error ?? 'Failed to create order');
     }
-  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, vatAmount, notes, eta, promoCode, promotionId]);
+  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, expressSurcharge, vatAmount, notes, eta, promoCode, promotionId]);
 
   // Success state
   if (orderCreated) {
@@ -479,6 +492,35 @@ export const RequestPickup = () => {
                   placeholder="Gate code, landmarks, special instructions..."
                   rows={2}
                 />
+              </div>
+
+              {/* Service Type */}
+              <div>
+                <Label>Service Type</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                      serviceType === 'standard' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                    )}
+                    onClick={() => setServiceType('standard')}
+                  >
+                    <p className="font-medium">Standard</p>
+                    <p className="text-xs text-muted-foreground">2-3 business days</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                      serviceType === 'express' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                    )}
+                    onClick={() => setServiceType('express')}
+                  >
+                    <p className="font-medium">Express</p>
+                    <p className="text-xs text-muted-foreground">
+                      {loyaltyTier === 'platinum' ? 'Free - Platinum perk' : `+KES ${EXPRESS_SURCHARGE}`}
+                    </p>
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -665,11 +707,33 @@ export const RequestPickup = () => {
                         Delivery Fee
                       </span>
                       <span>
-                        {zone
-                          ? `KES ${deliveryFee.toLocaleString()}`
-                          : 'Select zone'}
+                        {!zone
+                          ? 'Select zone'
+                          : deliveryFee === 0 && (loyaltyTier === 'gold' || loyaltyTier === 'platinum')
+                            ? (
+                              <span className="flex items-center gap-1 text-green-600 font-medium">
+                                <Gift className="h-3 w-3" />
+                                Free (Gold+ perk)
+                              </span>
+                            )
+                            : `KES ${deliveryFee.toLocaleString()}`}
                       </span>
                     </div>
+                    {serviceType === 'express' && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Express Surcharge</span>
+                        <span>
+                          {expressSurcharge === 0
+                            ? (
+                              <span className="flex items-center gap-1 text-green-600 font-medium">
+                                <Gift className="h-3 w-3" />
+                                Free (Platinum perk)
+                              </span>
+                            )
+                            : `KES ${expressSurcharge.toLocaleString()}`}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">VAT (16%)</span>
                       <span>KES {vatAmount.toLocaleString()}</span>

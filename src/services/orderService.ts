@@ -199,12 +199,21 @@ export const PRICING = {
   minimumOrder: 500,
 };
 
-export function getDeliveryFee(zone: string): number {
+export function getDeliveryFee(zone: string, loyaltyTier?: string): number {
+  if (loyaltyTier === 'gold' || loyaltyTier === 'platinum') return 0;
   const z = zone.toLowerCase();
   for (const [key, fee] of Object.entries(PRICING.deliveryFees)) {
     if (z.includes(key)) return fee;
   }
   return PRICING.deliveryFees.other;
+}
+
+export const EXPRESS_SURCHARGE = 500;
+
+export function getExpressSurcharge(serviceType: string, loyaltyTier?: string): number {
+  if (serviceType !== 'express') return 0;
+  if (loyaltyTier === 'platinum') return 0;
+  return EXPRESS_SURCHARGE;
 }
 
 export function getPricePerSqInch(itemType: string): number {

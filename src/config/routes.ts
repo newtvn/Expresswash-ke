@@ -58,6 +58,7 @@ export const ROUTES = {
   DRIVER_ROUTE: '/driver/route',
   DRIVER_PICKUP_DELIVERY: '/driver/pickup-delivery',
   DRIVER_CASH: '/driver/cash',
+  DRIVER_NOTIFICATIONS: '/driver/notifications',
 
   // Warehouse Portal
   WAREHOUSE_INTAKE: '/warehouse/intake',

@@ -175,10 +175,10 @@ export function CustomerSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem asChild>
+                <DropdownMenuItem asChild className="focus:bg-primary/10 focus:text-primary">
                   <Link to="/portal/profile">Profile</Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>
+                <DropdownMenuItem onClick={handleLogout} className="focus:bg-primary/10 focus:text-primary">
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
