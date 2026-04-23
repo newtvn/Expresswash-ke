@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, SearchInput } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -30,6 +31,7 @@ import {
 
 export const UserManagement = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -237,14 +239,15 @@ export const UserManagement = () => {
             <TabsTrigger value="drivers">Drivers ({getByRole('driver').length})</TabsTrigger>
             <TabsTrigger value="staff">Staff ({getByRole('warehouse_staff').length + getByRole('admin').length})</TabsTrigger>
           </TabsList>
-          <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} /></TabsContent>
-          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} /></TabsContent>
-          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} /></TabsContent>
+          <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
           <TabsContent value="staff">
             <DataTable
               data={[...getByRole('warehouse_staff'), ...getByRole('admin'), ...getByRole('super_admin')]}
               columns={columns}
               searchable={false}
+              onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
             />
           </TabsContent>
         </Tabs>

@@ -70,7 +70,7 @@ BEGIN
       SELECT jsonb_agg(row_to_json(t)::JSONB)
       FROM (
         SELECT
-          COALESCE(p.payment_method, 'unknown') AS method,
+          COALESCE(p.method::TEXT, 'unknown') AS method,
           COUNT(*) AS count,
           COALESCE(SUM(p.amount), 0) AS revenue
         FROM payments p
@@ -214,7 +214,7 @@ BEGIN
       COUNT(o.id) FILTER (WHERE o.status = 12) AS deliveries,
       COUNT(o.id) FILTER (WHERE o.status >= 5 AND o.status <> 13) AS pickups,
       ROUND(COALESCE(AVG(r.overall_rating), 0), 1) AS avg_rating,
-      COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_method = 'cash' AND pay.status = 'completed'), 0) AS cash_collected,
+      COALESCE(SUM(pay.amount) FILTER (WHERE pay.method = 'cash' AND pay.status = 'completed'), 0) AS cash_collected,
       CASE
         WHEN COUNT(o.id) > 0
         THEN ROUND(COUNT(o.id) FILTER (WHERE o.status = 13)::NUMERIC / COUNT(o.id) * 100, 1)
@@ -368,7 +368,7 @@ BEGIN
       ) t
     ), '[]'::JSONB),
     'outstanding_receivables', (
-      SELECT COALESCE(SUM(i.total_amount - COALESCE(paid.total_paid, 0)), 0)
+      SELECT COALESCE(SUM(i.total - COALESCE(paid.total_paid, 0)), 0)
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(amount) AS total_paid
@@ -428,7 +428,7 @@ BEGIN
       SELECT COUNT(*) FROM invoices WHERE status IN ('sent', 'overdue', 'partially_paid')
     ),
     'outstanding_amount', (
-      SELECT COALESCE(SUM(i.total_amount - COALESCE(paid.total_paid, 0)), 0)
+      SELECT COALESCE(SUM(i.total - COALESCE(paid.total_paid, 0)), 0)
       FROM invoices i
       LEFT JOIN (
         SELECT invoice_id, SUM(amount) AS total_paid

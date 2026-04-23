@@ -13,7 +13,7 @@ RETURNS trigger AS $$
 DECLARE
   points_earned INTEGER;
   new_balance INTEGER;
-  new_tier TEXT;
+  new_tier loyalty_tier;
   account_exists BOOLEAN;
 BEGIN
   -- Only fire on transition TO delivered (status 12)

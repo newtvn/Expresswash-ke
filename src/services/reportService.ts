@@ -125,21 +125,8 @@ export const getOrderStatusCounts = async (): Promise<OrderStatusCount[]> => {
   }));
 };
 
-export const getSalesData = async (days = 30): Promise<SalesDataPoint[]> => {
-  const { data: reportData, error: reportError } = await supabase
-    .from('report_sales')
-    .select('*')
-    .order('date');
-
-  if (!reportError && reportData && reportData.length > 0) {
-    return reportData.map((row) => ({
-      date: row.date as string,
-      orders: row.orders as number,
-      revenue: row.revenue as number,
-      avgOrderValue: row.avg_order_value as number,
-    }));
-  }
-
+export const getSalesData = async (days = 365): Promise<SalesDataPoint[]> => {
+  // Use real aggregated data from orders/payments, not static seed table
   const { data, error } = await supabase.rpc('get_sales_by_date', { days_back: days });
   if (error || !data || data.length === 0) return [];
 

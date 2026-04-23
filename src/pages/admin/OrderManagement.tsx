@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, SearchInput, ExportButton } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Eye, Package, History } from 'lucide-react';
+import { Package, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { getOrders, bulkUpdateOrderStatus, trackOrder } from '@/services/orderService';
 import { getDrivers } from '@/services/driverService';
@@ -39,8 +39,9 @@ const STATUS_OPTIONS = [
 
 export const OrderManagement = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const qc = useQueryClient();
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -188,15 +189,7 @@ export const OrderManagement = () => {
       key: 'id',
       header: 'Actions',
       render: (row) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => navigate(`/admin/orders/${row.trackingCode}`)}
-          >
-            <Eye className="w-4 h-4" />
-          </Button>
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="ghost"
             size="icon"
@@ -288,6 +281,7 @@ export const OrderManagement = () => {
           columns={columns}
           searchable={false}
           pageSize={15}
+          onRowClick={(row) => navigate(`/admin/orders/${row.trackingCode}`)}
         />
       )}
 

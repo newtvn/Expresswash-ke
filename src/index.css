@@ -66,6 +66,27 @@
     --brand-orange: 18 90% 59%;
     --brand-green: 159 50% 24%;
 
+    /* Pipeline Dashboard Tokens */
+    --dash-bg: oklch(98.8% 0.004 95);
+    --dash-surface: #ffffff;
+    --dash-surface-2: oklch(97.5% 0.006 95);
+    --dash-line: oklch(92% 0.006 95);
+    --dash-line-2: oklch(95% 0.005 95);
+    --dash-ink: oklch(22% 0.01 260);
+    --dash-ink-2: oklch(38% 0.01 260);
+    --dash-ink-3: oklch(58% 0.012 260);
+    --dash-ink-4: oklch(72% 0.01 260);
+    --dash-accent: oklch(58% 0.12 220);
+    --dash-accent-soft: oklch(95% 0.02 220);
+    --dash-pos: oklch(58% 0.12 155);
+    --dash-pos-soft: oklch(95% 0.025 155);
+    --dash-warn: oklch(68% 0.13 75);
+    --dash-warn-soft: oklch(95% 0.03 75);
+    --dash-neg: oklch(58% 0.15 25);
+    --dash-neg-soft: oklch(95% 0.025 25);
+    --dash-violet: oklch(58% 0.12 285);
+    --dash-violet-soft: oklch(95% 0.02 285);
+
     /* Custom Gradients */
     --gradient-hero: linear-gradient(135deg, hsl(213 100% 48%) 0%, hsl(213 100% 58%) 100%);
     --gradient-subtle: linear-gradient(180deg, hsl(220 14% 96%) 0%, hsl(0 0% 100%) 100%);

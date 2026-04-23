@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,10 +10,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Trash2, Loader2, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Loader2, CheckCircle, MapPin, Gift } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { createOrder, calculateItemPrice, getDeliveryFee, PRICING } from '@/services/orderService';
+import { createOrder, calculateItemPrice, getDeliveryFee, getExpressSurcharge, EXPRESS_SURCHARGE, PRICING } from '@/services/orderService';
 import type { PickupRequestItem } from '@/services/orderService';
+import { getAddresses, type Address } from '@/services/addressService';
+import { LocationPickerModal } from '@/components/shared';
 
 interface PlaceOrderDialogProps {
   open: boolean;
@@ -53,8 +56,12 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const loyaltyTier = user?.loyaltyTier;
+
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [trackingCode, setTrackingCode] = useState('');
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [serviceType, setServiceType] = useState<'standard' | 'express'>('standard');
 
   const [form, setForm] = useState({
     zone: user?.zone ?? '',
@@ -62,6 +69,23 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
     pickupAddress: '',
     notes: '',
     items: [{ name: '', quantity: 1 }] as { name: string; quantity: number }[],
+    pickupLat: undefined as number | undefined,
+    pickupLng: undefined as number | undefined,
+  });
+
+  // Saved addresses - auto-fill default
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ['addresses', user?.id],
+    queryFn: () => getAddresses(user!.id),
+    enabled: !!user?.id && open,
+    onSuccess: (addrs: Address[]) => {
+      if (addrs.length > 0 && !form.pickupAddress) {
+        const defaultAddr = addrs.find(a => a.isDefault) ?? addrs[0];
+        if (defaultAddr) {
+          setForm(prev => ({ ...prev, pickupAddress: defaultAddr.addressLine, zone: defaultAddr.zone, pickupLat: defaultAddr.latitude, pickupLng: defaultAddr.longitude }));
+        }
+      }
+    },
   });
 
   const addItem = () => setForm({ ...form, items: [...form.items, { name: '', quantity: 1 }] });
@@ -87,11 +111,12 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
       };
     });
     const subtotal = pricedItems.reduce((sum, i) => sum + i.totalPrice, 0);
-    const deliveryFee = form.zone ? getDeliveryFee(form.zone) : 0;
-    const vat = Math.round((subtotal + deliveryFee) * PRICING.vatRate);
-    const total = subtotal + deliveryFee + vat;
-    return { pricedItems, subtotal, deliveryFee, vat, total };
-  }, [form.items, form.zone]);
+    const deliveryFee = form.zone ? getDeliveryFee(form.zone, loyaltyTier) : 0;
+    const expressSurcharge = getExpressSurcharge(serviceType, loyaltyTier);
+    const vat = Math.round((subtotal + deliveryFee + expressSurcharge) * PRICING.vatRate);
+    const total = subtotal + deliveryFee + expressSurcharge + vat;
+    return { pricedItems, subtotal, deliveryFee, expressSurcharge, vat, total };
+  }, [form.items, form.zone, serviceType, loyaltyTier]);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -127,7 +152,8 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
     setTimeout(() => {
       setStep(1);
       setTrackingCode('');
-      setForm({ zone: user?.zone ?? '', pickupDate: '', pickupAddress: '', notes: '', items: [{ name: '', quantity: 1 }] });
+      setServiceType('standard');
+      setForm({ zone: user?.zone ?? '', pickupDate: '', pickupAddress: '', notes: '', items: [{ name: '', quantity: 1 }], pickupLat: undefined, pickupLng: undefined });
     }, 300);
   };
 
@@ -231,8 +257,32 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
                   </div>
                   <div className="flex justify-between">
                     <span>Delivery ({form.zone || '—'})</span>
-                    <span>KES {pricing.deliveryFee.toLocaleString()}</span>
+                    <span>
+                      {pricing.deliveryFee === 0 && (loyaltyTier === 'gold' || loyaltyTier === 'platinum')
+                        ? (
+                          <span className="flex items-center gap-1 text-green-600 font-medium">
+                            <Gift className="h-3 w-3" />
+                            Free (Gold+ perk)
+                          </span>
+                        )
+                        : `KES ${pricing.deliveryFee.toLocaleString()}`}
+                    </span>
                   </div>
+                  {serviceType === 'express' && (
+                    <div className="flex justify-between">
+                      <span>Express Surcharge</span>
+                      <span>
+                        {pricing.expressSurcharge === 0
+                          ? (
+                            <span className="flex items-center gap-1 text-green-600 font-medium">
+                              <Gift className="h-3 w-3" />
+                              Free (Platinum perk)
+                            </span>
+                          )
+                          : `KES ${pricing.expressSurcharge.toLocaleString()}`}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>VAT (16%)</span>
                     <span>KES {pricing.vat.toLocaleString()}</span>
@@ -255,6 +305,35 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
               </Select>
             </div>
 
+            {/* Service Type */}
+            <div>
+              <Label>Service Type</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button
+                  type="button"
+                  className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                    serviceType === 'standard' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                  )}
+                  onClick={() => setServiceType('standard')}
+                >
+                  <p className="font-medium">Standard</p>
+                  <p className="text-xs text-muted-foreground">2-3 business days</p>
+                </button>
+                <button
+                  type="button"
+                  className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                    serviceType === 'express' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                  )}
+                  onClick={() => setServiceType('express')}
+                >
+                  <p className="font-medium">Express</p>
+                  <p className="text-xs text-muted-foreground">
+                    {loyaltyTier === 'platinum' ? 'Free - Platinum perk' : `+KES ${EXPRESS_SURCHARGE}`}
+                  </p>
+                </button>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="order-pickup-date">Preferred Pickup Date *</Label>
               <Input
@@ -268,12 +347,45 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
 
             <div>
               <Label htmlFor="order-address">Pickup Address *</Label>
-              <Input
-                id="order-address"
-                value={form.pickupAddress}
-                onChange={(e) => setForm({ ...form, pickupAddress: e.target.value })}
-                placeholder="e.g. 45 Namanga Road, Kitengela"
-              />
+              {savedAddresses.length > 0 && (
+                <Select
+                  value=""
+                  onValueChange={(addrId) => {
+                    const addr = savedAddresses.find((a: Address) => a.id === addrId);
+                    if (addr) {
+                      setForm({ ...form, pickupAddress: addr.addressLine, zone: addr.zone, pickupLat: addr.latitude, pickupLng: addr.longitude });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="mb-2">
+                    <SelectValue placeholder="Choose from saved addresses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {savedAddresses.map((addr: Address) => (
+                      <SelectItem key={addr.id} value={addr.id}>
+                        {addr.label} — {addr.addressLine} ({addr.zone})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <div className="relative">
+                <Input
+                  id="order-address"
+                  value={form.pickupAddress}
+                  onChange={(e) => setForm({ ...form, pickupAddress: e.target.value })}
+                  placeholder="e.g. 45 Namanga Road, Kitengela"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => setMapPickerOpen(true)}
+                  title="Pick on map"
+                >
+                  <MapPin className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="bg-muted/50 rounded-lg p-3 text-xs text-muted-foreground">
@@ -333,6 +445,17 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
           )}
         </DialogFooter>
       </DialogContent>
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        open={mapPickerOpen}
+        onOpenChange={setMapPickerOpen}
+        onSelect={({ address, lat, lng }) => {
+          setForm((prev) => ({ ...prev, pickupAddress: address, pickupLat: lat, pickupLng: lng }));
+        }}
+        initialCenter={form.pickupLat && form.pickupLng ? { lat: form.pickupLat, lng: form.pickupLng } : undefined}
+        initialAddress={form.pickupAddress}
+      />
     </Dialog>
   );
 };

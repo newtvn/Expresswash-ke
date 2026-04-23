@@ -97,6 +97,7 @@ async function initiateSTKPush(
     narration: narration,
     callBackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
     errorCallBackUrl: `${CALLBACK_BASE_URL}/payment-callback`,
+    telco: 'Safaricom',
   };
 
   logger.info('Initiating STK Push', {
@@ -253,7 +254,7 @@ serve(async (req) => {
     const stkResponse = await initiateSTKPush(
       formattedPhone,
       amount,
-      orderId,
+      order.tracking_code,
       description || `ExpressWash Order ${order.tracking_code}`,
     );
 

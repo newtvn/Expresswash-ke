@@ -1,11 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, KPICard, DataTable, StatusBadge } from "@/components/shared";
 import type { Column } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Truck, Star, MapPin, CheckCircle2 } from "lucide-react";
+import { UserPlus, Truck, Star, MapPin, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 import { getDrivers } from "@/services/driverService";
+import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/config/queryKeys";
+import { useAuthStore } from "@/stores/authStore";
 
 type DriverTableRow = {
   id: string;
@@ -47,12 +56,89 @@ const driverColumns: Column<DriverTableRow>[] = [
  * Driver roster table with performance stats.
  * Connected to real Supabase driver data.
  */
+const VEHICLE_TYPES = ['car', 'van', 'truck', 'motorcycle'] as const;
+const ZONES = ['Kitengela', 'Athi River', 'Syokimau', 'Mlolongo', 'Greater Nairobi'] as const;
+
+const initialDriverForm = {
+  name: '',
+  email: '',
+  phone: '',
+  vehiclePlate: '',
+  vehicleType: '',
+  licenseNumber: '',
+  zone: '',
+  password: '',
+};
+
 export const DriverManagement = () => {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { user: adminUser } = useAuthStore();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newDriver, setNewDriver] = useState(initialDriverForm);
+  const [creating, setCreating] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: queryKeys.drivers.list(),
     queryFn: getDrivers,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
+
+  const handleCreateDriver = async () => {
+    if (!newDriver.name || !newDriver.email || !newDriver.password) {
+      toast.error('Name, email and password are required');
+      return;
+    }
+    if (!newDriver.vehiclePlate || !newDriver.vehicleType) {
+      toast.error('Vehicle plate and vehicle type are required');
+      return;
+    }
+    setCreating(true);
+    try {
+      // Call edge function which uses service_role to create user
+      // (no Supabase confirmation email sent, custom welcome email queued instead)
+      const { data: session } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.session?.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            email: newDriver.email,
+            password: newDriver.password,
+            name: newDriver.name,
+            phone: newDriver.phone,
+            role: 'driver',
+            zone: newDriver.zone,
+            driverDetails: {
+              vehiclePlate: newDriver.vehiclePlate,
+              vehicleType: newDriver.vehicleType,
+              licenseNumber: newDriver.licenseNumber,
+            },
+          }),
+        },
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        toast.error(result.error ?? 'Failed to create driver');
+        return;
+      }
+
+      toast.success(`Driver ${newDriver.name} created successfully`);
+      setAddDialogOpen(false);
+      setNewDriver(initialDriverForm);
+      setShowPassword(false);
+      qc.invalidateQueries({ queryKey: queryKeys.drivers.all });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   // Calculate KPIs from driver data
   const totalDrivers = drivers.length;
@@ -98,7 +184,7 @@ export const DriverManagement = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Driver Management" description="Manage your delivery fleet and track performance">
-        <Button>
+        <Button onClick={() => setAddDialogOpen(true)}>
           <UserPlus className="w-4 h-4 mr-2" />
           Add Driver
         </Button>
@@ -116,7 +202,68 @@ export const DriverManagement = () => {
         data={tableData}
         columns={driverColumns}
         searchPlaceholder="Search drivers..."
+        onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
       />
+
+      {/* Add Driver Dialog */}
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add New Driver</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div><Label>Full Name *</Label><Input value={newDriver.name} onChange={(e) => setNewDriver({ ...newDriver, name: e.target.value })} placeholder="John Doe" /></div>
+            <div><Label>Email *</Label><Input type="email" value={newDriver.email} onChange={(e) => setNewDriver({ ...newDriver, email: e.target.value })} placeholder="john@example.com" /></div>
+            <div>
+              <Label>Password *</Label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={newDriver.password}
+                  onChange={(e) => setNewDriver({ ...newDriver, password: e.target.value })}
+                  placeholder="Minimum 6 characters"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPassword(!showPassword)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div><Label>Phone</Label><Input value={newDriver.phone} onChange={(e) => setNewDriver({ ...newDriver, phone: e.target.value })} placeholder="+254 7XX XXX XXX" /></div>
+            <div><Label>Vehicle Plate *</Label><Input value={newDriver.vehiclePlate} onChange={(e) => setNewDriver({ ...newDriver, vehiclePlate: e.target.value })} placeholder="KAA 123A" /></div>
+            <div>
+              <Label>Vehicle Type *</Label>
+              <Select value={newDriver.vehicleType} onValueChange={(v) => setNewDriver({ ...newDriver, vehicleType: v })}>
+                <SelectTrigger><SelectValue placeholder="Select vehicle type" /></SelectTrigger>
+                <SelectContent>
+                  {VEHICLE_TYPES.map((type) => (
+                    <SelectItem key={type} value={type} className="capitalize">{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>License Number</Label><Input value={newDriver.licenseNumber} onChange={(e) => setNewDriver({ ...newDriver, licenseNumber: e.target.value })} placeholder="DL-12345678" /></div>
+            <div>
+              <Label>Zone</Label>
+              <Select value={newDriver.zone} onValueChange={(v) => setNewDriver({ ...newDriver, zone: v })}>
+                <SelectTrigger><SelectValue placeholder="Select zone" /></SelectTrigger>
+                <SelectContent>
+                  {ZONES.map((zone) => (
+                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateDriver} disabled={creating}>{creating ? 'Creating...' : 'Create Driver'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

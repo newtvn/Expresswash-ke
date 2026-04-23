@@ -6,6 +6,12 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -119,6 +125,7 @@ export const AuditLogs = () => {
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [selectedLog, setSelectedLog] = useState<AuditLogRow | null>(null);
   const limit = 50;
 
   const fetchLogs = useCallback(async () => {
@@ -231,6 +238,7 @@ export const AuditLogs = () => {
             columns={auditColumns}
             searchPlaceholder="Search logs..."
             emptyMessage="No audit logs found matching the current filters."
+            onRowClick={(row) => setSelectedLog(row)}
           />
         )}
       </div>
@@ -262,6 +270,58 @@ export const AuditLogs = () => {
           </div>
         </div>
       )}
+      {/* Detail Dialog */}
+      <Dialog open={!!selectedLog} onOpenChange={(open) => { if (!open) setSelectedLog(null); }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Audit Log Details</DialogTitle>
+          </DialogHeader>
+          {selectedLog && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Timestamp</p>
+                  <p className="font-medium">{new Date(selectedLog.timestamp).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">User</p>
+                  <p className="font-medium">{selectedLog.user}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Role</p>
+                  <p className="font-medium capitalize">{selectedLog.role}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Action</p>
+                  <Badge variant="outline" className={cn("text-xs font-medium", actionColors[selectedLog.action as string])}>
+                    {selectedLog.action as string}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Entity</p>
+                  <p className="font-medium">{selectedLog.entity}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">IP Address</p>
+                  <p className="font-medium">{selectedLog.ip}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Details</p>
+                <pre className="text-sm bg-muted p-4 rounded-lg overflow-x-auto whitespace-pre-wrap break-words font-mono">
+                  {(() => {
+                    try {
+                      return JSON.stringify(JSON.parse(selectedLog.details as string), null, 2);
+                    } catch {
+                      return selectedLog.details as string;
+                    }
+                  })()}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

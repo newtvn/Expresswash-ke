@@ -29,8 +29,8 @@ import type {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const today = new Date();
-const thirtyDaysAgo = new Date(today);
-thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+const oneYearAgo = new Date(today);
+oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
 const fmt = (d: Date) => d.toISOString().split('T')[0];
 
@@ -119,7 +119,7 @@ const TableSkeleton = () => (
 
 export const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState({
-    start: fmt(thirtyDaysAgo),
+    start: fmt(oneYearAgo),
     end: fmt(today),
   });
 

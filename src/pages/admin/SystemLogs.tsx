@@ -41,9 +41,14 @@ export const SystemLogs = () => {
   const [serviceFilter, setServiceFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [dateRange, setDateRange] = useState({
-    start: new Date().toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - 90);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    };
   });
   const [page] = useState(1);
 
@@ -164,40 +169,43 @@ export const SystemLogs = () => {
       </div>
 
       {/* Log Entries */}
-      <div className="bg-gray-950 rounded-lg border border-border overflow-hidden">
-        <div className="max-h-[600px] overflow-y-auto p-4 space-y-1">
-          {filteredLogs.length === 0 ? (
-            <p className="text-gray-500 text-center py-8 font-mono text-sm">
-              No log entries match the current filters
-            </p>
-          ) : (
-            filteredLogs.map((log) => (
-              <div
-                key={log.id}
-                className="flex items-start gap-3 py-1.5 px-2 rounded hover:bg-gray-900/50 transition-colors font-mono text-sm"
-              >
-                <span className="text-gray-500 whitespace-nowrap text-xs">
-                  {log.timestamp}
-                </span>
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "text-[10px] uppercase font-bold px-1.5 py-0 min-w-[50px] text-center",
-                    levelStyles[log.level]
-                  )}
-                >
-                  {log.level}
-                </Badge>
-                <span className="text-primary/80 whitespace-nowrap text-xs">
-                  [{log.service}]
-                </span>
-                <span className="text-gray-300 text-xs flex-1">
-                  {log.message}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        {filteredLogs.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-sm text-muted-foreground">No log entries match the current filters</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left font-medium text-muted-foreground px-4 py-3">Timestamp</th>
+                  <th className="text-left font-medium text-muted-foreground px-4 py-3 w-20">Level</th>
+                  <th className="text-left font-medium text-muted-foreground px-4 py-3 w-36">Service</th>
+                  <th className="text-left font-medium text-muted-foreground px-4 py-3">Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLogs.map((log) => (
+                  <tr key={log.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
+                      {new Date(log.timestamp).toLocaleString('en-KE')}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <Badge variant="outline" className={cn("text-[10px] uppercase font-semibold", levelStyles[log.level])}>
+                        {log.level}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <span className="text-xs font-medium text-foreground">{log.service}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-foreground text-xs">{log.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <p className="text-xs text-muted-foreground text-center">

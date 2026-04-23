@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeader } from '@/components/shared';
+import { cn } from '@/lib/utils';
+import { PageHeader, LocationPickerModal } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,15 +28,20 @@ import {
   Package,
   ArrowRight,
   Loader2,
+  Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 import { ROUTES } from '@/config/routes';
+import { getAddresses, extractZoneFromAddress, type Address } from '@/services/addressService';
 import {
   createOrder,
   calculateItemPrice,
   calculateETA,
   getDeliveryFee,
+  getExpressSurcharge,
+  EXPRESS_SURCHARGE,
   PRICING,
   type CreateOrderPayload,
   type PickupRequestItem,
@@ -87,9 +93,15 @@ export const RequestPickup = () => {
     total: number;
   } | null>(null);
 
+  const loyaltyTier = user?.loyaltyTier;
+
   // Form state
+  const [serviceType, setServiceType] = useState<'standard' | 'express'>('standard');
   const [zone, setZone] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
+  const [pickupLat, setPickupLat] = useState<number | undefined>(undefined);
+  const [pickupLng, setPickupLng] = useState<number | undefined>(undefined);
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -101,6 +113,26 @@ export const RequestPickup = () => {
 
   // Dynamic zones from DB
   const { data: activeZones = [] } = useActiveZones();
+
+  // Saved addresses
+  const { data: savedAddresses = [] } = useQuery({
+    queryKey: ['addresses', user?.id],
+    queryFn: () => getAddresses(user!.id),
+    enabled: !!user?.id,
+  });
+
+  // Auto-fill from default address on load
+  useEffect(() => {
+    if (savedAddresses.length > 0 && !pickupAddress) {
+      const defaultAddr = savedAddresses.find((a: Address) => a.isDefault) ?? savedAddresses[0];
+      if (defaultAddr) {
+        setPickupAddress(defaultAddr.addressLine);
+        setZone(defaultAddr.zone);
+        setPickupLat(defaultAddr.latitude);
+        setPickupLng(defaultAddr.longitude);
+      }
+    }
+  }, [savedAddresses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch ETA when zone changes
   useEffect(() => {
@@ -163,21 +195,27 @@ export const RequestPickup = () => {
 
   const deliveryFee = useMemo(() => {
     if (!zone) return 0;
+    if (loyaltyTier === 'gold' || loyaltyTier === 'platinum') return 0;
     const matchedZone = activeZones.find((z) => z.name === zone);
     if (matchedZone) return matchedZone.base_delivery_fee;
     // Defensive fallback: zone DB is authoritative, but if not loaded yet use hardcoded values
     console.warn(`Zone "${zone}" not found in DB, using hardcoded delivery fee`);
-    return getDeliveryFee(zone);
-  }, [zone, activeZones]);
+    return getDeliveryFee(zone, loyaltyTier);
+  }, [zone, activeZones, loyaltyTier]);
+
+  const expressSurcharge = useMemo(
+    () => getExpressSurcharge(serviceType, loyaltyTier),
+    [serviceType, loyaltyTier]
+  );
 
   const vatAmount = useMemo(
-    () => Math.round((subtotal + deliveryFee) * PRICING.vatRate),
-    [subtotal, deliveryFee]
+    () => Math.round((subtotal + deliveryFee + expressSurcharge) * PRICING.vatRate),
+    [subtotal, deliveryFee, expressSurcharge]
   );
 
   const grandTotal = useMemo(
-    () => subtotal + deliveryFee + vatAmount,
-    [subtotal, deliveryFee, vatAmount]
+    () => subtotal + deliveryFee + expressSurcharge + vatAmount,
+    [subtotal, deliveryFee, expressSurcharge, vatAmount]
   );
 
   const allValid = useMemo(
@@ -289,7 +327,7 @@ export const RequestPickup = () => {
     } else {
       toast.error(result.error ?? 'Failed to create order');
     }
-  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, vatAmount, notes, eta, promoCode, promotionId]);
+  }, [user, allValid, hasItems, grandTotal, zone, pickupAddress, pickupDate, calculatedItems, subtotal, deliveryFee, expressSurcharge, vatAmount, notes, eta, promoCode, promotionId]);
 
   // Success state
   if (orderCreated) {
@@ -399,13 +437,52 @@ export const RequestPickup = () => {
                   />
                 </div>
               </div>
+              {savedAddresses.length > 0 && (
+                <div>
+                  <Label>Saved Addresses</Label>
+                  <Select
+                    value=""
+                    onValueChange={(addrId) => {
+                      const addr = savedAddresses.find((a: Address) => a.id === addrId);
+                      if (addr) {
+                        setPickupAddress(addr.addressLine);
+                        setZone(addr.zone);
+                        setPickupLat(addr.latitude);
+                        setPickupLng(addr.longitude);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose from saved addresses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {savedAddresses.map((addr: Address) => (
+                        <SelectItem key={addr.id} value={addr.id}>
+                          {addr.label} — {addr.addressLine} ({addr.zone})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div>
                 <Label>Pickup Address *</Label>
-                <Input
-                  value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
-                  placeholder="e.g. 45 Namanga Road, Kitengela"
-                />
+                <div className="relative">
+                  <Input
+                    value={pickupAddress}
+                    onChange={(e) => setPickupAddress(e.target.value)}
+                    placeholder="e.g. 45 Namanga Road, Kitengela"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => setMapPickerOpen(true)}
+                    title="Pick on map"
+                  >
+                    <MapPin className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
               <div>
                 <Label>Notes (optional)</Label>
@@ -415,6 +492,35 @@ export const RequestPickup = () => {
                   placeholder="Gate code, landmarks, special instructions..."
                   rows={2}
                 />
+              </div>
+
+              {/* Service Type */}
+              <div>
+                <Label>Service Type</Label>
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    type="button"
+                    className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                      serviceType === 'standard' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                    )}
+                    onClick={() => setServiceType('standard')}
+                  >
+                    <p className="font-medium">Standard</p>
+                    <p className="text-xs text-muted-foreground">2-3 business days</p>
+                  </button>
+                  <button
+                    type="button"
+                    className={cn("p-3 rounded-lg border text-left text-sm transition-colors",
+                      serviceType === 'express' ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-muted-foreground/30'
+                    )}
+                    onClick={() => setServiceType('express')}
+                  >
+                    <p className="font-medium">Express</p>
+                    <p className="text-xs text-muted-foreground">
+                      {loyaltyTier === 'platinum' ? 'Free - Platinum perk' : `+KES ${EXPRESS_SURCHARGE}`}
+                    </p>
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -601,11 +707,33 @@ export const RequestPickup = () => {
                         Delivery Fee
                       </span>
                       <span>
-                        {zone
-                          ? `KES ${deliveryFee.toLocaleString()}`
-                          : 'Select zone'}
+                        {!zone
+                          ? 'Select zone'
+                          : deliveryFee === 0 && (loyaltyTier === 'gold' || loyaltyTier === 'platinum')
+                            ? (
+                              <span className="flex items-center gap-1 text-green-600 font-medium">
+                                <Gift className="h-3 w-3" />
+                                Free (Gold+ perk)
+                              </span>
+                            )
+                            : `KES ${deliveryFee.toLocaleString()}`}
                       </span>
                     </div>
+                    {serviceType === 'express' && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Express Surcharge</span>
+                        <span>
+                          {expressSurcharge === 0
+                            ? (
+                              <span className="flex items-center gap-1 text-green-600 font-medium">
+                                <Gift className="h-3 w-3" />
+                                Free (Platinum perk)
+                              </span>
+                            )
+                            : `KES ${expressSurcharge.toLocaleString()}`}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">VAT (16%)</span>
                       <span>KES {vatAmount.toLocaleString()}</span>
@@ -694,6 +822,22 @@ export const RequestPickup = () => {
           </Card>
         </div>
       </div>
+
+      {/* Location Picker Modal */}
+      <LocationPickerModal
+        open={mapPickerOpen}
+        onOpenChange={setMapPickerOpen}
+        onSelect={({ address, lat, lng }) => {
+          setPickupAddress(address);
+          setPickupLat(lat);
+          setPickupLng(lng);
+          // Try to extract zone from the address
+          const matchedZone = extractZoneFromAddress(address);
+          if (matchedZone) setZone(matchedZone);
+        }}
+        initialCenter={pickupLat && pickupLng ? { lat: pickupLat, lng: pickupLng } : undefined}
+        initialAddress={pickupAddress}
+      />
     </div>
   );
 };

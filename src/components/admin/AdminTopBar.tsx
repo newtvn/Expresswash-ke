@@ -22,10 +22,25 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/authStore';
 import { signOut } from '@/services/authService';
 
+function getTopBarRoutes(role?: string) {
+  switch (role) {
+    case 'admin':
+    case 'super_admin':
+      return { notifications: '/admin/notifications', profile: null }; // null = use user detail page
+    case 'driver':
+      return { notifications: '/driver/notifications', profile: '/driver/dashboard' };
+    case 'warehouse_staff':
+      return { notifications: '/warehouse/intake', profile: '/warehouse/intake' };
+    default: // customer
+      return { notifications: '/portal/notifications', profile: '/portal/profile' };
+  }
+}
+
 export function AdminTopBar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
+  const routes = getTopBarRoutes(user?.role);
 
   const getInitials = (name: string) => {
     return name
@@ -64,11 +79,14 @@ export function AdminTopBar() {
       {/* Breadcrumbs */}
       <Breadcrumb className="flex-1">
         <BreadcrumbList>
-          {breadcrumbs.map((crumb, index) => {
+          {breadcrumbs.flatMap((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
-            return (
+            const items = [];
+            if (index > 0) {
+              items.push(<BreadcrumbSeparator key={`sep-${index}`} />);
+            }
+            items.push(
               <BreadcrumbItem key={crumb.href}>
-                {index > 0 && <BreadcrumbSeparator />}
                 {isLast ? (
                   <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
                 ) : (
@@ -78,13 +96,14 @@ export function AdminTopBar() {
                 )}
               </BreadcrumbItem>
             );
+            return items;
           })}
         </BreadcrumbList>
       </Breadcrumb>
 
       {/* Right side actions */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" onClick={() => navigate(routes.notifications)}>
           <Bell className="h-4 w-4" />
           <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
           <span className="sr-only">Notifications</span>
@@ -109,14 +128,14 @@ export function AdminTopBar() {
               </div>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to="profile" className="flex items-center">
+            <DropdownMenuItem asChild className="focus:bg-primary/10 focus:text-primary">
+              <Link to={routes.profile ?? `/admin/users/${user?.id}`} className="flex items-center">
                 <User className="mr-2 h-4 w-4" />
                 Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="flex items-center">
+            <DropdownMenuItem onClick={handleLogout} className="flex items-center focus:bg-primary/10 focus:text-primary">
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>

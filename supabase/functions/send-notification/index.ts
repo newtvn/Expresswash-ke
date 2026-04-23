@@ -95,6 +95,37 @@ serve(async (req: Request) => {
           continue;
         }
 
+        // Safety-net: check notification preferences before sending
+        if (notification.recipient_id) {
+          const { data: prefs } = await supabase
+            .from('notification_preferences')
+            .select('sms_enabled, email_enabled')
+            .eq('profile_id', notification.recipient_id)
+            .single();
+
+          if (notification.channel === 'sms' && prefs && !prefs.sms_enabled) {
+            await supabase.from('notification_history')
+              .update({ status: 'failed', failure_reason: 'SMS notifications disabled by user' })
+              .eq('id', notification.id);
+            logger.info('Skipped SMS notification — disabled by user', {
+              recipientId: notification.recipient_id,
+            });
+            failed++;
+            continue;
+          }
+
+          if (notification.channel === 'email' && prefs && !prefs.email_enabled) {
+            await supabase.from('notification_history')
+              .update({ status: 'failed', failure_reason: 'Email notifications disabled by user' })
+              .eq('id', notification.id);
+            logger.info('Skipped email notification — disabled by user', {
+              recipientId: notification.recipient_id,
+            });
+            failed++;
+            continue;
+          }
+        }
+
         // Send based on channel
         if (notification.channel === 'sms' || notification.channel === 'whatsapp') {
           // TODO: WhatsApp Business API not yet configured; falls back to SMS
@@ -225,7 +256,7 @@ async function sendEmail(to: string, subject: string, htmlContent: string): Prom
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'ExpressWash <notifications@expresswash.co.ke>',
+      from: Deno.env.get('RESEND_FROM_EMAIL') || 'ExpressWash <onboarding@resend.dev>',
       to: [to],
       subject: subject,
       html: htmlContent,

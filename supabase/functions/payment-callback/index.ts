@@ -227,19 +227,27 @@ serve(async (req) => {
 
     // Parse callback data
     const raw = await req.json();
-    logger.info('Raw callback data', { keys: Object.keys(raw) });
+    logger.info('Raw callback data', { raw: JSON.stringify(raw) });
 
-    // Normalize fields: CreditBank may send PascalCase or camelCase
-    // Handle both { CheckoutRequestID: ... } and { checkoutRequestId: ... }
+    // Extract data — handle Safaricom nested format, CreditBank wrapper, or flat
+    // Safaricom format: { Body: { stkCallback: { CheckoutRequestID, ResultCode, CallbackMetadata: { Item: [...] } } } }
+    // CreditBank wrapper: { data: { ... } }
+    // Flat format: { CheckoutRequestID, ResultCode, ... }
+    const stk = raw?.Body?.stkCallback || raw?.body?.stkCallback || raw?.data || raw;
+
+    // Extract metadata items from Safaricom CallbackMetadata
+    const metaItems: Array<{ Name: string; Value: unknown }> = stk?.CallbackMetadata?.Item || stk?.callbackMetadata?.Item || [];
+    const getMeta = (name: string) => metaItems.find((i: { Name: string }) => i.Name === name)?.Value;
+
     const callback = {
-      checkoutRequestId: raw.CheckoutRequestID || raw.checkoutRequestId,
-      merchantRequestId: raw.MerchantRequestID || raw.merchantRequestId,
-      resultCode: raw.ResultCode ?? raw.resultCode,
-      resultDesc: raw.ResultDesc || raw.resultDesc,
-      amount: raw.Amount || raw.amount,
-      mpesaReceiptNumber: raw.MpesaReceiptNumber || raw.mpesaReceiptNumber,
-      transactionDate: raw.TransactionDate || raw.transactionDate,
-      phoneNumber: raw.PhoneNumber || raw.phoneNumber,
+      checkoutRequestId: stk.CheckoutRequestID || stk.checkoutRequestId,
+      merchantRequestId: stk.MerchantRequestID || stk.merchantRequestId,
+      resultCode: stk.ResultCode ?? stk.resultCode,
+      resultDesc: stk.ResultDesc || stk.resultDesc,
+      amount: getMeta('Amount') || stk.Amount || stk.amount,
+      mpesaReceiptNumber: getMeta('MpesaReceiptNumber') || stk.MpesaReceiptNumber || stk.mpesaReceiptNumber,
+      transactionDate: getMeta('TransactionDate') || stk.TransactionDate || stk.transactionDate,
+      phoneNumber: getMeta('PhoneNumber') || stk.PhoneNumber || stk.phoneNumber,
     };
 
     logger.info('Callback data normalized', {
@@ -257,6 +265,8 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: 'Invalid callback data',
+          rawKeys: Object.keys(raw),
+          rawData: raw,
         }),
         {
           status: 400,

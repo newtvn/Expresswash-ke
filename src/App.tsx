@@ -2,7 +2,12 @@ import { lazy, useEffect } from 'react';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+
+function SignUpRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/auth/signup${search}`} replace />;
+}
 import { LazyLoader } from '@/components/shared/LazyLoader';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { ProtectedRoute } from '@/components/shared/ProtectedRoute';
@@ -54,6 +59,8 @@ const PricingManagement = lazy(() => import('@/pages/admin/PricingManagement'));
 const RequestedQuotes = lazy(() => import('@/pages/admin/RequestedQuotes'));
 const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
 const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
+const UserDetail = lazy(() => import('@/pages/admin/UserDetail'));
+const NotificationCenter = lazy(() => import('@/pages/admin/NotificationCenter'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -75,6 +82,7 @@ const DriverDashboard = lazy(() => import('@/pages/driver/Dashboard'));
 const RouteView = lazy(() => import('@/pages/driver/RouteView'));
 const PickupDelivery = lazy(() => import('@/pages/driver/PickupDelivery'));
 const CashCollection = lazy(() => import('@/pages/driver/CashCollection'));
+const DriverNotifications = lazy(() => import('@/pages/driver/Notifications'));
 
 // Warehouse Pages
 const ItemIntake = lazy(() => import('@/pages/warehouse/ItemIntake'));
@@ -115,7 +123,7 @@ const App = () => {
     <TooltipProvider>
       <Sonner />
       <ErrorBoundary>
-        <BrowserRouter>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <SessionTimeoutWarning />
           <LazyLoader>
             <Routes>
@@ -140,7 +148,7 @@ const App = () => {
 
             {/* Legacy auth redirects */}
             <Route path="/signin" element={<Navigate to="/auth/signin" replace />} />
-            <Route path="/signup" element={<Navigate to="/auth/signup" replace />} />
+            <Route path="/signup" element={<SignUpRedirect />} />
 
             {/* Legacy path redirects */}
             <Route path="/customer" element={<Navigate to="/portal/dashboard" replace />} />
@@ -166,6 +174,7 @@ const App = () => {
               />
               <Route path="quotes" element={<RequestedQuotes />} />
               <Route path="users" element={<UserManagement />} />
+              <Route path="users/:id" element={<UserDetail />} />
               <Route
                 path="orders"
                 element={
@@ -201,6 +210,7 @@ const App = () => {
               <Route path="system-config" element={<SystemConfig />} />
               <Route path="audit-logs" element={<AuditLogs />} />
               <Route path="system-logs" element={<SystemLogs />} />
+              <Route path="notifications" element={<NotificationCenter />} />
               <Route path="pricing" element={<PricingManagement />} />
               <Route path="holidays" element={<HolidayCalendar />} />
               <Route path="promotions" element={<AdminPromotions />} />
@@ -274,6 +284,7 @@ const App = () => {
               <Route path="pickup-delivery" element={<PickupDelivery />} />
               <Route path="orders" element={<PickupDelivery />} />
               <Route path="cash" element={<CashCollection />} />
+              <Route path="notifications" element={<DriverNotifications />} />
             </Route>
 
             {/* Warehouse Portal */}

@@ -67,26 +67,28 @@ export const OrderTimeline = ({ orderId }: OrderTimelineProps) => {
   }
 
   return (
-    <div className="relative pl-6 space-y-0">
+    <div className="relative ml-2 space-y-0">
       {/* Vertical line */}
-      <div className="absolute left-[0.6875rem] top-2 bottom-2 w-0.5 bg-border" />
+      {history.length > 1 && (
+        <div className="absolute left-[5px] top-3 bottom-3 w-0.5 bg-border" />
+      )}
 
       {history.map((entry: OrderStatusHistoryEntry, i: number) => {
         const dotColor = statusColors[entry.toStatus] ?? 'bg-gray-400';
         const isLast = i === history.length - 1;
 
         return (
-          <div key={entry.id} className={cn('relative flex gap-3 pb-5', isLast && 'pb-0')}>
+          <div key={entry.id} className={cn('relative flex items-start gap-4 pb-6', isLast && 'pb-0')}>
             {/* Dot */}
             <div
               className={cn(
-                'absolute -left-6 top-1 w-3.5 h-3.5 rounded-full border-2 border-background z-10',
+                'relative top-0.5 w-3 h-3 rounded-full border-2 border-background shrink-0 z-10',
                 dotColor,
               )}
             />
 
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-sm font-medium text-foreground leading-tight">
                 {getStatusLabel(entry.toStatus)}
               </p>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground mt-0.5">
