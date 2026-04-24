@@ -194,9 +194,12 @@ const Hero = () => {
             </div>
 
             {/* UNIFIED TYPOGRAPHY HIERARCHY (Natural Wrap) */}
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight mb-6 max-w-2xl mx-auto lg:mx-0">
-              Professional Carpet &amp; <span className="text-primary">Fabric Care.</span>
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight mb-3 max-w-2xl mx-auto lg:mx-0">
+              Expresscarpets &amp; <span className="text-primary">Upholstery.</span>
             </h1>
+            <p className="text-xl md:text-2xl font-semibold text-slate-500 tracking-wide mb-6 max-w-2xl mx-auto lg:mx-0">
+              Professional Carpet &amp; Fabric Care
+            </p>
 
             <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 mb-6 leading-relaxed">
               <span className="font-semibold text-slate-800">Cleaner &amp; Faster.</span> We pick up, deep clean, and deliver your carpets, sofas, curtains, rugs and mattresses with precision care. Trusted by thousands of homes across Kenya.
