@@ -15,7 +15,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['TT Fors', 'DM Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['TT Fors', 'Outfit', 'DM Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        brand: ['TT Fors', 'Outfit', 'DM Sans', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
