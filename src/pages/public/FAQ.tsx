@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { ROUTES } from "@/config/routes";
 import { HelpCircle } from "lucide-react";
 import { useSEO } from "@/hooks/useSEO";
+import { PageBreadcrumb } from "@/components/shared";
 
 const faqs = [
   {
@@ -116,8 +117,9 @@ const FAQ = () => {
   });
 
   return (
-    <main className="flex-1 pt-24 pb-16">
+    <div className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">
+        <PageBreadcrumb items={[{ label: 'FAQ' }]} />
         {/* Page Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
           <span className="text-sm font-semibold text-primary uppercase tracking-wider">
@@ -167,7 +169,7 @@ const FAQ = () => {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 };
 

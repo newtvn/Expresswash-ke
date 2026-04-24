@@ -12,7 +12,7 @@ import CTA from "@/components/landing/CTA";
  */
 const Home = () => {
   return (
-    <main className="flex-1">
+    <div className="flex-1">
       <Hero />
       <Services />
       <Process />
@@ -20,7 +20,7 @@ const Home = () => {
       <Testimonials />
       <FAQ />
       <CTA />
-    </main>
+    </div>
   );
 };
 

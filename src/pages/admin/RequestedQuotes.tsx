@@ -135,7 +135,7 @@ export const RequestedQuotes = () => {
             <Eye className="w-4 h-4" />
           </Button>
           <Button
-            variant="default"
+            variant="outline"
             size="sm"
             className="h-8 text-xs gap-1"
             onClick={() => setAssignDialogOrder(row)}
@@ -287,9 +287,17 @@ export const RequestedQuotes = () => {
                 <SelectValue placeholder="Select a driver..." />
               </SelectTrigger>
               <SelectContent>
-                {drivers.filter((d) => d.isOnline || d.status === 'available').map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name} — {d.zone} ({d.status})
+                {drivers.map((d) => (
+                  <SelectItem key={d.id} value={d.id} suffix={
+                    <span className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                      d.status === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                      d.status === 'on_route' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {d.status}
+                    </span>
+                  }>
+                    {d.name} — {d.zone}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,17 +1,17 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useSEO } from '@/hooks/useSEO';
+import { PageBreadcrumb } from '@/components/shared';
 
 const PrivacyPolicy = () => {
+  useSEO({
+    title: 'Privacy Policy | Express Carpets & Upholstery',
+    description: 'Learn how Express Carpets & Upholstery collects, uses, and protects your personal information including order details and M-Pesa payment data.',
+    canonical: 'https://expresscarpets.co.ke/privacy',
+  });
+
   return (
-    <main className="flex-1 pt-24 pb-16">
+    <div className="flex-1 pt-24 pb-16">
       <div className="container mx-auto max-w-3xl">
-        <Button variant="ghost" size="sm" asChild className="mb-6">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-        </Button>
+        <PageBreadcrumb items={[{ label: 'Privacy Policy' }]} />
 
         <h1 className="text-3xl font-bold text-foreground mb-2">Privacy Policy</h1>
         <p className="text-sm text-muted-foreground mb-8">Last updated: February 2026</p>
@@ -97,7 +97,7 @@ const PrivacyPolicy = () => {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 };
 

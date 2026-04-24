@@ -1,5 +1,6 @@
 import PricingCalculator from "@/components/landing/PricingCalculator";
 import { useSEO } from "@/hooks/useSEO";
+import { PageBreadcrumb } from "@/components/shared";
 
 const PricingPage = () => {
   useSEO({
@@ -10,8 +11,9 @@ const PricingPage = () => {
   });
 
   return (
-    <main className="flex-1 pt-24 pb-16">
+    <div className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">
+        <PageBreadcrumb items={[{ label: 'Pricing' }]} />
         {/* Page Header */}
         <div className="text-center max-w-2xl mx-auto mb-8">
           <span className="text-sm font-semibold text-primary uppercase tracking-wider">
@@ -29,7 +31,7 @@ const PricingPage = () => {
 
       {/* Reuse the pricing calculator component */}
       <PricingCalculator />
-    </main>
+    </div>
   );
 };
 

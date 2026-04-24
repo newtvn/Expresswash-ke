@@ -32,7 +32,7 @@ const BubbleStyles = () => (
 
 const CTA = () => {
   return (
-    <section className="relative z-20 bg-slate-50 px-6 pb-0 pt-8">
+    <section id="contact" className="relative z-20 bg-slate-50 px-6 pb-0 pt-8">
       <BubbleStyles />
       <div className="container mx-auto max-w-7xl">
         <div className="relative bg-[#007AF4] rounded-t-2xl px-8 py-14 md:px-16 md:py-16 overflow-hidden text-center">

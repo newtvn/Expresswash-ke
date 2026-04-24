@@ -387,8 +387,16 @@ export const OrderManagement = () => {
               </SelectTrigger>
               <SelectContent>
                 {drivers.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name} — {d.zone} ({d.status})
+                  <SelectItem key={d.id} value={d.id} suffix={
+                    <span className={`ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                      d.status === 'available' ? 'bg-emerald-100 text-emerald-700' :
+                      d.status === 'on_route' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {d.status}
+                    </span>
+                  }>
+                    {d.name} — {d.zone}
                   </SelectItem>
                 ))}
               </SelectContent>

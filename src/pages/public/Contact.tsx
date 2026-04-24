@@ -16,6 +16,7 @@ import {
 import { COMPANY_INFO } from "@/config/constants";
 import { toast } from "sonner";
 import { useSEO } from "@/hooks/useSEO";
+import { PageBreadcrumb } from "@/components/shared";
 
 /**
  * Contact Page
@@ -58,8 +59,9 @@ const Contact = () => {
   };
 
   return (
-    <main className="flex-1 pt-24 pb-16">
+    <div className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">
+        <PageBreadcrumb items={[{ label: 'Contact' }]} />
         {/* Page Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
           <span className="text-sm font-semibold text-primary uppercase tracking-wider">
@@ -283,7 +285,7 @@ const Contact = () => {
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 };
 

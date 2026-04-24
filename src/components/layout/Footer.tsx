@@ -37,9 +37,9 @@ const Footer = () => {
             <ul className="space-y-0.5">
               {["Carpets", "Sofas", "Curtains", "Rugs", "Mattresses", "Chairs"].map((item) => (
                 <li key={item}>
-                  <a href="#services" className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
+                  <Link to="/#services" className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                     {item} Cleaning
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -50,17 +50,16 @@ const Footer = () => {
             <h4 className="font-semibold text-slate-900 mb-4">Company</h4>
             <ul className="space-y-0.5">
               {[
-                { name: "About Us", href: "#" },
-                { name: "How It Works", href: "#process" },
-                { name: "Pricing", href: "#pricing" },
-                { name: "Track Order", href: "/track" },
-                { name: "FAQ", href: "#" },
-                { name: "Contact", href: "#" },
+                { name: "How It Works", to: "/#process" },
+                { name: "Pricing", to: "/#pricing" },
+                { name: "Track Order", to: "/track" },
+                { name: "FAQ", to: "/#faq" },
+                { name: "Contact", to: "/#contact" },
               ].map((item) => (
                 <li key={item.name}>
-                  <a href={item.href} className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
+                  <Link to={item.to} className="inline-block text-sm text-slate-500 hover:text-[#007AF4] hover:translate-x-1 transition-all duration-200 py-1.5">
                     {item.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

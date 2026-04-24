@@ -7,6 +7,7 @@ Disallow: /driver/
 Disallow: /warehouse/
 Disallow: /auth/
 Disallow: /customer/
+Disallow: /portal/
 
 User-agent: Bingbot
 Allow: /
@@ -15,6 +16,7 @@ Disallow: /driver/
 Disallow: /warehouse/
 Disallow: /auth/
 Disallow: /customer/
+Disallow: /portal/
 
 User-agent: Twitterbot
 Allow: /
@@ -29,3 +31,4 @@ Disallow: /driver/
 Disallow: /warehouse/
 Disallow: /auth/
 Disallow: /customer/
+Disallow: /portal/

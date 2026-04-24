@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { CalendarCheck, Truck, Sparkles, PackageCheck } from "lucide-react";
-import worksBg from "@/assets/works.png";
+import worksBg from "@/assets/works.webp";
 
 const steps = [
   {

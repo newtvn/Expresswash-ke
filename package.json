@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/inject-meta.mjs",
     "build:dev": "vite build --mode development",
     "build:analyze": "vite build && vite-bundle-visualizer",
     "lint": "eslint .",

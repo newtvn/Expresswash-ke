@@ -13,6 +13,8 @@ import { trackOrder } from "@/services/orderService";
 import { Order } from "@/types";
 import { ORDER_STAGES } from "@/config/constants";
 import { ORDER_STATUS, getOrderStatusLabel, isOrderCancelled } from "@/constants/orderStatus";
+import { useSEO } from "@/hooks/useSEO";
+import { PageBreadcrumb } from "@/components/shared";
 
 /**
  * Public Order Tracking Page
@@ -20,6 +22,13 @@ import { ORDER_STATUS, getOrderStatusLabel, isOrderCancelled } from "@/constants
  * No Header/Footer -- PublicLayout handles that.
  */
 const TrackOrder = () => {
+  useSEO({
+    title: 'Track Your Order | Express Carpets & Upholstery',
+    description: 'Track your carpet, rug, or upholstery cleaning order in real-time. Enter your tracking code to see pickup, cleaning, and delivery status updates.',
+    keywords: 'track order, carpet cleaning status, order tracking, Express Carpets',
+    canonical: 'https://expresscarpets.co.ke/track',
+  });
+
   const [trackingCode, setTrackingCode] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,8 +66,9 @@ const TrackOrder = () => {
   const orderIsCancelled = order ? isOrderCancelled(order.status) : false;
 
   return (
-    <main className="flex-1 bg-slate-50 pt-24 pb-16">
+    <div className="flex-1 bg-slate-50 pt-24 pb-16">
       <div className="container mx-auto max-w-7xl px-6">
+        <PageBreadcrumb items={[{ label: 'Track Order' }]} />
 
         {/* Page Header — matching landing page pattern */}
         <div className="text-center max-w-2xl mx-auto mb-12">
@@ -200,7 +210,7 @@ const TrackOrder = () => {
 
       {/* Pre-footer CTA */}
       <CTA />
-    </main>
+    </div>
   );
 };
 
