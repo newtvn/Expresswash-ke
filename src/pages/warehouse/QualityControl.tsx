@@ -73,8 +73,6 @@ const QualityControl = () => {
 
   const handleReject = () => {
     toast.error(`${currentItem?.id} flagged for re-processing`, { description: "Will be sent back for cleaning" });
-      variant: "destructive",
-    });
     setChecklist({});
     setNotes("");
   };
