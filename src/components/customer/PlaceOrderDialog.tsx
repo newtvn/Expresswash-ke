@@ -317,7 +317,7 @@ export const PlaceOrderDialog = ({ open, onOpenChange }: PlaceOrderDialogProps) 
                   onClick={() => setServiceType('standard')}
                 >
                   <p className="font-medium">Standard</p>
-                  <p className="text-xs text-muted-foreground">2-3 business days</p>
+                  <p className="text-xs text-muted-foreground">24 hours</p>
                 </button>
                 <button
                   type="button"
