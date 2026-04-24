@@ -1,5 +1,5 @@
 const PHONE = "254746747481";
-const MESSAGE = "hello i would like to enquire how much you charge for your cleaning services";
+const MESSAGE = "hi\n i'm interested in your services may i get your rate card ?";
 const WA_URL = `https://wa.me/${PHONE}?text=${encodeURIComponent(MESSAGE)}`;
 
 const WhatsAppIcon = () => (
