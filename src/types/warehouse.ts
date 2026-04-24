@@ -10,6 +10,7 @@ export interface IntakeItem {
   warehouseLocation?: string;
   receivedAt: string;
   receivedBy: string;
+  imageUrl?: string;
 }
 
 export interface ProcessingItem {
