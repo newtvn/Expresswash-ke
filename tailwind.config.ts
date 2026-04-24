@@ -15,7 +15,8 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['TT Fors', 'DM Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['TT Fors', 'Outfit', 'DM Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        brand: ['TT Fors', 'Outfit', 'DM Sans', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -72,6 +73,18 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        // ── Brand palette ─────────────────────────────────────────────
+        // Blue #007AF4 | Navy #0E2F60 | Orange #F4743B | Deep Green #1E5B45
+        brand: {
+          blue:        "hsl(var(--brand-blue))",
+          "blue-fg":   "hsl(var(--brand-blue-fg))",
+          navy:        "hsl(var(--brand-navy))",
+          "navy-fg":   "hsl(var(--brand-navy-fg))",
+          orange:      "hsl(var(--brand-orange))",
+          "orange-fg": "hsl(var(--brand-orange-fg))",
+          green:       "hsl(var(--brand-green))",
+          "green-fg":  "hsl(var(--brand-green-fg))",
         },
       },
       borderRadius: {

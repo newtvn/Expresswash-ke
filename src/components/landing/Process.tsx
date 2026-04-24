@@ -81,11 +81,11 @@ const Process = () => {
         {/* Header — centered, Services-inspired */}
         <div className="mb-16 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
-            <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">
+            <span className="block w-16 h-[2px] bg-brand-blue/40" />
+            <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">
               How It Works
             </span>
-            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
+            <span className="block w-16 h-[2px] bg-brand-blue/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Simple 4-Step Process
@@ -115,17 +115,17 @@ const Process = () => {
                     {/* Dashed line extending from circle to the right — desktop */}
                     {!isLast && (
                       <div
-                        className="hidden lg:block absolute top-1/2 border-t-2 border-dashed border-[#007AF4]/25"
+                        className="hidden lg:block absolute top-1/2 border-t-2 border-dashed border-brand-blue/25"
                         style={{ left: 'calc(50% + 52px)', right: 'calc(-50% + 52px)' }}
                       />
                     )}
 
                     {/* Circle */}
                     <div className="relative z-10">
-                      <div className="w-24 h-24 rounded-full border-2 border-[#007AF4]/30 flex items-center justify-center bg-white">
-                        <Icon className="w-10 h-10 stroke-[1.5px] text-[#007AF4]" />
+                      <div className="w-24 h-24 rounded-full border-2 border-brand-blue/30 flex items-center justify-center bg-white">
+                        <Icon className="w-10 h-10 stroke-[1.5px] text-brand-blue" />
                       </div>
-                      <span className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-[#007AF4] text-white text-xs font-bold flex items-center justify-center shadow-md">
+                      <span className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-brand-blue text-white text-xs font-bold flex items-center justify-center shadow-md">
                         {step.step}
                       </span>
                     </div>
@@ -141,7 +141,7 @@ const Process = () => {
 
                 {/* Vertical dashed connector — mobile/tablet */}
                 {!isLast && (
-                  <div className="lg:hidden w-0 h-8 border-l-2 border-dashed border-[#007AF4]/25" />
+                  <div className="lg:hidden w-0 h-8 border-l-2 border-dashed border-brand-blue/25" />
                 )}
               </React.Fragment>
             );

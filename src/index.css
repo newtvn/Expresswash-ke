@@ -2,9 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Express Carpets & Upholstery Design System
-   Brand Colors: Blue #007AF4 | Navy #0E2F60 | Orange #F4743B | Green #1E5B45
-   Brand Font: TT Fors (fallback: DM Sans) */
+/* ─────────────────────────────────────────────────────────────────────
+   EXPRESS CARPETS & UPHOLSTERY — DESIGN SYSTEM
+   Brand Colors : Blue #007AF4 | Navy #0E2F60 | Orange #F4743B | Green #1E5B45
+   Brand Font   : TT Fors (commercial) — drop woff2 files into /public/fonts/
+                  Outfit is the free geometric fallback until then.
+   Hierarchy    : Headlines — TT Fors Bold, tight tracking
+                  Subheaders — TT Fors Bold
+                  Body       — TT Fors Regular / 400
+   ───────────────────────────────────────────────────────────────────── */
+
+/* TT Fors — auto-activates when files are added to /public/fonts/ */
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-Regular.woff2') format('woff2'),
+       url('/fonts/TTFors-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-Medium.woff2') format('woff2'),
+       url('/fonts/TTFors-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-DemiBold.woff2') format('woff2'),
+       url('/fonts/TTFors-DemiBold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-Bold.woff2') format('woff2'),
+       url('/fonts/TTFors-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-ExtraBold.woff2') format('woff2'),
+       url('/fonts/TTFors-ExtraBold.woff') format('woff');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Fors';
+  src: url('/fonts/TTFors-Italic.woff2') format('woff2'),
+       url('/fonts/TTFors-Italic.woff') format('woff');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
 
 @layer base {
   :root {
@@ -60,11 +116,17 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 213 100% 48%;
 
-    /* Brand Color Tokens */
-    --brand-blue: 213 100% 48%;
-    --brand-navy: 220 74% 22%;
-    --brand-orange: 18 90% 59%;
-    --brand-green: 159 50% 24%;
+    /* ── Brand Palette ───────────────────────────────────────────────
+       Blue #007AF4 | Navy #0E2F60 | Orange #F4743B | Deep Green #1E5B45
+       ─────────────────────────────────────────────────────────────── */
+    --brand-blue:         213 100% 48%;   /* #007AF4 */
+    --brand-blue-fg:      0 0% 100%;
+    --brand-navy:         220 74% 22%;    /* #0E2F60 */
+    --brand-navy-fg:      0 0% 100%;
+    --brand-orange:       18  90% 59%;    /* #F4743B */
+    --brand-orange-fg:    0 0% 100%;
+    --brand-green:        159 50% 24%;    /* #1E5B45 */
+    --brand-green-fg:     0 0% 100%;
 
     /* Pipeline Dashboard Tokens */
     --dash-bg: oklch(98.8% 0.004 95);
@@ -151,12 +213,45 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'TT Fors', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 400;
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight font-bold;
-    font-family: 'TT Fors', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Brand hierarchy — Headlines: Bold, tight tracking (per TT Fors brand spec) */
+  h1 {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
+    font-weight: 800;
+    @apply tracking-tight leading-tight;
+  }
+  h2 {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
+    font-weight: 700;
+    @apply tracking-tight leading-tight;
+  }
+  h3, h4 {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
+    font-weight: 700;
+    @apply tracking-tight;
+  }
+  h5, h6 {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
+    font-weight: 600;
+  }
+
+  /* Section labels — uppercase, wide tracking (per brand spec) */
+  .label-uppercase {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
+    font-weight: 700;
+    @apply uppercase tracking-widest text-sm;
+  }
+
+  /* Ensure all inputs and buttons inherit the brand font */
+  button, input, textarea, select {
+    font-family: 'TT Fors', 'Outfit', 'DM Sans', sans-serif;
   }
 }
 
