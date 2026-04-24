@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import askImg from "@/assets/ask.png";
+import askImg from "@/assets/ask.webp";
 import {
   Accordion,
   AccordionContent,
@@ -104,7 +104,7 @@ const FAQ = () => {
   }, [lockedHeight]);
 
   return (
-    <section className="py-24 bg-slate-50">
+    <section id="faq" className="py-24 bg-slate-50">
       <BubbleStyles />
       <div className="container mx-auto max-w-7xl px-6">
 
@@ -164,6 +164,9 @@ const FAQ = () => {
               <img
                 src={askImg}
                 alt="Ask us anything illustration"
+                loading="lazy"
+                width={512}
+                height={512}
                 className="w-full h-auto"
               />
             </div>

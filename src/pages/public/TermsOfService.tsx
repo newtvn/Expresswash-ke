@@ -1,17 +1,17 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useSEO } from '@/hooks/useSEO';
+import { PageBreadcrumb } from '@/components/shared';
 
 const TermsOfService = () => {
+  useSEO({
+    title: 'Terms of Service | Express Carpets & Upholstery',
+    description: 'Terms and conditions for using Express Carpets & Upholstery cleaning services in Kitengela, Athi River, Syokimau, and Greater Nairobi.',
+    canonical: 'https://expresscarpets.co.ke/terms',
+  });
+
   return (
-    <main className="flex-1 pt-24 pb-16">
+    <div className="flex-1 pt-24 pb-16">
       <div className="container mx-auto max-w-3xl">
-        <Button variant="ghost" size="sm" asChild className="mb-6">
-          <Link to="/">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Link>
-        </Button>
+        <PageBreadcrumb items={[{ label: 'Terms of Service' }]} />
 
         <h1 className="text-3xl font-bold text-foreground mb-2">Terms of Service</h1>
         <p className="text-sm text-muted-foreground mb-8">Last updated: February 2026</p>
@@ -123,7 +123,7 @@ const TermsOfService = () => {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 };
 

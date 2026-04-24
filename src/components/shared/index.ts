@@ -17,3 +17,4 @@ export { VirtualList } from './VirtualList';
 export { InvoiceDownloadButton } from './InvoiceDownloadButton';
 export { ReceiptDownloadButton } from './ReceiptDownloadButton';
 export { LocationPickerModal } from './LocationPickerModal';
+export { PageBreadcrumb } from './PageBreadcrumb';
