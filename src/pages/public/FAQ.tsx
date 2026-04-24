@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { ROUTES } from "@/config/routes";
 import { HelpCircle } from "lucide-react";
+import { useSEO } from "@/hooks/useSEO";
 
 const faqs = [
   {
@@ -70,6 +71,36 @@ const faqs = [
     answer:
       "Share your unique referral code with friends and family. When they place their first order, both of you receive KES 200 off your next order. There is no limit to how many people you can refer.",
   },
+  {
+    question: "Do you offer carpet cleaning near me in Syokimau, Athi River or Kitengela?",
+    answer:
+      "Yes! We are the leading carpet cleaning service near you in Syokimau, Athi River, Mlolongo, and Kitengela. We offer free pickup and delivery with same-day service available for all three zones when you book before 10 AM. Search 'carpet cleaning near me' and you will find us.",
+  },
+  {
+    question: "Do you wash rugs and rags?",
+    answer:
+      "Yes, we specialize in rug washing and rags cleaning for all sizes and materials — from small decorative rags to large Persian and oriental rugs. We use hand wash or machine wash depending on the fabric type. Rags cleaning starts from KES 400 depending on size.",
+  },
+  {
+    question: "Do you offer laundry wash services for homes in Nairobi?",
+    answer:
+      "Yes, Express Carpets & Upholstery (also known as ExpressWash) provides professional laundry wash services for household textiles. This includes carpets, sofas, chairs, curtains, rugs, rags, and mattresses. We serve Kitengela, Syokimau, Athi River, and Greater Nairobi.",
+  },
+  {
+    question: "Can you clean sofas and do sofa washing at home?",
+    answer:
+      "We offer sofa cleaning and sofa washing with our free pickup and delivery service — meaning we come to your location in Kitengela, Syokimau, Athi River or Nairobi, collect your sofa cushions or the whole sofa (where applicable), clean them at our facility, and return them fresh. Sofa washing starts from KES 800.",
+  },
+  {
+    question: "How do I find Express Carpets — is it the same as ExpressWash?",
+    answer:
+      "Yes! Express Carpets & Upholstery is also known as ExpressWash or Express Wash Kenya. We are a professional carpet and fabric cleaning company based in Kitengela, Kenya. You can find us at expresscarpets.co.ke or search for 'expresscarpets', 'expresswash', or 'carpet cleaning Kitengela' on Google.",
+  },
+  {
+    question: "Do you do curtain washing and curtain cleaning services?",
+    answer:
+      "Yes, we offer professional curtain washing for all fabric types including silk, linen, polyester, and blackout curtains. We handle takedown and re-hanging at no extra cost within Kitengela. Curtain washing starts from KES 200 per pair.",
+  },
 ];
 
 /**
@@ -77,6 +108,13 @@ const faqs = [
  * Displays frequently asked questions using shadcn Accordion.
  */
 const FAQ = () => {
+  useSEO({
+    title: "FAQ — Carpet Cleaning, Sofa Washing & Laundry Wash | Express Carpets Kenya",
+    description: "Answers to your questions about carpet cleaning, sofa washing, rug cleaning, rags washing, curtain washing, chair washing & laundry wash in Kitengela, Syokimau, Athi River & Nairobi. Free pickup & delivery.",
+    keywords: "carpet cleaning faq, sofa washing questions, rug cleaning nairobi, curtain washing kitengela, laundry wash syokimau, rags washing athi river, expresscarpets, expresswash",
+    canonical: "https://expresscarpets.co.ke/faq",
+  });
+
   return (
     <main className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">
