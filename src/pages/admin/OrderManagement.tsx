@@ -199,14 +199,14 @@ export const OrderManagement = () => {
           >
             <History className="w-4 h-4" />
           </Button>
-          {!row.driverName && row.status === 1 && (
+          {row.status >= 1 && row.status <= 4 && (
             <Button
               variant="outline"
               size="sm"
               className="h-8 text-xs"
               onClick={() => setAssignDialogOrder(row)}
             >
-              Assign Driver
+              {row.driverName ? 'Reassign' : 'Assign Driver'}
             </Button>
           )}
         </div>
