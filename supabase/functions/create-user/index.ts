@@ -100,21 +100,38 @@ serve(async (req: Request) => {
 
     const userId = authData.user.id;
 
+    // Explicitly upsert the profile so the correct role/zone is always set,
+    // regardless of whether the on_auth_user_created trigger runs or reads metadata correctly.
+    const { error: profileError } = await adminClient.from('profiles').upsert({
+      id: userId,
+      name,
+      email,
+      phone: phone || '',
+      role,
+      zone: zone || '',
+      is_active: true,
+    }, { onConflict: 'id' });
+
+    if (profileError) {
+      console.error('Profile upsert failed:', profileError.message);
+    }
+
     // If driver, insert into drivers table
-    if (role === 'driver' && driverDetails) {
-      const { error: driverError } = await adminClient.from('drivers').insert({
+    if (role === 'driver') {
+      const { error: driverError } = await adminClient.from('drivers').upsert({
         id: userId,
-        vehicle_plate: driverDetails.vehiclePlate || '',
-        vehicle_type: driverDetails.vehicleType || '',
-        license_number: driverDetails.licenseNumber || '',
+        zone: zone || '',
+        vehicle_plate: driverDetails?.vehiclePlate || '',
+        vehicle_type: driverDetails?.vehicleType || '',
+        license_number: driverDetails?.licenseNumber || '',
         status: 'offline',
         is_online: false,
         rating: 0,
         total_deliveries: 0,
-      });
+      }, { onConflict: 'id' });
 
       if (driverError) {
-        console.error('Driver record insert failed:', driverError.message);
+        console.error('Driver record upsert failed:', driverError.message);
       }
     }
 
