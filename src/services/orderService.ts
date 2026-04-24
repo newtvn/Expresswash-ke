@@ -208,7 +208,7 @@ export function getDeliveryFee(zone: string, loyaltyTier?: string): number {
   return PRICING.deliveryFees.other;
 }
 
-export const EXPRESS_SURCHARGE = 500;
+export const EXPRESS_SURCHARGE = 1000;
 
 export function getExpressSurcharge(serviceType: string, loyaltyTier?: string): number {
   if (serviceType !== 'express') return 0;
