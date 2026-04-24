@@ -91,9 +91,8 @@ const mattressItems = [
 const allItems = [...seatItems, ...mattressItems];
 
 const zones = [
-  { id: "kitengela", name: "Kitengela",       delivery: "Same Day" },
-  { id: "athiriver", name: "Athi River",       delivery: "Same Day" },
-  { id: "nairobi",   name: "Greater Nairobi",  delivery: "48 Hours" },
+  { id: "kitengela", name: "Kitengela",  delivery: "24 Hours" },
+  { id: "athiriver", name: "Athi River", delivery: "24 Hours" },
 ];
 
 // ── Sub-components ────────────────────────────────────────────────────
@@ -254,7 +253,7 @@ const PricingCalculator = () => {
               </div>
               <div className="md:col-span-2 bg-brand-navy/5 border border-brand-navy/20 rounded-xl p-4 text-sm text-slate-600 space-y-1">
                 <p><span className="font-semibold text-brand-navy">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
-                <p><span className="font-semibold text-brand-blue">EXPRESS:</span> Service turn around is within 24 hrs without fail.</p>
+                <p><span className="font-semibold text-brand-blue">EXPRESS:</span> Service turn around is within 24 hrs without fail. <span className="text-brand-orange font-semibold">+KES 1,000 surcharge.</span></p>
                 <p className="pt-1 text-xs text-slate-400">All prices in KES. VAT (16%) applicable. Custom &amp; Bed sizes — request a quote.</p>
               </div>
             </div>
@@ -269,7 +268,7 @@ const PricingCalculator = () => {
                   <MapPin className="w-4 h-4 text-brand-blue" />
                   <span className="text-sm font-semibold text-slate-700">Your Delivery Area</span>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {zones.map((zone) => (
                     <button
                       key={zone.id}
