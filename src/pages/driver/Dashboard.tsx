@@ -77,7 +77,7 @@ export const Dashboard = () => {
       </PageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="Deliveries Today" value={allStops.filter((s) => s.status === 'completed').length} icon={Truck} onClick={() => navigate(ROUTES.DRIVER_PICKUP_DELIVERY)} />
+        <KPICard label="Deliveries Today" value={assignedOrders.filter((o) => o.status === 'delivered').length} icon={Truck} onClick={() => navigate(ROUTES.DRIVER_PICKUP_DELIVERY)} />
         <KPICard label="Avg Rating" value={performance?.avgRating ?? 0} icon={Star} onClick={() => navigate(ROUTES.DRIVER_PICKUP_DELIVERY)} />
         <KPICard label="On-Time %" value={performance?.onTimeRate ?? 0} format="percentage" icon={Clock} onClick={() => navigate(ROUTES.DRIVER_ROUTE)} />
         <KPICard label="Total Deliveries" value={performance?.totalDeliveries ?? 0} icon={Package} onClick={() => navigate(ROUTES.DRIVER_PICKUP_DELIVERY)} />
