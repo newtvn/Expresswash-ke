@@ -42,6 +42,43 @@ const statusToLabel = (status: number): string => {
 
 const isCancelledOrRefunded = (status: number) => status === 13 || status === 14;
 
+// Valid status transitions matching the DB trigger
+const VALID_TRANSITIONS: Record<number, number[]> = {
+  1: [2, 13],
+  2: [3, 13],
+  3: [4, 13],
+  4: [5, 13],
+  5: [6],
+  6: [7],
+  7: [8],
+  8: [9, 6],
+  9: [10],
+  10: [11],
+  11: [12],
+  12: [14],
+  13: [],
+  14: [],
+};
+
+const getNextStatusLabel = (status: number): string => {
+  const labels: Record<number, string> = {
+    2: 'Confirm Quote',
+    3: 'Accept Quote',
+    4: 'Schedule Pickup',
+    5: 'Mark Picked Up',
+    6: 'Start Processing',
+    7: 'Move to Drying',
+    8: 'Send to QC',
+    9: 'Approve QC',
+    10: 'Dispatch',
+    11: 'Out for Delivery',
+    12: 'Mark Delivered',
+    13: 'Cancel Order',
+    14: 'Issue Refund',
+  };
+  return labels[status] ?? `Move to ${statusToLabel(status)}`;
+};
+
 const buildTimeline = (currentStatus: number) => {
   return ORDER_STAGES.map((stage) => {
     const Icon = stage.icon;
@@ -77,6 +114,7 @@ export const OrderDetails = () => {
   const [paymentSent, setPaymentSent] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -176,6 +214,21 @@ export const OrderDetails = () => {
       if (updated) setOrder(updated);
     } else {
       toast.info(result.message ?? 'Payment not yet confirmed. Please wait a moment and try again.');
+    }
+  };
+
+  const handleAdvanceStatus = async (newStatus: number) => {
+    if (!order) return;
+    setAdvancing(true);
+    const result = await updateOrderStatus(order.trackingCode, newStatus);
+    setAdvancing(false);
+    if (result.success && result.order) {
+      setOrder(result.order);
+      toast.success(`Order moved to "${statusToLabel(newStatus)}"`);
+    } else {
+      toast.error('Failed to update status', {
+        description: 'The status transition may not be allowed. Please try again.',
+      });
     }
   };
 
@@ -491,6 +544,42 @@ export const OrderDetails = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Admin Status Controls */}
+          {isAdminView && !isCancelledOrRefunded(order.status) && (VALID_TRANSITIONS[order.status] ?? []).length > 0 && (
+            <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Advance Order</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {(VALID_TRANSITIONS[order.status] ?? [])
+                  .filter((s) => s !== 13 && s !== 14)
+                  .map((nextStatus) => (
+                    <Button
+                      key={nextStatus}
+                      className="w-full"
+                      onClick={() => handleAdvanceStatus(nextStatus)}
+                      disabled={advancing}
+                    >
+                      {advancing ? 'Updating...' : getNextStatusLabel(nextStatus)}
+                    </Button>
+                  ))}
+                {(VALID_TRANSITIONS[order.status] ?? [])
+                  .filter((s) => s === 13 || s === 14)
+                  .map((nextStatus) => (
+                    <Button
+                      key={nextStatus}
+                      variant="destructive"
+                      className="w-full"
+                      onClick={() => handleAdvanceStatus(nextStatus)}
+                      disabled={advancing}
+                    >
+                      {getNextStatusLabel(nextStatus)}
+                    </Button>
+                  ))}
+              </CardContent>
+            </Card>
+          )}
 
           {/* ETA Card */}
           {order.estimatedDelivery && order.status < 12 && (

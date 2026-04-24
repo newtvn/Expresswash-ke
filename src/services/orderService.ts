@@ -672,16 +672,33 @@ export const assignDriverToOrder = async (
   driverName: string,
   driverPhone: string,
 ): Promise<{ success: boolean; error?: string }> => {
-  // 1. Update the order with driver info and correct status
+  // 1. Fetch current order status to respect DB transition rules
+  const { data: current } = await supabase
+    .from('orders')
+    .select('status')
+    .eq('id', orderId)
+    .single();
+
+  if (!current) {
+    return { success: false, error: 'Order not found' };
+  }
+
+  // Only advance status to DRIVER_ASSIGNED if order is CONFIRMED (2).
+  // For other statuses, just attach the driver without changing status.
+  const updatePayload: Record<string, unknown> = {
+    driver_id: driverId,
+    driver_name: driverName,
+    driver_phone: driverPhone,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (current.status === ORDER_STATUS.CONFIRMED) {
+    updatePayload.status = ORDER_STATUS.DRIVER_ASSIGNED;
+  }
+
   const { error } = await supabase
     .from('orders')
-    .update({
-      driver_id: driverId,
-      driver_name: driverName,
-      driver_phone: driverPhone,
-      status: ORDER_STATUS.DRIVER_ASSIGNED,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('id', orderId);
 
   if (error) {
