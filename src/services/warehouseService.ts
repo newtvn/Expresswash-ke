@@ -23,6 +23,7 @@ function mapIntake(row: Record<string, unknown>): IntakeItem {
     warehouseLocation: (row.warehouse_location as string) ?? undefined,
     receivedAt: row.received_at as string,
     receivedBy: row.received_by as string,
+    imageUrl: (row.image_url as string) ?? undefined,
   };
 }
 

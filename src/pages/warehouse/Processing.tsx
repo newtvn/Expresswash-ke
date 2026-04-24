@@ -25,7 +25,7 @@ const NEXT_STAGE: Record<ProcessingItem['stage'], ProcessingItem['stage'] | null
   intake: 'washing',
   washing: 'drying',
   drying: 'quality_check',
-  quality_check: 'ready_for_dispatch',
+  quality_check: null, // handled by QC tab with checklist
   ready_for_dispatch: null,
 };
 
@@ -101,8 +101,10 @@ export const Processing = () => {
                         disabled={moveMutation.isPending}
                       >
                         <ArrowRight className="mr-1 h-3 w-3" />
-                        {nextStage === 'washing' ? 'Start Washing' : nextStage === 'drying' ? 'Move to Dry' : nextStage === 'quality_check' ? 'QC Check' : 'Mark Ready'}
+                        {nextStage === 'washing' ? 'Start Washing' : nextStage === 'drying' ? 'Move to Dry' : 'Send to QC'}
                       </Button>
+                    ) : item.stage === 'quality_check' ? (
+                      <Badge className="bg-orange-100 text-orange-800">Pending QC Tab</Badge>
                     ) : (
                       <Badge className="bg-green-100 text-green-800"><CheckCircle className="mr-1 h-3 w-3" />Ready</Badge>
                     )}

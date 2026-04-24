@@ -1,81 +1,126 @@
-import { useState } from "react";
-import { PageHeader, EmptyState } from "@/components/shared";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PageHeader, EmptyState } from '@/components/shared';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
   Sparkles,
   CheckCircle2,
   XCircle,
   AlertTriangle,
   Package,
-} from "lucide-react";
-import { toast } from "sonner";
-
-const qcItems = [
-  {
-    id: "ITM-4003",
-    orderId: "EW-2024-01282",
-    type: "Mattress",
-    customer: "Mary Njeri",
-    elapsed: "6h 45m",
-  },
-  {
-    id: "ITM-4014",
-    orderId: "EW-2024-01285",
-    type: "Carpet (Small)",
-    customer: "Lucy Wairimu",
-    elapsed: "5h 45m",
-  },
-];
+  Loader2,
+  Timer,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { getProcessingItems, performQualityCheck, updateItemStage } from '@/services/warehouseService';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { ProcessingItem } from '@/types';
 
 const checklistItems = [
-  { id: "stains", label: "All stains removed or treated" },
-  { id: "odor", label: "No residual odors" },
-  { id: "color", label: "Colors intact, no fading or bleeding" },
-  { id: "texture", label: "Fabric texture restored" },
-  { id: "edges", label: "Edges and seams intact" },
-  { id: "dryness", label: "Completely dry to the touch" },
-  { id: "packaging", label: "Ready for proper packaging" },
+  { id: 'stains', label: 'All stains removed or treated' },
+  { id: 'odor', label: 'No residual odors' },
+  { id: 'color', label: 'Colors intact, no fading or bleeding' },
+  { id: 'texture', label: 'Fabric texture restored' },
+  { id: 'edges', label: 'Edges and seams intact' },
+  { id: 'dryness', label: 'Completely dry to the touch' },
+  { id: 'packaging', label: 'Ready for proper packaging' },
 ];
 
-/**
- * Warehouse Quality Control Page
- * QC checklist for items that completed washing and drying.
- */
 const QualityControl = () => {
-  // toast from sonner is imported at module level
-  const [selectedItem, setSelectedItem] = useState<string | null>(
-    qcItems.length > 0 ? qcItems[0].id : null
-  );
-  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
-  const [notes, setNotes] = useState("");
+  const { user } = useAuth();
+  const qc = useQueryClient();
 
-  const currentItem = qcItems.find((item) => item.id === selectedItem);
+  const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [checklist, setChecklist] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState('');
+
+  const { data: qcItems = [], isLoading } = useQuery({
+    queryKey: ['warehouse', 'processing', 'quality_check'],
+    queryFn: () => getProcessingItems('quality_check'),
+    refetchInterval: 30000,
+  });
+
+  // Auto-select first item if none selected
+  const effectiveSelected = selectedItem && qcItems.find((i) => i.id === selectedItem)
+    ? selectedItem
+    : qcItems.length > 0 ? qcItems[0].id : null;
+
+  const currentItem = qcItems.find((item) => item.id === effectiveSelected);
 
   const toggleCheck = (checkId: string) => {
     setChecklist((prev) => ({ ...prev, [checkId]: !prev[checkId] }));
   };
 
   const allChecked = checklistItems.every((item) => checklist[item.id]);
+  const failedChecks = checklistItems.filter((item) => !checklist[item.id]).map((item) => item.label);
 
-  const handleApprove = () => {
-    if (!allChecked) {
-      toast.error("Incomplete checklist", { description: "Please complete all checklist items before approving" });
-      return;
-    }
-    toast.success(`${currentItem?.id} passed quality control and is ready for dispatch`);
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentItem) throw new Error('No item selected');
+      const result = await performQualityCheck(
+        currentItem.id,
+        true,
+        notes || 'All checks passed',
+        user?.name ?? 'QC Inspector',
+      );
+      if (!result.success) throw new Error('QC approval failed');
+
+      // Update order status to quality_approved (9)
+      await supabase
+        .from('orders')
+        .update({ status: 9, updated_at: new Date().toISOString() })
+        .ilike('tracking_code', currentItem.orderNumber);
+    },
+    onSuccess: () => {
+      toast.success(`${currentItem?.itemName} passed QC — moved to dispatch`);
+      resetForm();
+      qc.invalidateQueries({ queryKey: ['warehouse'] });
+    },
+    onError: (e) => toast.error('Approval failed: ' + e.message),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentItem) throw new Error('No item selected');
+      // Record failed QC
+      await performQualityCheck(
+        currentItem.id,
+        false,
+        notes || 'Failed inspection — sent back for re-processing',
+        user?.name ?? 'QC Inspector',
+        failedChecks,
+      );
+      // Move item back to washing stage
+      await updateItemStage(currentItem.id, 'washing');
+
+      // Update order status back to in_washing (6)
+      await supabase
+        .from('orders')
+        .update({ status: 6, updated_at: new Date().toISOString() })
+        .ilike('tracking_code', currentItem.orderNumber);
+    },
+    onSuccess: () => {
+      toast.error(`${currentItem?.itemName} failed QC — sent back for re-processing`);
+      resetForm();
+      qc.invalidateQueries({ queryKey: ['warehouse'] });
+    },
+    onError: (e) => toast.error('Rejection failed: ' + e.message),
+  });
+
+  const resetForm = () => {
+    setSelectedItem(null);
     setChecklist({});
-    setNotes("");
+    setNotes('');
   };
 
-  const handleReject = () => {
-    toast.error(`${currentItem?.id} flagged for re-processing`, { description: "Will be sent back for cleaning" });
-    setChecklist({});
-    setNotes("");
-  };
+  const isPending = approveMutation.isPending || rejectMutation.isPending;
 
   return (
     <div className="space-y-6">
@@ -84,7 +129,9 @@ const QualityControl = () => {
         description="Inspect cleaned items before dispatch"
       />
 
-      {qcItems.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
+      ) : qcItems.length === 0 ? (
         <EmptyState
           icon={Sparkles}
           title="No items pending QC"
@@ -107,26 +154,35 @@ const QualityControl = () => {
                   onClick={() => {
                     setSelectedItem(item.id);
                     setChecklist({});
-                    setNotes("");
+                    setNotes('');
                   }}
                   className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    selectedItem === item.id
-                      ? "border-primary bg-primary/5"
-                      : "border-border/50 hover:border-primary/20"
+                    effectiveSelected === item.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border/50 hover:border-primary/20'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-foreground">
-                        {item.id}
+                        {item.itemName}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {item.type} | {item.orderId}
+                        {item.itemType} | {item.orderNumber}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.customerName}
                       </p>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {item.elapsed}
-                    </span>
+                    <div className="text-right">
+                      <Badge variant="outline" className="text-xs">{item.warehouseLocation}</Badge>
+                      {item.daysInWarehouse > 0 && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 justify-end">
+                          <Timer className={`h-3 w-3 ${item.daysInWarehouse > 3 ? 'text-red-500' : 'text-orange-500'}`} />
+                          {item.daysInWarehouse}d
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -141,11 +197,11 @@ const QualityControl = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-lg font-semibold">
-                        Inspecting: {currentItem.id}
+                        Inspecting: {currentItem.itemName}
                       </CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {currentItem.type} | Order: {currentItem.orderId} |
-                        Customer: {currentItem.customer}
+                        {currentItem.itemType} | Order: {currentItem.orderNumber} |
+                        Customer: {currentItem.customerName}
                       </p>
                     </div>
                   </div>
@@ -165,6 +221,7 @@ const QualityControl = () => {
                           id={item.id}
                           checked={!!checklist[item.id]}
                           onCheckedChange={() => toggleCheck(item.id)}
+                          disabled={isPending}
                         />
                         <Label
                           htmlFor={item.id}
@@ -189,13 +246,14 @@ const QualityControl = () => {
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={3}
+                      disabled={isPending}
                     />
                   </div>
 
                   {/* Progress indicator */}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>
-                      {Object.values(checklist).filter(Boolean).length} of{" "}
+                      {Object.values(checklist).filter(Boolean).length} of{' '}
                       {checklistItems.length} checks completed
                     </span>
                     <div className="flex-1 bg-secondary rounded-full h-2">
@@ -214,12 +272,20 @@ const QualityControl = () => {
 
                   {/* Actions */}
                   <div className="flex gap-3">
-                    <Button onClick={handleApprove} disabled={!allChecked} className="flex-1">
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                    <Button onClick={() => approveMutation.mutate()} disabled={!allChecked || isPending} className="flex-1">
+                      {approveMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                      )}
                       Approve & Move to Dispatch
                     </Button>
-                    <Button variant="destructive" onClick={handleReject} className="flex-1">
-                      <XCircle className="w-4 h-4 mr-2" />
+                    <Button variant="destructive" onClick={() => rejectMutation.mutate()} disabled={isPending} className="flex-1">
+                      {rejectMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="w-4 h-4 mr-2" />
+                      )}
                       Reject & Re-process
                     </Button>
                   </div>
