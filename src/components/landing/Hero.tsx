@@ -198,9 +198,28 @@ const Hero = () => {
               Professional Carpet &amp; <span className="text-primary">Fabric Care.</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-              <span className="font-semibold text-slate-800">Cleaner & Faster.</span> We pick up, deep clean, and deliver your carpets, sofas, and curtains with precision care. Trusted by thousands of homes across Kenya.
+            <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 mb-6 leading-relaxed">
+              <span className="font-semibold text-slate-800">Cleaner &amp; Faster.</span> We pick up, deep clean, and deliver your carpets, sofas, curtains, rugs and mattresses with precision care. Trusted by thousands of homes across Kenya.
             </p>
+
+            {/* SERVICE AREA BADGES — local SEO signals, visible to users & crawlers */}
+            <div className="flex flex-wrap gap-2 justify-center lg:justify-start mb-8" aria-label="Areas we serve">
+              {[
+                { area: "Kitengela", note: "Same Day" },
+                { area: "Syokimau", note: "Same Day" },
+                { area: "Athi River", note: "Same Day" },
+                { area: "Nairobi", note: "48 hrs" },
+              ].map(({ area, note }) => (
+                <span
+                  key={area}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/80 border border-slate-200 rounded-full text-sm text-slate-700 shadow-sm"
+                >
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                  <strong>{area}</strong>
+                  <span className="text-slate-400 text-xs">· {note}</span>
+                </span>
+              ))}
+            </div>
 
             {/* BUTTON CONTRAST & HIERARCHY */}
             <div className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start mb-12">

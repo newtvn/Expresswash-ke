@@ -1,10 +1,14 @@
 import PricingCalculator from "@/components/landing/PricingCalculator";
+import { useSEO } from "@/hooks/useSEO";
 
-/**
- * Standalone Pricing Page
- * Wraps the existing PricingCalculator with a page header section.
- */
 const PricingPage = () => {
+  useSEO({
+    title: "Pricing — Carpet Cleaning, Sofa Washing & Laundry Wash | Express Carpets Kenya",
+    description: "Transparent pricing for carpet cleaning, sofa washing, rug & rags cleaning, curtain washing, chair washing & mattress sanitization in Kitengela, Syokimau, Athi River & Nairobi. Get an instant quote online.",
+    keywords: "carpet cleaning price nairobi, sofa washing cost kitengela, rug cleaning price, curtain washing charges, chair washing price, laundry wash rates kenya, expresscarpets pricing, expresswash cost",
+    canonical: "https://expresscarpets.co.ke/pricing",
+  });
+
   return (
     <main className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">

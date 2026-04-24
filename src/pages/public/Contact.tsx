@@ -15,12 +15,20 @@ import {
 } from "lucide-react";
 import { COMPANY_INFO } from "@/config/constants";
 import { toast } from "sonner";
+import { useSEO } from "@/hooks/useSEO";
 
 /**
  * Contact Page
  * Contact form on the left, company info card on the right.
  */
 const Contact = () => {
+  useSEO({
+    title: "Contact Us | Carpet Cleaning & Sofa Washing — Kitengela, Syokimau, Athi River",
+    description: "Contact Express Carpets & Upholstery for professional carpet cleaning, sofa washing, rug cleaning, curtain washing & laundry wash in Kitengela, Syokimau, Athi River & Nairobi. Call or WhatsApp us today.",
+    keywords: "contact express carpets, carpet cleaning contact nairobi, sofa washing booking kitengela, expresscarpets phone, expresswash contact, carpet cleaners athi river, carpet cleaning near me",
+    canonical: "https://expresscarpets.co.ke/contact",
+  });
+
   // toast imported from sonner at module level
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);

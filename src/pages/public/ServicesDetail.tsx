@@ -12,13 +12,14 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "@/config/routes";
+import { useSEO } from "@/hooks/useSEO";
 
 const services = [
   {
     icon: Layers,
-    title: "Carpets",
+    title: "Carpet Cleaning",
     description:
-      "Professional deep cleaning for all carpet types including Persian, shag, Berber, and wall-to-wall carpets. We use eco-friendly solutions that remove deep stains, allergens, and odors while preserving fabric integrity.",
+      "Professional deep carpet cleaning for all types including Persian, shag, Berber, and wall-to-wall carpets. Serving Kitengela, Syokimau, Athi River & Nairobi with free pickup. We use eco-friendly solutions that remove deep stains, allergens, and odors.",
     features: [
       "Hot water extraction",
       "Stain pre-treatment",
@@ -30,9 +31,9 @@ const services = [
   },
   {
     icon: Armchair,
-    title: "Chairs",
+    title: "Chair Washing",
     description:
-      "Expert fabric and leather chair cleaning. We revive office chairs, dining chairs, and accent chairs, removing dirt buildup, food stains, and everyday grime without damaging delicate upholstery.",
+      "Expert chair washing for fabric and leather chairs. We revive office chairs, dining chairs, and accent chairs in Kitengela, Syokimau, Athi River & Nairobi — removing dirt buildup, food stains, and everyday grime.",
     features: [
       "Fabric & leather care",
       "Color restoration",
@@ -44,9 +45,9 @@ const services = [
   },
   {
     icon: Blinds,
-    title: "Curtains",
+    title: "Curtain Washing",
     description:
-      "Gentle yet thorough curtain cleaning for all fabric types including silk, linen, polyester, and blackout curtains. We handle takedown and re-hanging at no extra cost within Kitengela.",
+      "Gentle curtain washing for all fabric types including silk, linen, polyester, and blackout curtains. We handle takedown and re-hanging at no extra cost within Kitengela, Syokimau & Athi River.",
     features: [
       "Gentle wash cycles",
       "Takedown & rehang",
@@ -58,9 +59,9 @@ const services = [
   },
   {
     icon: RectangleHorizontal,
-    title: "Rugs",
+    title: "Rug & Rags Cleaning",
     description:
-      "Specialized rug care and restoration for area rugs, oriental rugs, and decorative pieces. Our experts understand the unique requirements of different rug materials and weaving techniques.",
+      "Specialized rug washing and rags cleaning for area rugs, oriental rugs, and decorative pieces. Our experts handle all rug materials and weaving techniques with care across Kitengela, Syokimau & Athi River.",
     features: [
       "Hand wash option",
       "Fringe cleaning",
@@ -72,9 +73,9 @@ const services = [
   },
   {
     icon: Sofa,
-    title: "Sofas",
+    title: "Sofa Cleaning & Sofa Washing",
     description:
-      "Complete sofa and upholstery cleaning that brings new life to your living room. We handle everything from microfiber to leather, sectionals to loveseats, ensuring thorough cleaning of cushions and frames.",
+      "Complete sofa washing and upholstery cleaning that brings new life to your living room in Kitengela, Syokimau, Athi River & Nairobi. We handle microfiber to leather, sectionals to loveseats.",
     features: [
       "Deep cushion cleaning",
       "Frame sanitization",
@@ -86,9 +87,9 @@ const services = [
   },
   {
     icon: BedDouble,
-    title: "Mattresses",
+    title: "Mattress Cleaning",
     description:
-      "Deep sanitization and stain removal for all mattress types. Our process eliminates dust mites, bacteria, and allergens while removing stubborn stains for a healthier sleep environment.",
+      "Deep mattress sanitization and stain removal for all mattress types in Kitengela, Syokimau & Athi River. Our process eliminates dust mites, bacteria, and allergens for a healthier sleep environment.",
     features: [
       "UV sanitization",
       "Dust mite removal",
@@ -105,6 +106,13 @@ const services = [
  * Shows all 6 service types with descriptions, pricing, and CTAs.
  */
 const ServicesDetail = () => {
+  useSEO({
+    title: "Carpet Cleaning, Sofa Washing, Rug & Curtain Cleaning | Express Carpets Kenya",
+    description: "Professional carpet cleaning, sofa washing, sofa cleaning, rug & rags washing, curtain washing, chair washing & mattress sanitization in Kitengela, Syokimau, Athi River & Nairobi. Free pickup & delivery.",
+    keywords: "carpet cleaning services nairobi, sofa washing kitengela, sofa cleaning athi river, rug cleaning syokimau, rags washing, curtain washing kenya, chair washing nairobi, mattress cleaning, upholstery cleaning kenya",
+    canonical: "https://expresscarpets.co.ke/services",
+  });
+
   return (
     <main className="flex-1 pt-24 pb-16">
       <div className="container mx-auto">

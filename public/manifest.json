@@ -1,8 +1,8 @@
 {
-  "name": "Express Carpets Driver",
-  "short_name": "EC Driver",
-  "description": "Express Carpets & Upholstery driver app — manage pickups, deliveries, and cash collection",
-  "start_url": "/driver",
+  "name": "Express Carpets & Upholstery",
+  "short_name": "ExpressCarpets",
+  "description": "Professional carpet, sofa, mattress & upholstery cleaning in Nairobi & Kitengela. Get instant quotes and real-time order tracking.",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -28,34 +28,34 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["business", "productivity"],
+  "categories": ["business", "lifestyle"],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Home",
-      "description": "Driver dashboard",
-      "url": "/driver/dashboard",
+      "name": "Book a Cleaning",
+      "short_name": "Book",
+      "description": "Schedule a new cleaning service",
+      "url": "/",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "My Route",
-      "short_name": "Route",
-      "description": "View today's route",
-      "url": "/driver/route",
+      "name": "Our Services",
+      "short_name": "Services",
+      "description": "View all cleaning services",
+      "url": "/services",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Orders",
-      "short_name": "Orders",
-      "description": "Manage assigned orders",
-      "url": "/driver/orders",
+      "name": "Track Order",
+      "short_name": "Track",
+      "description": "Track your cleaning order",
+      "url": "/track",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Cash Collection",
-      "short_name": "Cash",
-      "description": "Record cash collections",
-      "url": "/driver/cash",
+      "name": "Contact Us",
+      "short_name": "Contact",
+      "description": "Get in touch with us",
+      "url": "/contact",
       "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
     }
   ],

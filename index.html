@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Canonical & Crawling -->
+    <link rel="canonical" href="https://expresscarpets.co.ke/" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
+    <!-- Geo Targeting: Primary = Kitengela (HQ), also covers Syokimau & Athi River -->
+    <meta name="geo.region" content="KE-110" />
+    <meta name="geo.placename" content="Kitengela, Kajiado County, Kenya" />
+    <meta name="geo.position" content="-1.4755;36.9604" />
+    <meta name="ICBM" content="-1.4755, 36.9604" />
+
     <!-- PWA Configuration -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0ea5e9" />
@@ -14,7 +24,8 @@
 
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
     <!-- Resource Hints for Performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,25 +41,280 @@
     <!-- DM Sans serves as the closest free fallback to TT Fors -->
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
 
-    <title>Express Carpets &amp; Upholstery - Professional Cleaning</title>
-    <meta name="description" content="Express Carpets &amp; Upholstery - Professional Carpet, Sofa &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
+    <title>Express Carpets &amp; Upholstery | Carpet Cleaning Kitengela, Syokimau &amp; Athi River</title>
+    <meta name="description" content="Express Carpets &amp; Upholstery — #1 carpet cleaning, sofa washing, rug cleaning, curtain washing &amp; mattress sanitization in Kitengela, Syokimau, Athi River &amp; Nairobi. Free pickup &amp; delivery. Book now!" />
     <meta name="author" content="Express Carpets &amp; Upholstery" />
-    <meta name="keywords" content="carpet cleaning, upholstery cleaning, sofa cleaning, mattress cleaning, professional cleaning, kenya, nairobi, kitengela" />
+    <meta name="keywords" content="carpet cleaning near me, carpet cleaning Kitengela, carpet cleaning Syokimau, carpet cleaning Athi River, expresscarpets, expresswash, carpets wash, carpet cleaners, carpet cleaning nairobi, laundry wash nairobi, rags cleaning, rags washing, chair washing, curtains washing, sofa cleaning nairobi, sofa washing, upholstery cleaning kenya, mattress cleaning, carpet wash nairobi, sofa cleaning Kitengela, professional carpet cleaning kenya" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Express Carpets &amp; Upholstery" />
+    <meta property="og:locale" content="en_KE" />
     <meta property="og:url" content="https://expresscarpets.co.ke/" />
-    <meta property="og:title" content="Express Carpets &amp; Upholstery - Professional Cleaning" />
-    <meta property="og:description" content="Professional Carpet &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:title" content="Express Carpets &amp; Upholstery | Carpet Cleaning Kitengela, Syokimau &amp; Athi River" />
+    <meta property="og:description" content="Professional carpet cleaning, sofa washing, rug cleaning &amp; curtain washing in Kitengela, Syokimau, Athi River &amp; Nairobi. Free pickup &amp; delivery. Book online!" />
+    <meta property="og:image" content="https://expresscarpets.co.ke/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Express Carpets &amp; Upholstery - Professional Cleaning Service in Kenya" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://expresscarpets.co.ke/" />
-    <meta name="twitter:title" content="Express Carpets &amp; Upholstery - Professional Cleaning" />
-    <meta name="twitter:description" content="Professional Carpet &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
-    <meta name="twitter:image" content="/og-image.png" />
     <meta name="twitter:site" content="@ExpressCarpetsKE" />
+    <meta name="twitter:url" content="https://expresscarpets.co.ke/" />
+    <meta name="twitter:title" content="Express Carpets &amp; Upholstery | Carpet Cleaning Kitengela, Syokimau &amp; Athi River" />
+    <meta name="twitter:description" content="Professional carpet cleaning, sofa washing &amp; rug cleaning in Kitengela, Syokimau, Athi River &amp; Nairobi. Free pickup &amp; delivery." />
+    <meta name="twitter:image" content="https://expresscarpets.co.ke/og-image.png" />
+    <meta name="twitter:image:alt" content="Express Carpets &amp; Upholstery - Professional Cleaning Service in Kenya" />
+
+    <!-- Structured Data: WebSite (enables Google Sitelinks Searchbox) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "https://expresscarpets.co.ke/#website",
+      "url": "https://expresscarpets.co.ke",
+      "name": "Express Carpets & Upholstery",
+      "description": "Professional carpet cleaning, sofa washing, rug cleaning and upholstery services in Kitengela, Syokimau, Athi River and Nairobi, Kenya.",
+      "inLanguage": "en-KE",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://expresscarpets.co.ke/track?order={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: LocalBusiness with all service areas -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "@id": "https://expresscarpets.co.ke/#business",
+      "name": "Express Carpets & Upholstery",
+      "alternateName": ["ExpressCarpets", "ExpressWash", "Express Wash Kenya"],
+      "description": "Professional carpet cleaning, sofa washing, rug cleaning, rags washing, curtain washing, chair washing, laundry wash and mattress sanitization in Kitengela, Syokimau, Athi River and Nairobi, Kenya.",
+      "url": "https://expresscarpets.co.ke",
+      "logo": "https://expresscarpets.co.ke/logo.png",
+      "image": "https://expresscarpets.co.ke/og-image.png",
+      "telephone": "+254 712 345 678",
+      "email": "info@expresscarpets.co.ke",
+      "priceRange": "KSh",
+      "currenciesAccepted": "KES",
+      "paymentAccepted": "Cash, M-Pesa, Credit Card, Bank Transfer",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Kitengela",
+        "addressLocality": "Kitengela",
+        "addressRegion": "Kajiado County",
+        "addressCountry": "KE"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-1.4755",
+        "longitude": "36.9604"
+      },
+      "areaServed": [
+        {
+          "@type": "City",
+          "name": "Kitengela",
+          "containedInPlace": {"@type": "AdministrativeArea", "name": "Kajiado County"}
+        },
+        {
+          "@type": "City",
+          "name": "Syokimau",
+          "containedInPlace": {"@type": "AdministrativeArea", "name": "Machakos County"}
+        },
+        {
+          "@type": "City",
+          "name": "Athi River",
+          "containedInPlace": {"@type": "AdministrativeArea", "name": "Machakos County"}
+        },
+        {
+          "@type": "City",
+          "name": "Mlolongo",
+          "containedInPlace": {"@type": "AdministrativeArea", "name": "Machakos County"}
+        },
+        {
+          "@type": "City",
+          "name": "Nairobi"
+        }
+      ],
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"],
+          "opens": "07:00",
+          "closes": "19:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": "Saturday",
+          "opens": "08:00",
+          "closes": "17:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": "Sunday",
+          "opens": "09:00",
+          "closes": "14:00"
+        }
+      ],
+      "sameAs": [
+        "https://twitter.com/ExpressCarpetsKE"
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Cleaning Services",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Carpet Cleaning",
+              "description": "Professional deep carpet cleaning for all carpet types in Kitengela, Syokimau, Athi River and Nairobi. Hot water extraction, stain pre-treatment and deodorizing.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "500",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Sofa Cleaning & Sofa Washing",
+              "description": "Complete sofa and upholstery cleaning service. We clean sofas, loveseats and sectionals in Kitengela, Syokimau, Athi River and Nairobi.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "800",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Rug Cleaning & Rags Washing",
+              "description": "Specialized rug care, rags cleaning and washing for area rugs, oriental rugs and decorative pieces.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "400",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Curtain Washing",
+              "description": "Gentle curtain washing and cleaning for all fabric types including silk, linen and blackout curtains.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "200",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Chair Washing & Upholstery Cleaning",
+              "description": "Expert fabric and leather chair washing in Kitengela, Syokimau, Athi River and Nairobi.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "300",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Mattress Cleaning",
+              "description": "Deep mattress sanitization, dust mite removal and stain extraction for healthier sleep.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            },
+            "price": "600",
+            "priceCurrency": "KES"
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Laundry Wash",
+              "description": "Professional laundry wash and textile cleaning services for homes and businesses in Kitengela, Syokimau and Athi River.",
+              "areaServed": ["Kitengela","Syokimau","Athi River","Nairobi"]
+            }
+          }
+        ]
+      }
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage (triggers Google FAQ rich results) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Do you offer carpet cleaning near me in Syokimau, Athi River and Kitengela?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes! Express Carpets & Upholstery serves Syokimau, Athi River (including Mlolongo), and Kitengela with same-day carpet cleaning service. We offer free pickup and delivery — just book online and our driver comes to you."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What services does Express Carpets (ExpressWash) offer?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Express Carpets & Upholstery (also known as ExpressWash) offers professional carpet cleaning, sofa washing, sofa cleaning, rug cleaning, rags washing, curtain washing, chair washing, laundry wash, and mattress sanitization across Kitengela, Syokimau, Athi River and Nairobi."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much does carpet cleaning cost in Kitengela or Nairobi?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Carpet cleaning starts from KES 500, sofa cleaning from KES 800, chair washing from KES 300, curtain washing from KES 200 per pair, rug and rags cleaning from KES 400, and mattress cleaning from KES 600. Use our free online pricing calculator for an instant quote."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do you do sofa cleaning and sofa washing in Syokimau or Athi River?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, we provide professional sofa cleaning and sofa washing in Syokimau, Athi River, Mlolongo, Kitengela and Greater Nairobi. Same-day service is available for Syokimau and Athi River for orders placed before 10 AM."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can you clean rugs, rags and curtains?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. We specialize in rug cleaning, rags washing, and curtain washing for all fabric types including Persian rugs, area rugs, silk curtains, linen and blackout curtains. We also handle takedown and re-hanging for curtains within Kitengela at no extra charge."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do you offer laundry wash services?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Express Carpets & Upholstery provides laundry wash services for household textiles including carpets, sofas, chairs, curtains, rugs and mattresses. We offer free pickup and delivery across Kitengela, Syokimau, Athi River and Nairobi."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there pickup and delivery for carpet cleaning?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, free pickup and delivery is included in all our prices. Our drivers come to your location in Kitengela, Syokimau, Athi River, Mlolongo or Nairobi. Same-day service is available for Kitengela and Athi River zones."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
 
   <body>
