@@ -276,7 +276,7 @@ const Hero = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 mb-6 leading-relaxed">
-              <span className="font-semibold text-slate-800">Cleaner &amp; Faster:</span> We are a professional cleaning company, specialising in deep cleaning, restoration and maintenance of carpets and upholstery in Kitengela, Nairobi and its environs. At Express Carpets we use fully automated machines for dusting, cleaning and drying.
+              <span className="font-semibold text-slate-800">Cleaner &amp; Faster:</span> We are a professional cleaning company, specializing in deep cleaning, restoration and maintenance of carpets and upholstery in Kitengela, Nairobi and its environs. At Express Carpets we use fully automated machines for dusting, cleaning and drying.
             </p>
 
             {/* SERVICE AREA BADGES — local SEO signals, visible to users & crawlers */}
