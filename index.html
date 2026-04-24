@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Canonical & Crawling -->
+    <link rel="canonical" href="https://expresscarpets.co.ke/" />
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+
     <!-- PWA Configuration -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#0ea5e9" />
@@ -14,7 +18,8 @@
 
     <!-- Icons -->
     <link rel="icon" type="image/png" href="/logo.png" />
-    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
 
     <!-- Resource Hints for Performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -30,25 +35,85 @@
     <!-- DM Sans serves as the closest free fallback to TT Fors -->
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap" rel="stylesheet" />
 
-    <title>Express Carpets &amp; Upholstery - Professional Cleaning</title>
-    <meta name="description" content="Express Carpets &amp; Upholstery - Professional Carpet, Sofa &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
+    <title>Express Carpets &amp; Upholstery - Professional Cleaning in Nairobi, Kenya</title>
+    <meta name="description" content="Express Carpets &amp; Upholstery offers professional carpet, sofa, mattress &amp; upholstery cleaning in Nairobi, Kitengela &amp; surrounding areas. Get instant quotes and real-time order tracking." />
     <meta name="author" content="Express Carpets &amp; Upholstery" />
-    <meta name="keywords" content="carpet cleaning, upholstery cleaning, sofa cleaning, mattress cleaning, professional cleaning, kenya, nairobi, kitengela" />
+    <meta name="keywords" content="carpet cleaning nairobi, upholstery cleaning kenya, sofa cleaning nairobi, mattress cleaning, carpet cleaning kitengela, professional carpet cleaning, express carpets kenya, carpet wash nairobi" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Express Carpets &amp; Upholstery" />
+    <meta property="og:locale" content="en_KE" />
     <meta property="og:url" content="https://expresscarpets.co.ke/" />
-    <meta property="og:title" content="Express Carpets &amp; Upholstery - Professional Cleaning" />
-    <meta property="og:description" content="Professional Carpet &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
-    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:title" content="Express Carpets &amp; Upholstery - Professional Cleaning in Nairobi" />
+    <meta property="og:description" content="Professional carpet, sofa, mattress &amp; upholstery cleaning in Nairobi &amp; Kitengela. Instant quotes, real-time tracking, free pickup &amp; delivery." />
+    <meta property="og:image" content="https://expresscarpets.co.ke/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Express Carpets &amp; Upholstery - Professional Cleaning Service" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://expresscarpets.co.ke/" />
-    <meta name="twitter:title" content="Express Carpets &amp; Upholstery - Professional Cleaning" />
-    <meta name="twitter:description" content="Professional Carpet &amp; Upholstery Cleaning Service with instant quotes and real-time tracking" />
-    <meta name="twitter:image" content="/og-image.png" />
     <meta name="twitter:site" content="@ExpressCarpetsKE" />
+    <meta name="twitter:url" content="https://expresscarpets.co.ke/" />
+    <meta name="twitter:title" content="Express Carpets &amp; Upholstery - Professional Cleaning in Nairobi" />
+    <meta name="twitter:description" content="Professional carpet, sofa, mattress &amp; upholstery cleaning in Nairobi &amp; Kitengela. Instant quotes, real-time tracking." />
+    <meta name="twitter:image" content="https://expresscarpets.co.ke/og-image.png" />
+    <meta name="twitter:image:alt" content="Express Carpets &amp; Upholstery - Professional Cleaning Service" />
+
+    <!-- Structured Data: Local Business -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "@id": "https://expresscarpets.co.ke/#business",
+      "name": "Express Carpets & Upholstery",
+      "description": "Professional carpet, sofa, mattress and upholstery cleaning service in Nairobi and Kitengela, Kenya.",
+      "url": "https://expresscarpets.co.ke",
+      "logo": "https://expresscarpets.co.ke/logo.png",
+      "image": "https://expresscarpets.co.ke/og-image.png",
+      "telephone": "+254700000000",
+      "email": "info@expresscarpets.co.ke",
+      "priceRange": "KSh",
+      "currenciesAccepted": "KES",
+      "paymentAccepted": "Cash, M-Pesa",
+      "areaServed": [
+        {"@type": "City", "name": "Nairobi"},
+        {"@type": "City", "name": "Kitengela"}
+      ],
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Nairobi",
+        "addressCountry": "KE"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-1.286389",
+        "longitude": "36.817223"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+          "opens": "07:00",
+          "closes": "19:00"
+        }
+      ],
+      "sameAs": [
+        "https://twitter.com/ExpressCarpetsKE"
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Cleaning Services",
+        "itemListElement": [
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Carpet Cleaning"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Sofa & Upholstery Cleaning"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Mattress Cleaning"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Curtain Cleaning"}}
+        ]
+      }
+    }
+    </script>
   </head>
 
   <body>
