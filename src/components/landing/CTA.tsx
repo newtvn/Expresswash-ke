@@ -35,7 +35,7 @@ const CTA = () => {
     <section id="contact" className="relative z-20 bg-slate-50 px-6 pb-0 pt-8">
       <BubbleStyles />
       <div className="container mx-auto max-w-7xl">
-        <div className="relative bg-[#007AF4] rounded-t-2xl px-8 py-14 md:px-16 md:py-16 overflow-hidden text-center">
+        <div className="relative bg-brand-blue rounded-t-2xl px-8 py-14 md:px-16 md:py-16 overflow-hidden text-center">
 
           {/* Floating foam bubbles */}
           <div className="bubble-1 absolute top-8 left-[6%] w-20 h-20 rounded-full bg-white/[0.06]" />

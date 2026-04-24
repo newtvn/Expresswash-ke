@@ -116,11 +116,17 @@
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 213 100% 48%;
 
-    /* Brand Color Tokens */
-    --brand-blue: 213 100% 48%;
-    --brand-navy: 220 74% 22%;
-    --brand-orange: 18 90% 59%;
-    --brand-green: 159 50% 24%;
+    /* ── Brand Palette ───────────────────────────────────────────────
+       Blue #007AF4 | Navy #0E2F60 | Orange #F4743B | Deep Green #1E5B45
+       ─────────────────────────────────────────────────────────────── */
+    --brand-blue:         213 100% 48%;   /* #007AF4 */
+    --brand-blue-fg:      0 0% 100%;
+    --brand-navy:         220 74% 22%;    /* #0E2F60 */
+    --brand-navy-fg:      0 0% 100%;
+    --brand-orange:       18  90% 59%;    /* #F4743B */
+    --brand-orange-fg:    0 0% 100%;
+    --brand-green:        159 50% 24%;    /* #1E5B45 */
+    --brand-green-fg:     0 0% 100%;
 
     /* Pipeline Dashboard Tokens */
     --dash-bg: oklch(98.8% 0.004 95);

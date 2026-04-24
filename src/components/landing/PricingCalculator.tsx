@@ -112,7 +112,7 @@ const RateTable = ({
     <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#0E2F60] text-white">
+          <tr className="bg-brand-navy text-white">
             <th className="text-left px-3 py-2 font-semibold">Type</th>
             {hasSqPricing ? (
               <>
@@ -196,9 +196,9 @@ const PricingCalculator = () => {
         {/* Header */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
-            <span className="text-sm font-semibold text-[#007AF4] uppercase tracking-wider">Pricing</span>
-            <span className="block w-16 h-[2px] bg-[#007AF4]/40" />
+            <span className="block w-16 h-[2px] bg-brand-blue/40" />
+            <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">Pricing</span>
+            <span className="block w-16 h-[2px] bg-brand-blue/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Transparent Pricing
@@ -217,7 +217,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("calculator")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "calculator"
-                  ? "bg-[#007AF4] text-white shadow"
+                  ? "bg-brand-blue text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -227,7 +227,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("ratecard")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "ratecard"
-                  ? "bg-[#007AF4] text-white shadow"
+                  ? "bg-brand-blue text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -252,9 +252,9 @@ const PricingCalculator = () => {
                 <RateTable title="Home Cleaning" rows={homeCleaningRates} hasSqPricing />
                 <RateTable title="Office Cleaning" rows={officeCleaningRates} hasSqPricing />
               </div>
-              <div className="md:col-span-2 bg-[#0E2F60]/5 border border-[#0E2F60]/20 rounded-xl p-4 text-sm text-slate-600 space-y-1">
-                <p><span className="font-semibold text-[#0E2F60]">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
-                <p><span className="font-semibold text-[#007AF4]">EXPRESS:</span> Service turn around is within 24 hrs without fail.</p>
+              <div className="md:col-span-2 bg-brand-navy/5 border border-brand-navy/20 rounded-xl p-4 text-sm text-slate-600 space-y-1">
+                <p><span className="font-semibold text-brand-navy">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
+                <p><span className="font-semibold text-brand-blue">EXPRESS:</span> Service turn around is within 24 hrs without fail.</p>
                 <p className="pt-1 text-xs text-slate-400">All prices in KES. VAT (16%) applicable. Custom &amp; Bed sizes — request a quote.</p>
               </div>
             </div>
@@ -266,7 +266,7 @@ const PricingCalculator = () => {
               {/* Delivery Zone Pills */}
               <div className="mb-8">
                 <div className="flex items-center gap-2 mb-4">
-                  <MapPin className="w-4 h-4 text-[#007AF4]" />
+                  <MapPin className="w-4 h-4 text-brand-blue" />
                   <span className="text-sm font-semibold text-slate-700">Your Delivery Area</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
@@ -276,11 +276,11 @@ const PricingCalculator = () => {
                       onClick={() => setSelectedZone(zone)}
                       className={`p-4 rounded-[8px] text-left transition-all duration-300 ${
                         selectedZone.id === zone.id
-                          ? "border-2 border-[#007AF4] bg-[#007AF4]/5 shadow-sm"
+                          ? "border-2 border-brand-blue bg-brand-blue/5 shadow-sm"
                           : "border border-slate-200 bg-white hover:border-slate-300"
                       }`}
                     >
-                      <p className={`text-sm font-semibold transition-colors duration-300 ${selectedZone.id === zone.id ? "text-[#007AF4]" : "text-slate-700"}`}>
+                      <p className={`text-sm font-semibold transition-colors duration-300 ${selectedZone.id === zone.id ? "text-brand-blue" : "text-slate-700"}`}>
                         {zone.name}
                       </p>
                       <p className="text-xs text-slate-400 mt-0.5">{zone.delivery}</p>
@@ -304,11 +304,11 @@ const PricingCalculator = () => {
                           <div
                             key={item.id}
                             className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 ${
-                              active ? "border-[#007AF4] bg-blue-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
+                              active ? "border-brand-blue bg-blue-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${active ? "bg-[#007AF4]" : "bg-slate-100"}`}>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${active ? "bg-brand-blue" : "bg-slate-100"}`}>
                                 <item.icon className={`w-5 h-5 transition-colors duration-300 ${active ? "text-white" : "text-slate-400"}`} />
                               </div>
                               <div>
@@ -324,10 +324,10 @@ const PricingCalculator = () => {
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span className={`w-7 text-center font-bold text-sm ${active ? "text-[#007AF4]" : "text-slate-400"}`}>{quantity}</span>
+                              <span className={`w-7 text-center font-bold text-sm ${active ? "text-brand-blue" : "text-slate-400"}`}>{quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, 1)}
-                                className="w-8 h-8 rounded-lg bg-[#007AF4] hover:bg-[#005FCC] flex items-center justify-center transition-colors duration-200"
+                                className="w-8 h-8 rounded-lg bg-brand-blue hover:bg-[#005FCC] flex items-center justify-center transition-colors duration-200"
                               >
                                 <Plus className="w-3.5 h-3.5 text-white" />
                               </button>
@@ -349,11 +349,11 @@ const PricingCalculator = () => {
                           <div
                             key={item.id}
                             className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-300 ${
-                              active ? "border-[#007AF4] bg-blue-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
+                              active ? "border-brand-blue bg-blue-50/50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${active ? "bg-[#007AF4]" : "bg-slate-100"}`}>
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${active ? "bg-brand-blue" : "bg-slate-100"}`}>
                                 <item.icon className={`w-5 h-5 transition-colors duration-300 ${active ? "text-white" : "text-slate-400"}`} />
                               </div>
                               <div>
@@ -369,10 +369,10 @@ const PricingCalculator = () => {
                               >
                                 <Minus className="w-3.5 h-3.5" />
                               </button>
-                              <span className={`w-7 text-center font-bold text-sm ${active ? "text-[#007AF4]" : "text-slate-400"}`}>{quantity}</span>
+                              <span className={`w-7 text-center font-bold text-sm ${active ? "text-brand-blue" : "text-slate-400"}`}>{quantity}</span>
                               <button
                                 onClick={() => updateQuantity(item.id, 1)}
-                                className="w-8 h-8 rounded-lg bg-[#007AF4] hover:bg-[#005FCC] flex items-center justify-center transition-colors duration-200"
+                                className="w-8 h-8 rounded-lg bg-brand-blue hover:bg-[#005FCC] flex items-center justify-center transition-colors duration-200"
                               >
                                 <Plus className="w-3.5 h-3.5 text-white" />
                               </button>
@@ -393,8 +393,8 @@ const PricingCalculator = () => {
                   <div className="rounded-2xl sticky top-24 shadow-md overflow-hidden border border-slate-200/60">
                     {/* White header with foam bubbles */}
                     <div className="relative bg-white px-6 pt-6 pb-14">
-                      <h3 className="text-lg font-semibold text-[#007AF4]">Your Quote</h3>
-                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[50px] text-[#007AF4]">
+                      <h3 className="text-lg font-semibold text-brand-blue">Your Quote</h3>
+                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[50px] text-brand-blue">
                         <circle cx="0"   cy="30" r="30" fill="currentColor" />
                         <circle cx="50"  cy="22" r="35" fill="currentColor" />
                         <circle cx="110" cy="15" r="40" fill="currentColor" />
@@ -409,7 +409,7 @@ const PricingCalculator = () => {
                     </div>
 
                     {/* Blue body */}
-                    <div className="bg-[#007AF4] px-6 pb-6 pt-2">
+                    <div className="bg-brand-blue px-6 pb-6 pt-2">
                       {itemCount > 0 ? (
                         <div className="space-y-6">
                           <div className="space-y-3">
