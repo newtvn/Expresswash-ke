@@ -15,6 +15,7 @@ CREATE POLICY "Users can insert own order items" ON order_items
   );
 
 -- Allow drivers assigned to the order to delete items (for re-measurement)
+DROP POLICY IF EXISTS "Assigned drivers can delete order items" ON order_items;
 CREATE POLICY "Assigned drivers can delete order items" ON order_items
   FOR DELETE TO authenticated USING (
     EXISTS (
@@ -25,6 +26,7 @@ CREATE POLICY "Assigned drivers can delete order items" ON order_items
   );
 
 -- Allow drivers assigned to the order to update items
+DROP POLICY IF EXISTS "Assigned drivers can update order items" ON order_items;
 CREATE POLICY "Assigned drivers can update order items" ON order_items
   FOR UPDATE TO authenticated USING (
     EXISTS (
@@ -33,3 +35,4 @@ CREATE POLICY "Assigned drivers can update order items" ON order_items
       AND (orders.driver_id = auth.uid() OR is_admin())
     )
   );
+
