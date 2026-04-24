@@ -205,37 +205,31 @@ const services = [
     icon: Layers,
     title: "Carpet Cleaning",
     description: "Deep carpet cleaning for all types and sizes — carpets wash, stain removal & deodorizing",
-    price: "From KES 500",
   },
   {
     icon: Armchair,
     title: "Chair Washing",
     description: "Fabric and leather chair washing — dining chairs, office chairs & accent seats",
-    price: "From KES 300",
   },
   {
     icon: Blinds,
     title: "Curtain Washing",
     description: "Gentle curtain washing for all fabric types — silk, linen & blackout curtains",
-    price: "From KES 200",
   },
   {
     icon: RectangleHorizontal,
     title: "Rug & Rags Cleaning",
     description: "Specialized rug washing and rags cleaning — area rugs, oriental rugs & decorative pieces",
-    price: "From KES 400",
   },
   {
     icon: Sofa,
     title: "Sofa Cleaning",
     description: "Complete sofa washing & upholstery cleaning — sofas, loveseats & sectionals",
-    price: "From KES 800",
   },
   {
     icon: BedDouble,
     title: "Mattress Cleaning",
     description: "Deep mattress sanitization, dust mite removal & stain extraction",
-    price: "From KES 600",
   },
 ];
 
@@ -318,7 +312,7 @@ const Services = () => {
                     className="relative w-full py-2.5 rounded-[5px] font-semibold bg-transparent group-hover:bg-white border border-[#007AF4] group-hover:border-white text-[#007AF4] transition-colors duration-500 z-10"
                     onClick={(e) => { e.stopPropagation(); handleServiceClick(service); }}
                   >
-                    {service.price}
+                    Enquire
                   </button>
                 </div>
               );

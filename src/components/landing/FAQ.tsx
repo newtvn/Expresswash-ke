@@ -152,10 +152,10 @@ const FAQ = () => {
               </p>
 
               <a
-                href="tel:+254700000000"
+                href="tel:+254746747481"
                 className="relative z-10 inline-flex items-center gap-2 mt-6 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-full text-sm text-white font-medium transition-colors"
               >
-                Call +254 700 000 000
+                Call +254 746 747 481
               </a>
             </div>
 
