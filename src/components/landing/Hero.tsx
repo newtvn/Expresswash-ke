@@ -185,14 +185,6 @@ const Hero = () => {
 
           <div className="lg:col-span-7 text-center lg:text-left pt-10 pointer-events-auto">
 
-            {/* HIGH-CONTRAST KICKER BADGE */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-blue-100/80 backdrop-blur-sm rounded-full mb-8 border border-blue-200 shadow-sm">
-              <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
-              <span className="text-sm font-bold text-blue-900 tracking-wide">
-                Kenya&apos;s Premium Cleaning Service
-              </span>
-            </div>
-
             {/* UNIFIED TYPOGRAPHY HIERARCHY (Natural Wrap) */}
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-slate-900 leading-[1.1] tracking-tight mb-3 max-w-2xl mx-auto lg:mx-0">
               Expresscarpets &amp; <span className="text-primary">Upholstery.</span>
