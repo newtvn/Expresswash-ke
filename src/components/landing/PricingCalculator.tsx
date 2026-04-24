@@ -206,6 +206,10 @@ const PricingCalculator = () => {
           <p className="text-slate-500 text-lg mt-3">
             Affordable rates for all your carpet &amp; upholstery cleaning needs.
           </p>
+          <p className="inline-flex items-center gap-2 mt-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-4 py-1.5">
+            <span>⚠️</span>
+            Prices shown are <strong>minimum starting rates</strong> — final price varies with the size of the item.
+          </p>
 
           {/* Tabs */}
           <div className="flex justify-center gap-2 mt-6">
@@ -309,7 +313,7 @@ const PricingCalculator = () => {
                               </div>
                               <div>
                                 <p className={`text-sm font-medium ${active ? "text-slate-900" : "text-slate-700"}`}>{item.name}</p>
-                                <p className="text-xs text-slate-400">KES {item.price.toLocaleString()} / unit</p>
+                                <p className="text-xs text-slate-400">from KES {item.price.toLocaleString()} / unit <span className="text-amber-500 italic">· price varies by size</span></p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -354,7 +358,7 @@ const PricingCalculator = () => {
                               </div>
                               <div>
                                 <p className={`text-sm font-medium ${active ? "text-slate-900" : "text-slate-700"}`}>{item.name}</p>
-                                <p className="text-xs text-slate-400">KES {item.price.toLocaleString()} / unit</p>
+                                <p className="text-xs text-slate-400">from KES {item.price.toLocaleString()} / unit <span className="text-amber-500 italic">· price varies by size</span></p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
