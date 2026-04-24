@@ -1,7 +1,86 @@
 import { AnimatedButton } from "@/components/ui/animated-button";
-import { Star } from "lucide-react";
+import { Star, MessageCircle, LogIn, Phone, Mail, X } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const PHONE = "254746747481";
+const WA_MESSAGE = "Hi,\nI'm interested in your services, may I get your rate card?";
+const WA_URL = `https://wa.me/${PHONE}?text=${encodeURIComponent(WA_MESSAGE)}`;
+
+const PickupChoiceModal = ({ onClose }: { onClose: () => void }) => (
+  <div
+    className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+    onClick={onClose}
+  >
+    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <div
+      className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors"
+        aria-label="Close"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      <h2 className="text-xl font-bold text-slate-900 mb-1">Schedule a Pickup</h2>
+      <p className="text-sm text-slate-500 mb-6">How would you like to proceed?</p>
+
+      <div className="flex flex-col gap-4">
+        {/* WhatsApp option */}
+        <a
+          href={WA_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-start gap-4 p-4 rounded-xl border-2 border-green-200 bg-green-50 hover:border-green-400 hover:bg-green-100 transition-all group"
+        >
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+            <MessageCircle className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-slate-900 group-hover:text-green-700 transition-colors">Chat on WhatsApp</p>
+            <p className="text-sm text-slate-500 mt-0.5">Quick enquiry — no account needed</p>
+            <div className="mt-3 flex flex-col gap-1.5">
+              <a
+                href="tel:+254746747481"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-green-700 transition-colors"
+              >
+                <Phone className="w-4 h-4 flex-shrink-0" />
+                <span>Call: 0746 747 481</span>
+              </a>
+              <a
+                href="mailto:expresscleaning@goalfusion.co.ke"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-green-700 transition-colors"
+              >
+                <Mail className="w-4 h-4 flex-shrink-0" />
+                <span>expresscleaning@goalfusion.co.ke</span>
+              </a>
+            </div>
+          </div>
+        </a>
+
+        {/* Sign in option */}
+        <Link
+          to="/auth/signin"
+          onClick={onClose}
+          className="flex items-start gap-4 p-4 rounded-xl border-2 border-slate-200 bg-slate-50 hover:border-primary hover:bg-orange-50 transition-all group"
+        >
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center group-hover:bg-primary transition-colors">
+            <LogIn className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900 group-hover:text-primary transition-colors">Sign In / Create Account</p>
+            <p className="text-sm text-slate-500 mt-0.5">Track orders, earn loyalty rewards &amp; get exclusive offers</p>
+          </div>
+        </Link>
+      </div>
+    </div>
+  </div>
+);
 
 /* ───────────────────────────────────────────────────────────────────
    1. FIBER CANVAS
@@ -151,6 +230,7 @@ const UnifiedCleanVisual = () => (
 const Hero = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [pickupModalOpen, setPickupModalOpen] = useState(false);
   useFiberCanvas(canvasRef);
 
   useEffect(() => {
@@ -196,7 +276,7 @@ const Hero = () => {
             </h1>
 
             <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto lg:mx-0 mb-6 leading-relaxed">
-              <span className="font-semibold text-slate-800">Cleaner &amp; Faster:</span> We are a professional cleaning company, specialising in deep cleaning, restoration and maintenance of carpets and upholstery in Kitengela, Nairobi and its environs. At Express Carpets we use fully automated machines for dusting, cleaning and drying.
+              <span className="font-semibold text-slate-800">Cleaner &amp; Faster:</span> We are a professional cleaning company, specializing in deep cleaning, restoration and maintenance of carpets and upholstery in Kitengela, Nairobi and its environs. At Express Carpets we use fully automated machines for dusting, cleaning and drying.
             </p>
 
             {/* SERVICE AREA BADGES — local SEO signals, visible to users & crawlers */}
@@ -227,11 +307,9 @@ const Hero = () => {
                 bg="#F4743B"
                 bordered={false}
                 className="text-lg py-5"
-                asChild
+                onClick={() => setPickupModalOpen(true)}
               >
-                <Link to="/portal/request-pickup">
-                  Schedule Pickup
-                </Link>
+                Schedule Pickup
               </AnimatedButton>
               <AnimatedButton
                 color="#64748b"
@@ -271,6 +349,8 @@ const Hero = () => {
           <div className="hidden lg:block lg:col-span-5"></div>
         </div>
       </div>
+
+      {pickupModalOpen && <PickupChoiceModal onClose={() => setPickupModalOpen(false)} />}
     </section>
   );
 };
