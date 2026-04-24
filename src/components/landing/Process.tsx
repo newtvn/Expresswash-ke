@@ -6,7 +6,7 @@ const steps = [
   {
     icon: CalendarCheck,
     step: "1",
-    title: "Book Online",
+    title: "Book Online / Call",
     description:
       "Schedule a convenient pickup time through our website or call us directly.",
   },
