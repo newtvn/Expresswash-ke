@@ -40,9 +40,9 @@ export const Dashboard = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <KPICard label="Active Orders" value={activeOrders} icon={ShoppingCart} />
-        <KPICard label="Loyalty Points" value={loyalty?.points ?? user?.loyaltyPoints ?? 0} icon={Award} />
-        <KPICard label="Total Spent" value={user?.totalSpent ?? 0} format="currency" icon={Wallet} />
+        <KPICard label="Active Orders" value={activeOrders} icon={ShoppingCart} onClick={() => navigate(ROUTES.CUSTOMER_ORDERS)} />
+        <KPICard label="Loyalty Points" value={loyalty?.points ?? user?.loyaltyPoints ?? 0} icon={Award} onClick={() => navigate(ROUTES.CUSTOMER_LOYALTY)} />
+        <KPICard label="Total Spent" value={user?.totalSpent ?? 0} format="currency" icon={Wallet} onClick={() => navigate(ROUTES.CUSTOMER_PAYMENTS)} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -74,7 +74,7 @@ export const Dashboard = () => {
                       itemsCount={order.items.length}
                       date={order.pickupDate}
                       zone={order.zone}
-                      className="cursor-pointer"
+                      onClick={() => navigate(ROUTES.CUSTOMER_ORDER_DETAILS.replace(':id', order.trackingCode))}
                     />
                   ))}
                 </div>

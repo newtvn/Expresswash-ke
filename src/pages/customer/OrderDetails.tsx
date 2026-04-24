@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ROUTES } from '@/config/routes';
-import { getOrderById, getOrderByUUID, cancelOrder } from '@/services/orderService';
+import { getOrderById, getOrderByUUID, cancelOrder, updateOrderStatus } from '@/services/orderService';
 import { initiateSTKPush, isValidPhoneNumber, formatPhoneNumber, verifyPayment, getPaymentByOrderId } from '@/services/paymentService';
 import { ORDER_STAGES } from '@/config/constants';
 import { Order } from '@/types';
@@ -83,20 +83,27 @@ export const OrderDetails = () => {
 
     let cancelled = false;
 
-    const fetchOrder = (showSpinner = false) => {
+    const fetchOrder = async (showSpinner = false) => {
       if (showSpinner) setLoading(true);
-      getOrderById(id)
-        .then((result) => {
-          if (!cancelled && result) {
-            setOrder(result);
-            if (result.id) {
-              getPaymentByOrderId(result.id).then((payment) => {
-                if (!cancelled && payment?.status === 'completed') setPaymentComplete(true);
-              });
+      try {
+        const result = await getOrderById(id);
+        if (!cancelled && result) {
+          setOrder(result);
+          if (result.id) {
+            const payment = await getPaymentByOrderId(result.id);
+            if (!cancelled && payment?.status === 'completed') {
+              setPaymentComplete(true);
+              // If payment was completed but order status wasn't advanced, advance it now
+              if (result.status === 2) {
+                const updated = await updateOrderStatus(result.trackingCode, 3);
+                if (!cancelled && updated.order) setOrder(updated.order);
+              }
             }
           }
-        })
-        .finally(() => { if (!cancelled) setLoading(false); });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
     fetchOrder(true);
@@ -158,8 +165,13 @@ export const OrderDetails = () => {
 
     if (result.verified) {
       toast.success('Payment verified!');
+      setPaymentComplete(true);
       setPayDialogOpen(false);
       setPaymentSent(false);
+      // Advance order from "Quote Sent" to "Quote Accepted" after payment
+      if (order.status === 2) {
+        await updateOrderStatus(order.trackingCode, 3);
+      }
       const updated = await getOrderByUUID(order.id);
       if (updated) setOrder(updated);
     } else {
@@ -383,6 +395,25 @@ export const OrderDetails = () => {
                     <Smartphone className="h-4 w-4" />
                     Pay Now
                   </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Payment Completed Card */}
+          {!isAdminView && paymentComplete && !isCancelledOrRefunded(order.status) && (
+            <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/50">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-800 dark:text-green-200">Payment Received</p>
+                    <p className="text-sm text-green-600 dark:text-green-400">
+                      KES {(order.total ?? 0).toLocaleString()} paid via M-Pesa
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
