@@ -13,8 +13,8 @@ import { useSEO } from "@/hooks/useSEO";
  */
 const Home = () => {
   useSEO({
-    title: "Express Carpets & Upholstery | Carpet Cleaning Kitengela, Syokimau & Athi River",
-    description: "Express Carpets & Upholstery — #1 carpet cleaning, sofa washing, rug cleaning, curtain washing & mattress sanitization in Kitengela, Syokimau, Athi River & Nairobi. Free pickup & delivery. Book now!",
+    title: "Carpet Cleaning Kitengela & Nairobi | Express Carpets Kenya",
+    description: "Professional carpet cleaning, sofa washing & rug cleaning in Kitengela, Syokimau, Athi River & Nairobi. Free pickup & delivery. Book now!",
     keywords: "carpet cleaning near me, carpet cleaning Kitengela, carpet cleaning Syokimau, carpet cleaning Athi River, expresscarpets, expresswash, carpets wash, carpet cleaners, carpet cleaning nairobi, laundry wash nairobi, rags cleaning, rags washing, chair washing, curtains washing, sofa cleaning nairobi, sofa washing, upholstery cleaning kenya, mattress cleaning, carpet wash nairobi, sofa cleaning Kitengela, professional carpet cleaning kenya",
     canonical: "https://expresscarpets.co.ke/",
   });
