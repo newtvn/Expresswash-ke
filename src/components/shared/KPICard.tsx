@@ -10,6 +10,7 @@ interface KPICardProps {
   format?: 'number' | 'currency' | 'percentage';
   icon?: LucideIcon;
   className?: string;
+  onClick?: () => void;
 }
 
 export const KPICard = ({
@@ -20,6 +21,7 @@ export const KPICard = ({
   format = 'number',
   icon: Icon,
   className,
+  onClick,
 }: KPICardProps) => {
   const formatValue = () => {
     switch (format) {
@@ -42,7 +44,14 @@ export const KPICard = ({
       : Minus;
 
   return (
-    <Card className={cn('bg-card border-border/50 hover:shadow-md transition-shadow', className)}>
+    <Card
+      className={cn(
+        'bg-card border-border/50 hover:shadow-md transition-shadow',
+        onClick && 'cursor-pointer hover:border-primary/30',
+        className,
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">

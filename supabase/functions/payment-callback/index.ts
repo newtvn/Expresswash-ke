@@ -325,8 +325,27 @@ serve(async (req) => {
       .single();
 
     if (payment) {
-      // Send notification to customer
       const status = callback.resultCode === 0 ? 'completed' : 'failed';
+
+      // Advance order status after successful payment
+      // If order is at status 2 (Quote Sent), move to 3 (Quote Accepted)
+      if (status === 'completed' && payment.order_id) {
+        const { data: order } = await supabase
+          .from('orders')
+          .select('status')
+          .eq('id', payment.order_id)
+          .single();
+
+        if (order && order.status === 2) {
+          await supabase
+            .from('orders')
+            .update({ status: 3, updated_at: new Date().toISOString() })
+            .eq('id', payment.order_id);
+          logger.info('Order status advanced to Quote Accepted after payment', { orderId: payment.order_id });
+        }
+      }
+
+      // Send notification to customer
       await sendPaymentNotification(
         supabase,
         payment.order_id,
