@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Order, OrderItem, TrackingResponse, PaginatedResponse } from '@/types';
+import { Order, OrderItem, TrackingResponse, PaginatedResponse, OrderSource } from '@/types';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
 import { orderLogger } from '@/lib/logger';
 import { getHolidayDates } from './holidayService';
@@ -29,6 +29,7 @@ export interface PickupRequestItem {
 export interface CreateOrderPayload {
   customerId: string;
   customerName: string;
+  customerPhone?: string;
   zone: string;
   pickupAddress: string;
   pickupDate: string;
@@ -40,6 +41,7 @@ export interface CreateOrderPayload {
   notes?: string;
   promoCode?: string;
   promotionId?: string;
+  orderSource?: OrderSource;
   /** When true, skip server-side pricing — caller already validated via calculateServerPrice */
   skipServerPricing?: boolean;
 }
@@ -57,6 +59,7 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
     trackingCode: row.tracking_code as string,
     customerId: (row.customer_id as string) ?? undefined,
     customerName: row.customer_name as string,
+    customerPhone: (row.customer_phone as string) ?? undefined,
     status: row.status as number,
     items: items.map((i) => ({
       name: i.name as string,
@@ -79,6 +82,7 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
     driverName: (row.driver_name as string) ?? undefined,
     driverPhone: (row.driver_phone as string) ?? undefined,
     driverId: (row.driver_id as string) ?? undefined,
+    orderSource: ((row.order_source as OrderSource) ?? 'app'),
     createdAt: (row.created_at as string) ?? undefined,
     updatedAt: (row.updated_at as string) ?? undefined,
   };
@@ -317,6 +321,7 @@ export const createOrder = async (
           tracking_code: trackingCode,
           customer_id: payload.customerId,
           customer_name: payload.customerName,
+          customer_phone: payload.customerPhone ?? null,
           status: ORDER_STATUS.PENDING,
           pickup_date: payload.pickupDate,
           estimated_delivery: eta.date,
@@ -327,6 +332,7 @@ export const createOrder = async (
           vat: serverVat,
           total: serverTotal,
           notes: payload.notes ?? null,
+          order_source: payload.orderSource ?? 'app',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -848,4 +854,61 @@ export const getDriverAssignedOrders = async (driverId: string): Promise<Order[]
     const { order_items, ...order } = orderData as Record<string, unknown> & { order_items: Record<string, unknown>[] };
     return mapOrder(order, order_items ?? []);
   });
+};
+
+/**
+ * Fetch all PENDING orders with no driver assigned — the queue all drivers can see and accept.
+ * Excludes walk-ins (order_source = 'walkin') since those go straight to warehouse.
+ */
+export const getPendingOrdersForDrivers = async (): Promise<Order[]> => {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('status', ORDER_STATUS.PENDING)
+    .is('driver_id', null)
+    .neq('order_source', 'walkin')
+    .order('created_at', { ascending: true });
+
+  if (error || !data) return [];
+
+  return data.map((orderData) => {
+    const { order_items, ...order } = orderData as Record<string, unknown> & { order_items: Record<string, unknown>[] };
+    return mapOrder(order, order_items ?? []);
+  });
+};
+
+/**
+ * Driver accepts a pending order — assigns them to it and moves status to DRIVER_ASSIGNED.
+ */
+export const acceptOrderPickup = async (
+  orderId: string,
+  driverId: string,
+  driverName: string,
+  driverPhone: string,
+): Promise<{ success: boolean; error?: string }> => {
+  // Atomic check: only accept if still unassigned and PENDING
+  const { data: current } = await supabase
+    .from('orders')
+    .select('status, driver_id')
+    .eq('id', orderId)
+    .single();
+
+  if (!current) return { success: false, error: 'Order not found' };
+  if (current.driver_id) return { success: false, error: 'Order already taken by another driver' };
+  if (current.status !== ORDER_STATUS.PENDING) return { success: false, error: 'Order is no longer available' };
+
+  const { error } = await supabase
+    .from('orders')
+    .update({
+      driver_id: driverId,
+      driver_name: driverName,
+      driver_phone: driverPhone,
+      status: ORDER_STATUS.DRIVER_ASSIGNED,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', orderId)
+    .is('driver_id', null); // Guard against race conditions
+
+  if (error) return { success: false, error: `Failed to accept order: ${error.message}` };
+  return { success: true };
 };

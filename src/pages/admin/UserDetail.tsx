@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Save, X, Edit, Star, ShoppingCart, DollarSign, Award, Copy, ShieldOff, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Save, X, Edit, Star, ShoppingCart, DollarSign, Award, Copy, ShieldOff, ShieldCheck, CheckCircle, XCircle, Plus, MessageSquare, Download } from 'lucide-react';
 import { ConfirmDialog } from '@/components/shared';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -122,6 +122,20 @@ export const UserDetail = () => {
   const { data: invoicesResult, isLoading: invoicesLoading } = useQuery({
     queryKey: ['admin', 'user-invoices', userId],
     queryFn: () => getInvoices({ customerId: userId!, page: 1, limit: 50 }),
+    enabled: !!userId,
+  });
+
+  // ── Fetch user payments ──────────────────────────────────────────
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: ['admin', 'user-payments', userId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('customer_id', userId!)
+        .order('created_at', { ascending: false });
+      return (data ?? []) as Record<string, unknown>[];
+    },
     enabled: !!userId,
   });
 
@@ -507,6 +521,7 @@ export const UserDetail = () => {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="orders">Orders ({orderTableData.length})</TabsTrigger>
           <TabsTrigger value="invoices">Invoices ({invoiceTableData.length})</TabsTrigger>
+          <TabsTrigger value="payments">Payments ({payments.length})</TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
           <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
           {user.role === 'driver' && <TabsTrigger value="driver">Driver Info</TabsTrigger>}
@@ -745,6 +760,11 @@ export const UserDetail = () => {
 
         {/* ── Invoices Tab ──────────────────────────────────────────── */}
         <TabsContent value="invoices">
+          <div className="flex justify-end mb-3">
+            <Button size="sm" onClick={() => navigate(`/admin/invoices?customerId=${userId}&customerName=${encodeURIComponent(user.name)}&phone=${encodeURIComponent(user.phone ?? '')}`)}>
+              <Plus className="w-4 h-4 mr-2" /> Create Invoice
+            </Button>
+          </div>
           {invoicesLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -758,6 +778,37 @@ export const UserDetail = () => {
               searchPlaceholder="Search invoices..."
               emptyMessage="No invoices found for this user"
             />
+          )}
+        </TabsContent>
+
+        {/* ── Payments Tab ──────────────────────────────────────────── */}
+        <TabsContent value="payments">
+          {paymentsLoading ? (
+            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : payments.length === 0 ? (
+            <Card><CardContent className="py-12 text-center text-muted-foreground"><DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No payments recorded</p></CardContent></Card>
+          ) : (
+            <div className="space-y-2">
+              {payments.map((p) => (
+                <div key={p.id as string} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="text-sm font-medium">{(p.payment_method as string) ?? 'M-Pesa'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(p.created_at as string).toLocaleDateString()}
+                      {p.mpesa_receipt && ` · Ref: ${p.mpesa_receipt as string}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-green-600">KES {Number(p.amount).toLocaleString()}</p>
+                    <p className={`text-xs ${p.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}`}>{p.status as string}</p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between p-3 border-t font-semibold">
+                <span>Total Paid</span>
+                <span className="text-green-600">KES {payments.filter((p) => p.status === 'completed').reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}</span>
+              </div>
+            </div>
           )}
         </TabsContent>
 

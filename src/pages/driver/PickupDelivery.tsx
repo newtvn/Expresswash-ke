@@ -15,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
 import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
 import { ORDER_STATUS, getOrderStatusLabel } from '@/constants/orderStatus';
+import { notifyOrderStatus, buildPickupSmsMessage } from '@/services/notificationService';
 import { Order } from '@/types';
 
 interface MeasurementDialogData {
@@ -209,6 +210,23 @@ export const PickupDelivery = () => {
         orderId: measurementDialog.orderId,
         type: 'pickup',
       });
+
+      // Send pickup confirmation notification with actual item measurements
+      try {
+        const currentOrderForNotif = await getOrderByUUID(measurementDialog.orderId);
+        if (currentOrderForNotif?.customerId) {
+          const itemsList = buildPickupSmsMessage(updatedItems);
+          await notifyOrderStatus(
+            currentOrderForNotif.customerId,
+            measurementDialog.orderId,
+            currentOrderForNotif.trackingCode,
+            'picked_up',
+            { itemsList },
+          );
+        }
+      } catch {
+        // Non-critical — order is already marked picked up
+      }
 
       setMeasurementDialog(null);
       toast.success('Pickup completed successfully!', {

@@ -323,7 +323,7 @@ export const RequestPickup = () => {
         eta: eta?.label ?? 'To be confirmed',
         total: validatedTotal,
       });
-      toast.success('Pickup request submitted!');
+      toast.success('Order placed! A driver will accept your pickup shortly.');
     } else {
       toast.error(result.error ?? 'Failed to create order');
     }
@@ -334,8 +334,8 @@ export const RequestPickup = () => {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Pickup Requested!"
-          description="Your order has been submitted successfully"
+          title="Order Placed!"
+          description="Your order has been submitted and is awaiting driver pickup"
         />
         <Card className="max-w-lg mx-auto">
           <CardContent className="py-10 text-center space-y-6">
@@ -343,9 +343,9 @@ export const RequestPickup = () => {
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
             <div>
-              <h3 className="text-xl font-bold">Order Confirmed</h3>
+              <h3 className="text-xl font-bold">Order Placed Successfully</h3>
               <p className="text-muted-foreground mt-1">
-                A driver will be assigned shortly
+                A driver will accept your order shortly. You will be notified once they are on the way.
               </p>
             </div>
             <div className="bg-muted/50 rounded-xl p-6 space-y-3">
@@ -355,7 +355,7 @@ export const RequestPickup = () => {
               </div>
               <Separator />
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Estimated Delivery</span>
+                <span className="text-muted-foreground">Estimated Completion</span>
                 <span className="font-medium">{orderCreated.eta}</span>
               </div>
               <Separator />
@@ -394,8 +394,8 @@ export const RequestPickup = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Request Pickup"
-        description="Enter your item dimensions for an instant quote"
+        title="Place an Order"
+        description="Enter your item details and estimated dimensions to place your order"
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -662,13 +662,13 @@ export const RequestPickup = () => {
           </Card>
         </div>
 
-        {/* Right - Quote Summary */}
+        {/* Right - Order Summary */}
         <div>
           <Card className="sticky top-24">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
-                Quote Summary
+                Order Summary
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -778,8 +778,9 @@ export const RequestPickup = () => {
 
                   {/* Price and delivery info */}
                   <div className="text-xs text-muted-foreground space-y-1">
-                    <p>• Pricing is based on item dimensions (per sq inch)</p>
-                    <p>• Final price may vary after driver measures on pickup</p>
+                    <p>• Estimated price based on your dimensions — driver will confirm actual measurements at pickup</p>
+                    <p>• Final price is calculated after driver measures your items</p>
+                    <p>• Payment is collected after delivery</p>
                     <p>• Deliveries Monday-Friday only (weekends excluded)</p>
                     {zone && (() => {
                       const matchedZone = activeZones.find((az) => az.name === zone);
@@ -800,11 +801,11 @@ export const RequestPickup = () => {
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
+                        Placing Order...
                       </>
                     ) : (
                       <>
-                        Confirm Pickup Request
+                        Place Order
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </>
                     )}

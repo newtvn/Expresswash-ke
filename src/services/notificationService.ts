@@ -25,13 +25,13 @@ export interface NotificationTemplate {
 const TEMPLATES: Record<Notification['type'], NotificationTemplate> = {
   order_created: {
     type: 'order_created',
-    title: 'Order Confirmed',
-    messageTemplate: 'Your order {{trackingCode}} has been created. Estimated delivery: {{eta}}',
+    title: 'Order Placed',
+    messageTemplate: 'Your order {{trackingCode}} has been placed with Express Carpets. A driver will accept your pickup shortly.',
   },
   driver_assigned: {
     type: 'driver_assigned',
-    title: 'Driver Assigned',
-    messageTemplate: '{{driverName}} has been assigned to your order {{trackingCode}}. They will contact you soon.',
+    title: 'Driver On The Way',
+    messageTemplate: 'Hi {{customerName}}, {{driverName}} is on the way to pick up your items for order {{trackingCode}}. They will contact you shortly.',
   },
   pickup_scheduled: {
     type: 'pickup_scheduled',
@@ -41,27 +41,27 @@ const TEMPLATES: Record<Notification['type'], NotificationTemplate> = {
   picked_up: {
     type: 'picked_up',
     title: 'Items Picked Up',
-    messageTemplate: 'Your items have been picked up and are on their way to our facility.',
+    messageTemplate: 'Thank you for trusting us at Express Carpets with your cleaning needs. Your cleaning order of {{itemsList}} has been picked up. We will notify you once your items are ready.',
   },
   in_processing: {
     type: 'in_processing',
     title: 'Processing Started',
-    messageTemplate: 'We have started processing your order {{trackingCode}}.',
+    messageTemplate: 'Great news! Your items are now being cleaned at our facility. Order {{trackingCode}}.',
   },
   ready_for_delivery: {
     type: 'ready_for_delivery',
     title: 'Ready for Delivery',
-    messageTemplate: 'Your order {{trackingCode}} is ready for delivery. Estimated delivery: {{deliveryDate}}',
+    messageTemplate: '{{deliveryMessage}}',
   },
   out_for_delivery: {
     type: 'out_for_delivery',
     title: 'Out for Delivery',
-    messageTemplate: '{{driverName}} is on the way with your order {{trackingCode}}.',
+    messageTemplate: '{{dispatchMessage}}',
   },
   delivered: {
     type: 'delivered',
     title: 'Order Delivered',
-    messageTemplate: 'Your order {{trackingCode}} has been delivered. Thank you for choosing ExpressWash!',
+    messageTemplate: 'Your order {{trackingCode}} has been delivered. We hope you love the results! Please share your feedback: {{feedbackLink}} — Express Carpets',
   },
   price_updated: {
     type: 'price_updated',
@@ -74,6 +74,44 @@ const TEMPLATES: Record<Notification['type'], NotificationTemplate> = {
     messageTemplate: '{{message}}',
   },
 };
+
+/**
+ * Returns the appropriate delivery/dispatch message based on the 6:30 PM cutoff rule.
+ * After 18:30, items will be delivered the next day.
+ */
+export function getDeliveryMessage(trackingCode: string, isTomorrow = false): string {
+  if (isTomorrow) {
+    return `Your carpets for order ${trackingCode} are ready and will be delivered tomorrow. Our team will contact you with the exact time. — Express Carpets`;
+  }
+  return `Your cleaned items for order ${trackingCode} are on their way! Our driver will deliver them shortly. — Express Carpets`;
+}
+
+export function getDispatchMessage(trackingCode: string, isTomorrow = false): string {
+  if (isTomorrow) {
+    return `Your carpets for order ${trackingCode} are ready and will be dispatched for delivery tomorrow. — Express Carpets`;
+  }
+  return `Your items for order ${trackingCode} have been dispatched and are out for delivery. — Express Carpets`;
+}
+
+export function isPastDeliveryCutoff(): boolean {
+  const now = new Date();
+  return now.getHours() > 18 || (now.getHours() === 18 && now.getMinutes() >= 30);
+}
+
+/**
+ * Build the SMS pickup message with actual item measurements.
+ */
+export function buildPickupSmsMessage(items: Array<{ name: string; quantity: number; lengthInches?: number; widthInches?: number }>): string {
+  const itemsList = items
+    .map((i) => {
+      const dims = i.lengthInches && i.widthInches
+        ? ` (${i.lengthInches}" × ${i.widthInches}")`
+        : '';
+      return `${i.quantity}x ${i.name}${dims}`;
+    })
+    .join(', ');
+  return itemsList;
+}
 
 /**
  * Create a notification from template
