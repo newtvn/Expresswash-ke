@@ -15,11 +15,14 @@ export interface OrderStage {
   description: string;
 }
 
+export type OrderSource = 'app' | 'walkin' | 'call' | 'whatsapp';
+
 export interface Order {
   id?: string;
   trackingCode: string;
   customerId?: string;
   customerName: string;
+  customerPhone?: string;
   status: number;
   items: OrderItem[];
   pickupDate: string;
@@ -34,6 +37,7 @@ export interface Order {
   driverName?: string;
   driverPhone?: string;
   driverId?: string;
+  orderSource?: OrderSource;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -15,11 +15,13 @@ import {
   Settings,
   Shield,
   FileText,
-  ClipboardList,
   ChevronUp,
   DollarSign,
   Calendar,
   Tag,
+  BookOpen,
+  ScanLine,
+  Wallet,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -55,15 +57,17 @@ const navGroups = [
   {
     label: 'Management',
     items: [
-      { title: 'Requested Quotes', href: '/admin/quotes', icon: ClipboardList },
       { title: 'Users', href: '/admin/users', icon: Users },
       { title: 'Orders', href: '/admin/orders', icon: Package },
       { title: 'Drivers', href: '/admin/drivers', icon: Truck },
     ],
   },
   {
-    label: 'Financial',
+    label: 'Accounts',
     items: [
+      { title: 'Accounts', href: '/admin/accounts', icon: BookOpen },
+      { title: 'Invoices', href: '/admin/invoices', icon: FileText },
+      { title: 'Receipts', href: '/admin/receipts', icon: ScanLine },
       { title: 'Billing', href: '/admin/billing', icon: Receipt },
       { title: 'Profit & Expense', href: '/admin/profit-expense', icon: TrendingUp },
     ],
@@ -96,6 +100,7 @@ const navGroups = [
       { title: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { title: 'Holiday Calendar', href: '/admin/holidays', icon: Calendar },
       { title: 'Configuration', href: '/admin/system-config', icon: Settings },
+      { title: 'Settings', href: '/admin/settings', icon: Wallet },
       { title: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
       { title: 'System Logs', href: '/admin/system-logs', icon: FileText },
     ],
@@ -201,6 +206,9 @@ export function AdminSidebar() {
               >
                 <DropdownMenuItem asChild>
                   <Link to="/portal/profile">Profile</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/admin/settings">Settings</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleLogout}>
                   Logout

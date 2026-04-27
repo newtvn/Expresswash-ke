@@ -62,6 +62,10 @@ const HolidayCalendar = lazy(() => import('@/pages/admin/HolidayCalendar'));
 const AdminPromotions = lazy(() => import('@/pages/admin/Promotions'));
 const UserDetail = lazy(() => import('@/pages/admin/UserDetail'));
 const NotificationCenter = lazy(() => import('@/pages/admin/NotificationCenter'));
+const Accounts = lazy(() => import('@/pages/admin/Accounts'));
+const AdminInvoices = lazy(() => import('@/pages/admin/AdminInvoices'));
+const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
+const Receipts = lazy(() => import('@/pages/admin/Receipts'));
 
 // Customer Pages
 const CustomerDashboard = lazy(() => import('@/pages/customer/Dashboard'));
@@ -216,6 +220,10 @@ const App = () => {
               <Route path="pricing" element={<PricingManagement />} />
               <Route path="holidays" element={<HolidayCalendar />} />
               <Route path="promotions" element={<AdminPromotions />} />
+              <Route path="accounts" element={<Accounts />} />
+              <Route path="invoices" element={<AdminInvoices />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="receipts" element={<Receipts />} />
             </Route>
 
             {/* Customer Portal */}
