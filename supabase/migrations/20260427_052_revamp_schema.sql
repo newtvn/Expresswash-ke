@@ -92,27 +92,14 @@ WHERE p.order_id = o.id
   AND o.customer_id IS NOT NULL;
 
 -- ============================================================
--- PART 4: expenses
+-- PART 4: expenses — table already exists from migration 002
+-- Just update the RLS policy to use explicit WITH CHECK clause.
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS expenses (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  description TEXT        NOT NULL,
-  category    TEXT        NOT NULL,
-  amount      NUMERIC(12,2) NOT NULL CHECK (amount >= 0),
-  date        DATE        NOT NULL DEFAULT CURRENT_DATE,
-  notes       TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "expenses_admin_all" ON expenses;
 DROP POLICY IF EXISTS "admins_manage_expenses" ON expenses;
 CREATE POLICY "admins_manage_expenses" ON expenses
   FOR ALL TO authenticated USING (is_admin()) WITH CHECK (is_admin());
-
-CREATE INDEX IF NOT EXISTS idx_expenses_date     ON expenses(date DESC);
-CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 
 -- ============================================================
 -- PART 5: journal_entries
