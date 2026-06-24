@@ -52,6 +52,9 @@ Run these in order on Supabase before deploying the updated Edge Functions:
 14. `supabase/migrations/20260624_066_invoice_ledger_entry_date.sql`
     - Replaces `post_invoice_to_ledger(...)` so invoice ledger entries use the invoice issue date instead of payment due date.
     - Repairs existing posted invoice journal entries that were incorrectly dated after their invoice issue/creation date.
+15. `supabase/migrations/20260624_067_balance_sheet_current_earnings.sql`
+    - Replaces `get_ledger_balance_sheet(...)` so current income/expense earnings are shown as an equity component until books are closed to retained earnings.
+    - Fixes false out-of-balance report badges when the ledger is balanced but current earnings have not been closed.
 
 ## Supabase Secrets
 
@@ -133,7 +136,7 @@ The payment flow follows the two transcript constraints:
 
 ## Post-Deploy Test Checklist
 
-1. Apply the migrations above through `20260624_066_invoice_ledger_entry_date.sql`.
+1. Apply the migrations above through `20260624_067_balance_sheet_current_earnings.sql`.
 2. Set Supabase secrets.
 3. Register the PesaPal IPN URL and set `PESAPAL_IPN_ID`.
 4. Deploy the three Edge Functions.
