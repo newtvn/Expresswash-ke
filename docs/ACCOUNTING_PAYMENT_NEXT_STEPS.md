@@ -49,6 +49,9 @@ Run these in order on Supabase before deploying the updated Edge Functions:
 13. `supabase/migrations/20260624_065_refund_cumulative_guard.sql`
     - Replaces `record_customer_refund(...)` so cumulative refunds cannot exceed the original payment amount or invoice paid amount.
     - Keeps the refund ledger posting balanced while preserving the original payment history.
+14. `supabase/migrations/20260624_066_invoice_ledger_entry_date.sql`
+    - Replaces `post_invoice_to_ledger(...)` so invoice ledger entries use the invoice issue date instead of payment due date.
+    - Repairs existing posted invoice journal entries that were incorrectly dated after their invoice issue/creation date.
 
 ## Supabase Secrets
 
@@ -130,7 +133,7 @@ The payment flow follows the two transcript constraints:
 
 ## Post-Deploy Test Checklist
 
-1. Apply the migrations above through `20260624_065_refund_cumulative_guard.sql`.
+1. Apply the migrations above through `20260624_066_invoice_ledger_entry_date.sql`.
 2. Set Supabase secrets.
 3. Register the PesaPal IPN URL and set `PESAPAL_IPN_ID`.
 4. Deploy the three Edge Functions.
