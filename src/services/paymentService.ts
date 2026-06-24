@@ -1,9 +1,9 @@
 /**
  * Payment Service for ExpressWash
- * Handles STK Push, QR Codes, and payment verification
+ * Handles provider-backed payments, QR Codes, and payment verification
  *
- * All sensitive bank API calls are routed through Supabase Edge Functions.
- * No bank credentials are used in frontend code.
+ * All sensitive provider API calls are routed through Supabase Edge Functions.
+ * No provider credentials are used in frontend code.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -52,12 +52,12 @@ export function isValidPhoneNumber(phone: string): boolean {
 }
 
 // ============================================================
-// STK PUSH (M-PESA PAYMENT PROMPT)
+// PROVIDER-BACKED PAYMENT START
 // ============================================================
 
 /**
- * Initiate STK Push - Prompts customer to pay via M-Pesa
- * Calls the stk-push Edge Function which securely handles bank API credentials.
+ * Start a payment. The Edge Function name remains `stk-push` for compatibility,
+ * but it delegates to the configured payment provider.
  */
 export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushResponse> {
   try {
@@ -78,7 +78,7 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
       };
     }
 
-    // Call stk-push Edge Function (handles bank auth + API call securely)
+    // Call Edge Function (handles provider auth + API call securely)
     const { data, error } = await supabase.functions.invoke('stk-push', {
       body: {
         phoneNumber,
@@ -104,9 +104,12 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
 
     return {
       success: true,
+      provider: data.provider,
       merchantRequestId: data.merchantRequestId,
       checkoutRequestId: data.checkoutRequestId,
-      customerMessage: data.message || 'Please check your phone and enter your M-Pesa PIN',
+      redirectUrl: data.redirectUrl,
+      idempotent: data.idempotent,
+      customerMessage: data.message || 'Continue to complete payment.',
     };
   } catch {
     return {
@@ -117,9 +120,9 @@ export async function initiateSTKPush(request: STKPushRequest): Promise<STKPushR
 }
 
 /**
- * Query STK Push payment status
+ * Query payment status
  * Checks payment record in database. If still processing, the payment-callback
- * Edge Function will update it when the bank sends confirmation.
+ * Edge Function will update it when the provider sends confirmation.
  */
 export async function queryPaymentStatus(request: PaymentQueryRequest): Promise<PaymentQueryResponse> {
   try {
@@ -285,6 +288,13 @@ function mapDatabaseToPayment(data: Record<string, unknown>): Payment {
     amount: data.amount as number,
     method: data.method as Payment['method'],
     status: data.status as Payment['status'],
+    provider: (data.provider as string) ?? undefined,
+    providerPaymentId: (data.provider_payment_id as string) ?? undefined,
+    providerReference: (data.provider_reference as string) ?? undefined,
+    providerStatus: (data.provider_status as string) ?? undefined,
+    payerPhoneNumber: (data.payer_phone_number as string) ?? undefined,
+    payerPhoneMatchesIntent: (data.payer_phone_matches_intent as boolean | null) ?? undefined,
+    payerPhoneMismatchAt: (data.payer_phone_mismatch_at as string) ?? undefined,
     phoneNumber: (data.phone_number as string) ?? undefined,
     customerName: (data.customer_name as string) ?? undefined,
     recordedBy: (data.recorded_by as string) ?? undefined,

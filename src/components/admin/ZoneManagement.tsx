@@ -219,7 +219,7 @@ function ZoneForm({
         <Label htmlFor="base_delivery_fee">Delivery Fee (KES)</Label>
         <Input
           id="base_delivery_fee" name="base_delivery_fee" type="number"
-          defaultValue={zone?.base_delivery_fee || 200} required min={0}
+          defaultValue={zone?.base_delivery_fee || 200} required min={1}
         />
       </div>
 

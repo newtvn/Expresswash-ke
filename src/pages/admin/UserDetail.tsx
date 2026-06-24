@@ -792,10 +792,10 @@ export const UserDetail = () => {
               {payments.map((p) => (
                 <div key={p.id as string} className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
-                    <p className="text-sm font-medium">{(p.payment_method as string) ?? 'M-Pesa'}</p>
+                    <p className="text-sm font-medium">{((p.method as string) ?? 'mpesa').replace('_', ' ')}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(p.created_at as string).toLocaleDateString()}
-                      {p.mpesa_receipt && ` · Ref: ${p.mpesa_receipt as string}`}
+                      {p.mpesa_receipt_number && ` · Ref: ${p.mpesa_receipt_number as string}`}
                     </p>
                   </div>
                   <div className="text-right">

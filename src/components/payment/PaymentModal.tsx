@@ -1,6 +1,6 @@
 /**
  * Payment Modal Component
- * Shows STK Push payment status and polling
+ * Shows payment status and polling
  */
 
 import { useEffect, useState } from 'react';
@@ -97,18 +97,18 @@ export function PaymentModal({
             <div className="space-y-4">
               <div className="flex items-center justify-center gap-2 text-blue-600">
                 <Smartphone className="w-5 h-5" />
-                <span className="font-medium">Check your phone for M-Pesa prompt</span>
+	                <span className="font-medium">Complete the payment request</span>
               </div>
               {phoneNumber && (
                 <p className="text-sm text-gray-600">
-                  A payment request has been sent to <strong>{phoneNumber}</strong>
+	                  A payment request has been started for <strong>{phoneNumber}</strong>
                 </p>
               )}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
                 <p className="font-medium text-blue-900 mb-2">Next Steps:</p>
                 <ol className="list-decimal list-inside space-y-1 text-blue-800">
-                  <li>Open the M-Pesa prompt on your phone</li>
-                  <li>Enter your M-Pesa PIN</li>
+	                  <li>Open the secure payment page or phone prompt</li>
+	                  <li>Confirm the payment details</li>
                   <li>Confirm the payment of <strong>KES {amount.toLocaleString()}</strong></li>
                 </ol>
               </div>

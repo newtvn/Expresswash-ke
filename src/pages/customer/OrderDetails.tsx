@@ -184,9 +184,17 @@ export const OrderDetails = () => {
     setPaymentLoading(false);
 
     if (result.success) {
+      if (result.redirectUrl) {
+        toast.success('Redirecting to payment...', {
+          description: result.customerMessage ?? 'Continue to complete payment securely.',
+        });
+        window.location.assign(result.redirectUrl);
+        return;
+      }
+
       setPaymentSent(true);
-      toast.success('Payment prompt sent!', {
-        description: result.customerMessage ?? 'Check your phone and enter your M-Pesa PIN',
+      toast.success('Payment started!', {
+        description: result.customerMessage ?? 'Continue to complete payment.',
       });
     } else {
       toast.error('Payment failed', {
@@ -635,10 +643,10 @@ export const OrderDetails = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Pay via M-Pesa
+              Pay Securely
             </DialogTitle>
             <DialogDescription>
-              Enter your Safaricom phone number to receive the M-Pesa payment prompt
+              Enter your phone number to continue to the secure payment page.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -655,7 +663,7 @@ export const OrderDetails = () => {
 
             {!paymentSent ? (
               <div className="space-y-2">
-                <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
+                <Label htmlFor="mpesa-phone">Payment Phone Number</Label>
                 <Input
                   id="mpesa-phone"
                   type="tel"
@@ -670,9 +678,9 @@ export const OrderDetails = () => {
                 <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                   <Smartphone className="h-6 w-6 text-green-600" />
                 </div>
-                <p className="font-medium">Payment prompt sent!</p>
+                <p className="font-medium">Payment started.</p>
                 <p className="text-sm text-muted-foreground">
-                  Check your phone and enter your M-Pesa PIN to complete the payment.
+                  Complete the payment, then return here to verify the order.
                 </p>
               </div>
             )}
@@ -684,9 +692,9 @@ export const OrderDetails = () => {
             {!paymentSent ? (
               <Button onClick={handlePayNow} disabled={paymentLoading || !phoneNumber.trim()}>
                 {paymentLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending...</>
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Starting...</>
                 ) : (
-                  <>Send Payment Prompt</>
+                  <>Continue to Payment</>
                 )}
               </Button>
             ) : (
