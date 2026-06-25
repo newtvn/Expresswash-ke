@@ -14,18 +14,15 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, PieChart, Pie, Cell, Legend,
-} from 'recharts';
-import {
   DollarSign, TrendingUp, TrendingDown, AlertCircle, Plus, Download,
-  FileText, Users, Package, User, GitCommitHorizontal,
+  FileText, Users, GitCommitHorizontal,
   RotateCcw, Trash2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
+import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
 import {
   getLedgerCashFlow,
   getLedgerBalanceSheet,
@@ -47,7 +44,7 @@ import {
   reversePostedJournalEntry,
   saveAccountingContact,
 } from '@/services/accounting/application';
-import type { AccountBalance, Bill, ChartAccount, Contact, JournalEntry, NotificationOutboxItem } from '@/types/accounting';
+import type { Bill, ChartAccount, Contact, JournalEntry, NotificationOutboxItem } from '@/types/accounting';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
 type ExpenseCategory = 'fuel' | 'supplies' | 'salary' | 'rent' | 'utilities' | 'marketing' | 'maintenance' | 'other';
@@ -332,8 +329,6 @@ const PAYMENT_METHODS: Array<{ value: ExpensePaymentMethod; label: string }> = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'card', label: 'Card' },
 ];
-
-const CHART_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed'];
 
 const makeBillLine = (): BillFormLine => ({
   id: crypto.randomUUID(),
@@ -715,14 +710,10 @@ export const Accounts = () => {
     }, {});
 
   const salesByPersonData = Object.entries(salesByPerson).map(([name, total]) => ({ name, total }));
-  const incomeAccounts = chartAccounts.filter((account) => account.accountType === 'income');
   const expenseAccounts = chartAccounts.filter((account) => account.accountType === 'expense');
-  const assetAccounts = chartAccounts.filter((account) => account.accountType === 'asset');
-  const liabilityAccounts = chartAccounts.filter((account) => account.accountType === 'liability');
-  const equityAccounts = chartAccounts.filter((account) => account.accountType === 'equity');
 
   const formatCurrency = (value: number | undefined) => `KES ${(value ?? 0).toLocaleString()}`;
-  const formatAccount = (account: ChartAccount | AccountBalance) => `${account.code} · ${account.name}`;
+  const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
   const canReplayOutbox = (item: NotificationOutboxItem) => item.status === 'failed' || item.status === 'dead_letter';
   const reportRangeLabel = reportFrom || reportTo
     ? `${reportFrom ?? 'Start'} to ${reportTo ?? 'Today'}`
@@ -749,28 +740,6 @@ export const Accounts = () => {
   const removeAllocationRow = (id: string) => {
     setAllocationRows((current) => (current.length === 1 ? current : current.filter((row) => row.id !== id)));
   };
-
-  const renderReportRows = (
-    title: string,
-    rows: Array<{ code: string; name: string; amount?: number; balance?: number }>,
-    empty: string,
-  ) => (
-    <div>
-      <p className="text-sm font-medium mb-2">{title}</p>
-      {rows.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{empty}</p>
-      ) : (
-        <div className="space-y-1">
-          {rows.map((row) => (
-            <div key={`${title}-${row.code}`} className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{row.code} · {row.name}</span>
-              <span className="font-medium">{formatCurrency(row.amount ?? row.balance)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -826,265 +795,25 @@ export const Accounts = () => {
         </TabsList>
 
         {/* ---- REPORTS ---- */}
-        <TabsContent value="reports" className="mt-4 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Ledger Reports</p>
-              <p className="text-xs text-muted-foreground">Generated from posted double-entry journal lines. Range: {reportRangeLabel}</p>
-            </div>
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Profit & Loss</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-green-50 p-3">
-                    <p className="text-xs text-muted-foreground">Income</p>
-                    <p className="font-bold text-green-700">{formatCurrency(profitAndLoss?.totalIncome)}</p>
-                  </div>
-                  <div className="rounded-lg bg-red-50 p-3">
-                    <p className="text-xs text-muted-foreground">Expenses</p>
-                    <p className="font-bold text-red-700">{formatCurrency(profitAndLoss?.totalExpenses)}</p>
-                  </div>
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <p className="text-xs text-muted-foreground">Net</p>
-                    <p className="font-bold text-blue-700">{formatCurrency(profitAndLoss?.netProfit)}</p>
-                  </div>
-                </div>
-                {renderReportRows('Income Accounts', profitAndLoss?.income ?? [], 'No posted income journal lines yet')}
-                {renderReportRows('Expense Accounts', profitAndLoss?.expenses ?? [], 'No posted expense journal lines yet')}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Balance Sheet</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <p className="text-xs text-muted-foreground">Assets</p>
-                    <p className="font-bold text-blue-700">{formatCurrency(balanceSheet?.totalAssets)}</p>
-                  </div>
-                  <div className="rounded-lg bg-orange-50 p-3">
-                    <p className="text-xs text-muted-foreground">Liabilities</p>
-                    <p className="font-bold text-orange-700">{formatCurrency(balanceSheet?.totalLiabilities)}</p>
-                  </div>
-                  <div className="rounded-lg bg-purple-50 p-3">
-                    <p className="text-xs text-muted-foreground">Equity</p>
-                    <p className="font-bold text-purple-700">{formatCurrency(balanceSheet?.totalEquity)}</p>
-                  </div>
-                </div>
-                <Badge variant={balanceSheet?.balanced ? 'default' : 'destructive'}>
-                  {balanceSheet?.balanced ? 'Balanced' : 'Out of balance'}
-                </Badge>
-                {renderReportRows('Assets', balanceSheet?.assets ?? [], 'No asset balances yet')}
-                {renderReportRows('Liabilities', balanceSheet?.liabilities ?? [], 'No liability balances yet')}
-                {renderReportRows('Equity', balanceSheet?.equity ?? [], 'No equity balances yet')}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">VAT Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Output VAT</span>
-                  <span className="font-semibold">{formatCurrency(vatSummary?.outputVat)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Input VAT</span>
-                  <span className="font-semibold">{formatCurrency(vatSummary?.inputVat)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="font-medium">Net VAT Payable</span>
-                  <span className="font-bold">{formatCurrency(vatSummary?.netVatPayable)}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  VAT is calculated from posted invoices, bills, and expenses in the canonical accounting tables.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Cash Flow</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-green-50 p-3">
-                    <p className="text-xs text-muted-foreground">Inflows</p>
-                    <p className="font-bold text-green-700">{formatCurrency(cashFlow?.totalInflows)}</p>
-                  </div>
-                  <div className="rounded-lg bg-red-50 p-3">
-                    <p className="text-xs text-muted-foreground">Outflows</p>
-                    <p className="font-bold text-red-700">{formatCurrency(cashFlow?.totalOutflows)}</p>
-                  </div>
-                  <div className="rounded-lg bg-blue-50 p-3">
-                    <p className="text-xs text-muted-foreground">Net</p>
-                    <p className="font-bold text-blue-700">{formatCurrency(cashFlow?.netCashFlow)}</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium mb-2">Inflows</p>
-                  {(cashFlow?.inflows.length ?? 0) === 0 ? (
-                    <p className="text-xs text-muted-foreground">No posted cash inflows yet</p>
-                  ) : cashFlow!.inflows.map((row) => (
-                    <div key={`in-${row.sourceType}`} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{row.label}</span>
-                      <span className="font-medium">{formatCurrency(row.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <p className="text-sm font-medium mb-2">Outflows</p>
-                  {(cashFlow?.outflows.length ?? 0) === 0 ? (
-                    <p className="text-xs text-muted-foreground">No posted cash outflows yet</p>
-                  ) : cashFlow!.outflows.map((row) => (
-                    <div key={`out-${row.sourceType}`} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{row.label}</span>
-                      <span className="font-medium">{formatCurrency(row.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader><CardTitle className="text-base">Chart of Accounts</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    { label: 'Assets', data: assetAccounts },
-                    { label: 'Liabilities', data: liabilityAccounts },
-                    { label: 'Equity', data: equityAccounts },
-                    { label: 'Income', data: incomeAccounts },
-                    { label: 'Expenses', data: expenseAccounts },
-                  ].map((group) => (
-                    <div key={group.label} className="rounded-lg border p-3">
-                      <p className="text-xs font-medium uppercase text-muted-foreground">{group.label}</p>
-                      <div className="mt-2 space-y-1">
-                        {group.data.map((account) => (
-                          <p key={account.id} className="text-sm">{formatAccount(account)}</p>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="text-base">Journal Entries</CardTitle></CardHeader>
-              <CardContent>
-                {(ledgerOverview?.entries ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No posted journal entries yet</p>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                    {(ledgerOverview?.entries ?? []).map((entry) => (
-                      <div key={entry.id} className="rounded-lg border p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold">{entry.entryNumber}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {entry.sourceType.replace('_', ' ')} · {formatDate(entry.entryDate)} · {entry.status}
-                            </p>
-                            {entry.memo && <p className="text-xs mt-1">{entry.memo}</p>}
-                          </div>
-                          {entry.status === 'posted' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={reverseJournalMutation.isPending}
-                              onClick={() => reverseJournalMutation.mutate(entry)}
-                            >
-                              Reverse
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Sales by Customer */}
-            <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Sales by Customer</CardTitle></CardHeader>
-              <CardContent>
-                {(summary?.orders ?? []).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={(summary?.orders ?? []).slice(0, 10).map((o) => ({ name: o.customer_name, total: o.total }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip formatter={(v) => `KES ${Number(v).toLocaleString()}`} />
-                      <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Sales by Person */}
-            <Card>
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" /> Sales by Admin</CardTitle></CardHeader>
-              <CardContent>
-                {salesByPersonData.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie data={salesByPersonData} dataKey="total" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                        {salesByPersonData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                      </Pie>
-                      <Legend />
-                      <Tooltip formatter={(v) => `KES ${Number(v).toLocaleString()}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Sales by Item */}
-            <Card className="lg:col-span-2">
-              <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Sales by Item Type</CardTitle></CardHeader>
-              <CardContent>
-                {salesByItem.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No item data yet</p>
-                ) : (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={salesByItem}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip
-                        formatter={(value, name) => [
-                          name === 'total' ? `KES ${Number(value).toLocaleString()}` : Number(value).toLocaleString(),
-                          name === 'total' ? 'Amount' : 'Quantity',
-                        ]}
-                      />
-                      <Bar dataKey="quantity" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+        <TabsContent value="reports">
+          <AccountsReportsPanel
+            dateRange={dateRange}
+            reportRangeLabel={reportRangeLabel}
+            chartAccounts={chartAccounts}
+            entries={ledgerOverview?.entries ?? []}
+            orders={summary?.orders ?? []}
+            salesByPersonData={salesByPersonData}
+            salesByItem={salesByItem}
+            profitAndLoss={profitAndLoss}
+            balanceSheet={balanceSheet}
+            vatSummary={vatSummary}
+            cashFlow={cashFlow}
+            reversePending={reverseJournalMutation.isPending}
+            setDateRange={setDateRange}
+            formatCurrency={formatCurrency}
+            formatDate={formatDate}
+            onReverseJournalEntry={(entry) => reverseJournalMutation.mutate(entry)}
+          />
         </TabsContent>
 
         {/* ---- EXPENSES ---- */}
