@@ -11,8 +11,10 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
-const DIST = join(import.meta.dirname, '..', 'dist');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DIST = join(__dirname, '..', 'dist');
 const BASE_URL = 'https://expresscarpets.co.ke';
 
 const routes = [
