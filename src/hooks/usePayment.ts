@@ -1,6 +1,6 @@
 /**
  * Custom React hook for payment operations
- * Simplifies STK Push and payment verification in components
+ * Simplifies provider-backed payment start and verification in components
  */
 
 import { useState, useCallback } from 'react';
@@ -21,7 +21,7 @@ import type {
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * Hook for initiating STK Push payments
+ * Hook for initiating provider-backed payments
  */
 export function useSTKPush() {
   const { toast } = useToast();
@@ -34,7 +34,7 @@ export function useSTKPush() {
       if (response.success) {
         toast({
           title: 'Payment Request Sent',
-          description: response.customerMessage || 'Check your phone for M-Pesa prompt',
+          description: response.customerMessage || 'Continue to complete payment.',
         });
       } else {
         toast({
@@ -137,7 +137,7 @@ export function usePayment() {
         };
       }
 
-      // Initiate STK Push
+      // Initiate provider-backed payment
       const response = await new Promise<STKPushResponse>((resolve) => {
         stkPush.initiatePayment(request, {
           onSuccess: resolve,

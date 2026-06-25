@@ -43,8 +43,8 @@ const PrivacyPolicy = () => {
             <h2 className="text-xl font-semibold text-foreground">3. Information Sharing</h2>
             <p>
               We share your information only as necessary to provide our services. This includes sharing your pickup address
-              and contact details with assigned drivers, and processing payments through our banking partner (Credit Bank)
-              and M-Pesa. We do not sell your personal information to third parties.
+              and contact details with assigned drivers, and processing payments through our payment provider and M-Pesa.
+              We do not sell your personal information to third parties.
             </p>
           </section>
 

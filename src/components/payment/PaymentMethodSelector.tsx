@@ -21,10 +21,10 @@ interface PaymentMethodSelectorProps {
 }
 
 const paymentMethods = [
-  {
-    value: 'mpesa' as PaymentMethod,
-    label: 'M-Pesa',
-    description: 'Pay instantly with M-Pesa STK Push',
+	{
+	  value: 'mpesa' as PaymentMethod,
+	  label: 'PesaPal / M-Pesa',
+	  description: 'Pay securely through PesaPal',
     icon: Smartphone,
     recommended: true,
   },

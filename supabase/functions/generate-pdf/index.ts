@@ -33,6 +33,13 @@ const COMPANY = {
   website: 'www.expresswash.co.ke',
 };
 
+type InvoiceLine = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -131,18 +138,23 @@ async function generateInvoicePDF(
     throw new Error(`Invoice not found: ${invoiceId}`);
   }
 
-  // Fetch invoice items
-  const { data: items } = await supabase
+  // Fetch legacy relational invoice items. Newer admin invoices may store
+  // transitional JSON items on invoices.items until invoice_lines exists.
+  const { data: relationalItems } = await supabase
     .from('invoice_items')
     .select('*')
     .eq('invoice_id', invoiceId);
 
   // Fetch customer phone from profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('phone')
-    .eq('id', invoice.customer_id)
-    .single();
+  const { data: profile } = invoice.customer_id
+    ? await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', invoice.customer_id)
+      .maybeSingle()
+    : { data: null };
+
+  const lineItems = normalizeInvoiceItems(relationalItems, invoice.items);
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]); // A4
@@ -183,20 +195,24 @@ async function generateInvoicePDF(
   y -= 15;
   page.drawText(invoice.customer_name ?? '', { x: 50, y, font, size: 10, color: darkGray });
   y -= 13;
-  page.drawText(invoice.customer_email ?? '', { x: 50, y, font, size: 9, color: gray });
-  if (profile?.phone) {
+  if (invoice.customer_email) {
     y -= 13;
-    page.drawText(profile.phone, { x: 50, y, font, size: 9, color: gray });
+    page.drawText(invoice.customer_email, { x: 50, y, font, size: 9, color: gray });
+  }
+  const customerPhone = invoice.customer_phone ?? profile?.phone;
+  if (customerPhone) {
+    y -= 13;
+    page.drawText(customerPhone, { x: 50, y, font, size: 9, color: gray });
   }
 
   // Invoice details (right side)
   const detailsY = y + 41;
   page.drawText('Order #:', { x: 350, y: detailsY, font, size: 9, color: gray });
-  page.drawText(invoice.order_number ?? '', { x: 420, y: detailsY, font, size: 9, color: darkGray });
+  page.drawText(invoice.order_number ?? invoice.order_tracking_code ?? '', { x: 420, y: detailsY, font, size: 9, color: darkGray });
   page.drawText('Issued:', { x: 350, y: detailsY - 14, font, size: 9, color: gray });
-  page.drawText(formatDate(invoice.issued_at), { x: 420, y: detailsY - 14, font, size: 9, color: darkGray });
+  page.drawText(formatDate(invoice.issued_at ?? invoice.created_at), { x: 420, y: detailsY - 14, font, size: 9, color: darkGray });
   page.drawText('Due:', { x: 350, y: detailsY - 28, font, size: 9, color: gray });
-  page.drawText(formatDate(invoice.due_at), { x: 420, y: detailsY - 28, font, size: 9, color: darkGray });
+  page.drawText(formatDate(invoice.due_at ?? invoice.due_date), { x: 420, y: detailsY - 28, font, size: 9, color: darkGray });
   if (invoice.paid_at) {
     page.drawText('Paid:', { x: 350, y: detailsY - 42, font, size: 9, color: gray });
     page.drawText(formatDate(invoice.paid_at), { x: 420, y: detailsY - 42, font, size: 9, color: rgb(0.1, 0.6, 0.2) });
@@ -214,7 +230,6 @@ async function generateInvoicePDF(
   y -= 22;
 
   // Items rows
-  const lineItems = items ?? [];
   for (const item of lineItems) {
     page.drawText(item.description ?? '', { x: 55, y, font, size: 9, color: darkGray });
     page.drawText(String(item.quantity ?? 1), { x: 335, y, font, size: 9, color: darkGray });
@@ -239,7 +254,7 @@ async function generateInvoicePDF(
     y -= 15;
   }
 
-  page.drawText(`VAT (${((invoice.vat_rate ?? 0.16) * 100).toFixed(0)}%):`, { x: 370, y, font, size: 9, color: gray });
+  page.drawText(`VAT (${formatVatRate(invoice.vat_rate)}%):`, { x: 370, y, font, size: 9, color: gray });
   page.drawText(`KES ${formatNumber(invoice.vat_amount)}`, { x: 470, y, font, size: 9, color: darkGray });
   y -= 20;
 
@@ -288,11 +303,13 @@ async function generateReceiptPDF(
   }
 
   // Fetch customer phone
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('phone')
-    .eq('id', invoice.customer_id)
-    .single();
+  const { data: profile } = invoice.customer_id
+    ? await supabase
+      .from('profiles')
+      .select('phone')
+      .eq('id', invoice.customer_id)
+      .maybeSingle()
+    : { data: null };
 
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 600]); // Shorter page for receipt
@@ -332,10 +349,10 @@ async function generateReceiptPDF(
 
   const details = [
     ['Invoice #', invoice.invoice_number ?? ''],
-    ['Order #', invoice.order_number ?? ''],
+    ['Order #', invoice.order_number ?? invoice.order_tracking_code ?? ''],
     ['Customer', invoice.customer_name ?? ''],
     ['Email', invoice.customer_email ?? ''],
-    ['Phone', profile?.phone ?? ''],
+    ['Phone', invoice.customer_phone ?? profile?.phone ?? ''],
     ['Payment Date', formatDate(payment.created_at)],
     ['Payment Method', methodLabel[payment.method] ?? payment.method],
     ['Reference', payment.reference ?? ''],
@@ -398,9 +415,40 @@ function formatDate(isoDate: string | null): string {
   }
 }
 
-function formatNumber(num: number | null): string {
+function formatNumber(num: number | string | null): string {
   if (num === null || num === undefined) return '0';
-  return num.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const parsed = Number(num);
+  if (!Number.isFinite(parsed)) return '0';
+  return parsed.toLocaleString('en-KE', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function formatVatRate(rawRate: number | string | null): string {
+  const rate = Number(rawRate ?? 0.16);
+  const normalized = rate > 1 ? rate : rate * 100;
+  return normalized.toFixed(0);
+}
+
+function normalizeInvoiceItems(relationalItems: Record<string, unknown>[] | null, jsonItems: unknown): InvoiceLine[] {
+  if (relationalItems && relationalItems.length > 0) {
+    return relationalItems.map((item) => ({
+      description: String(item.description ?? ''),
+      quantity: Number(item.quantity ?? 1),
+      unit_price: Number(item.unit_price ?? 0),
+      total: Number(item.total ?? 0),
+    }));
+  }
+
+  if (!Array.isArray(jsonItems)) return [];
+
+  return jsonItems.map((item) => {
+    const row = item as Record<string, unknown>;
+    return {
+      description: String(row.description ?? row.name ?? ''),
+      quantity: Number(row.quantity ?? 1),
+      unit_price: Number(row.unit_price ?? row.unitPrice ?? 0),
+      total: Number(row.total ?? 0),
+    };
+  });
 }
 
 function jsonResponse(data: unknown, status = 200) {

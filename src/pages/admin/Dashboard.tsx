@@ -98,6 +98,11 @@ function getServiceSummary(items: { name: string; quantity: number }[]): string 
   return `${items[0].name}+`;
 }
 
+function finiteNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // ── Main Component ──────────────────────────────────────────────────
 
 export const Dashboard = () => {
@@ -128,10 +133,10 @@ export const Dashboard = () => {
         const { data, error } = await supabase.rpc('get_delivery_metrics');
         if (error || !data) return { avgDays: 0, deliveredTotal: 0, onTimeCount: 0, onTimeRate: 0 };
         return {
-          avgDays: Number(data.avg_days) ?? 0,
-          deliveredTotal: Number(data.delivered_total) ?? 0,
-          onTimeCount: Number(data.on_time_count) ?? 0,
-          onTimeRate: Number(data.on_time_rate) ?? 0,
+          avgDays: finiteNumber(data.avg_days),
+          deliveredTotal: finiteNumber(data.delivered_total),
+          onTimeCount: finiteNumber(data.on_time_count),
+          onTimeRate: finiteNumber(data.on_time_rate),
         };
       } catch {
         return { avgDays: 0, deliveredTotal: 0, onTimeCount: 0, onTimeRate: 0 };

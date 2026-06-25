@@ -1,6 +1,6 @@
 /**
  * Payment type definitions for ExpressWash
- * Unified type supporting both STK Push (order-based) and manual (invoice-based) payments
+ * Unified type supporting provider-backed order payments and manual invoice payments.
  */
 
 export type PaymentMethod = 'mpesa' | 'cash' | 'card' | 'bank_transfer' | 'qr_code';
@@ -8,7 +8,7 @@ export type PaymentStatus = 'pending' | 'processing' | 'completed' | 'failed' | 
 
 export interface Payment {
   id: string;
-  orderId?: string;              // STK Push / order-based payments
+  orderId?: string;              // Provider-backed order payments
   invoiceId?: string;            // Manual / invoice-based payments
   invoiceNumber?: string;
   amount: number;
@@ -17,8 +17,15 @@ export interface Payment {
   phoneNumber?: string;
   customerName?: string;
   recordedBy?: string;           // Who recorded the payment (manual/cash)
-  merchantRequestId?: string;    // STK Push merchant request ID
-  checkoutRequestId?: string;    // STK Push checkout request ID
+  provider?: string;
+  providerPaymentId?: string;
+  providerReference?: string;
+  providerStatus?: string;
+  payerPhoneNumber?: string;
+  payerPhoneMatchesIntent?: boolean | null;
+  payerPhoneMismatchAt?: string;
+  merchantRequestId?: string;    // Legacy/provider merchant reference
+  checkoutRequestId?: string;    // Legacy/provider checkout or tracking ID
   reference?: string;            // Manual payment reference
   referenceNumber?: string;      // System-generated reference
   mpesaReceiptNumber?: string;
@@ -32,18 +39,18 @@ export interface Payment {
 }
 
 /**
- * STK Push Request - sent to bank/M-Pesa API
+ * Payment start request - sent to the provider-backed Edge Function.
  */
 export interface STKPushRequest {
   phoneNumber: string; // Format: 254712345678 (without +)
   amount: number; // Amount to charge
   accountReference: string; // Order ID or reference
   transactionDesc: string; // Description shown to customer
-  callbackUrl?: string; // URL to receive payment confirmation
+  callbackUrl?: string; // Optional provider callback URL override
 }
 
 /**
- * STK Push Response - from bank/M-Pesa API
+ * Payment start response - from the provider-backed Edge Function.
  */
 export interface STKPushResponse {
   success: boolean;
@@ -52,11 +59,14 @@ export interface STKPushResponse {
   responseCode?: string;
   responseDescription?: string;
   customerMessage?: string;
+  provider?: string;
+  redirectUrl?: string;
+  idempotent?: boolean;
   errorMessage?: string;
 }
 
 /**
- * Payment Callback - received from bank after payment
+ * Payment Callback - received from provider after payment
  */
 export interface PaymentCallback {
   merchantRequestId: string;
