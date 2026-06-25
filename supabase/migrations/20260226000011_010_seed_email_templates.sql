@@ -26,6 +26,17 @@ SET body = 'Hi {{customerName}}, reminder: We will pick up your items on {{picku
 WHERE name = 'Pickup Reminder' AND channel = 'sms';
 
 INSERT INTO notification_templates (name, channel, subject, body, variables, is_active)
+VALUES (
+  'Order Confirmation',
+  'sms',
+  NULL,
+  'Dear {{customerName}}, your order {{orderNumber}} has been confirmed. Pickup scheduled for {{pickupDate}}. Track at expresswash.co.ke/track',
+  ARRAY['customerName', 'orderNumber', 'pickupDate'],
+  true
+)
+ON CONFLICT (name, channel) DO NOTHING;
+
+INSERT INTO notification_templates (name, channel, subject, body, variables, is_active)
 VALUES
   (
     'Order Confirmation',

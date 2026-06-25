@@ -123,7 +123,7 @@ Important behavior:
 
 ## Migrations Applied
 
-These migrations were part of this branch. Migrations `053` through `067` have been applied live; `068` is the next local hardening migration:
+These migrations were part of this branch. Migrations `053` through `067` have been applied live; `068` is the next hardening migration:
 
 ```text
 053 accounting payment safety
@@ -141,8 +141,10 @@ These migrations were part of this branch. Migrations `053` through `067` have b
 065 refund cumulative guard
 066 invoice ledger entry date
 067 balance sheet current earnings
-068 accounting permission hardening (local next migration; not live-applied in this handoff)
+068 accounting permission hardening (verified locally; not live-applied in this handoff)
 ```
+
+Local migration filenames have been normalized to Supabase CLI-compatible timestamp versions so a fresh local reset can replay the full chain. The live database already has migrations through `067`, so do not apply the new baseline or replay historical local-bootstrap migrations against live. For live, apply only the new `068` hardening SQL, using the live migration history as the source of truth.
 
 Runbook details are in:
 
@@ -270,7 +272,7 @@ notification_outbox
 
 Confirm non-admin roles cannot mutate accounting records directly.
 
-Current local implementation: `supabase/migrations/20260625_068_accounting_permission_hardening.sql`.
+Current local implementation: `supabase/migrations/20260625000001_068_accounting_permission_hardening.sql`.
 
 The migration:
 
@@ -279,6 +281,13 @@ The migration:
 - makes payment-completion/provider-callback and notification-attempt RPCs service-role only,
 - removes direct authenticated writes to core accounting tables except `contacts`, which the current admin UI upserts directly,
 - leaves reads protected by existing RLS policies.
+
+Local verification completed after the migration-chain repair:
+
+- `supabase db reset --local` replays from the new baseline through `068`.
+- `supabase db lint --local` passes with only the existing `v_tier` and `v_default_fees` warnings.
+- Chrome DevTools local smoke passed against `http://127.0.0.1:8080`: admin login, Admin Accounts reports, Balance Sheet `Balanced`, Payables & Bills, Payments Received, Credits & Refunds, Contacts, Outbox, and Admin Invoices all rendered against local Supabase.
+- Permission probes confirmed anon has zero direct grants on accounting/outbox tables; authenticated has read grants plus contact upsert only; provider callback/payment-completion/notification-attempt RPCs are service-role only.
 
 ### 3. Split large admin UI files
 
@@ -365,7 +374,8 @@ Ready for this batch:
 
 - Branch is pushed.
 - Migrations through `067` applied and verified.
-- Tests passed.
-- Chrome verification passed.
+- Local migration chain through `068` resets cleanly.
+- Tests passed locally.
+- Chrome verification passed locally and previously live through `067`.
 - PR review completed locally.
 - No known critical or important blockers remain.

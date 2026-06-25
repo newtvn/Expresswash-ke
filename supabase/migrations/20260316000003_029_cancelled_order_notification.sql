@@ -30,7 +30,7 @@ VALUES
     || E'<h2 style="color: #dc2626;">Order Cancelled</h2>'
     || E'<p>Dear {{customerName}},</p>'
     || E'<p>Your order <strong>{{orderNumber}}</strong> has been cancelled.</p>'
-    || E'<p>If this was a mistake or you have any questions, please don\'t hesitate to contact us.</p>'
+    || E'<p>If this was a mistake or you have any questions, please don''t hesitate to contact us.</p>'
     || E'<p><a href="https://expresswash.co.ke/contact" style="display: inline-block; padding: 10px 20px; background: #dc2626; color: white; text-decoration: none; border-radius: 6px;">Contact Us</a></p>'
     || E'<p>We hope to serve you again soon!</p>'
     || E'<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">'

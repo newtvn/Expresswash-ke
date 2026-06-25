@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION auto_confirm_referral_signup()
 RETURNS TRIGGER AS $$
 BEGIN
   -- Link pending referral to the new user (by email match)
-  UPDATE referrals
+  UPDATE public.referrals
   SET referee_id = NEW.id,
       referee_name = COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
   WHERE referee_email = NEW.email
@@ -16,7 +16,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS trg_auto_confirm_referral ON auth.users;
 CREATE TRIGGER trg_auto_confirm_referral
