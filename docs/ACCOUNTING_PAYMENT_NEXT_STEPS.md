@@ -55,6 +55,11 @@ Run these in order on Supabase before deploying the updated Edge Functions:
 15. `supabase/migrations/20260624_067_balance_sheet_current_earnings.sql`
     - Replaces `get_ledger_balance_sheet(...)` so current income/expense earnings are shown as an equity component until books are closed to retained earnings.
     - Fixes false out-of-balance report badges when the ledger is balanced but current earnings have not been closed.
+16. `supabase/migrations/20260625_068_accounting_permission_hardening.sql`
+    - Removes PostgreSQL's default public execute surface from accounting security-definer RPCs.
+    - Keeps admin UI workflows callable only through authenticated RPCs with admin checks.
+    - Restricts provider callback and notification-attempt worker RPCs to `service_role`.
+    - Removes direct authenticated writes to core accounting tables except contact upserts; bills, allocations, refunds, credit notes, ledger entries, and outbox changes go through RPCs.
 
 ## Supabase Secrets
 
@@ -136,7 +141,7 @@ The payment flow follows the two transcript constraints:
 
 ## Post-Deploy Test Checklist
 
-1. Apply the migrations above through `20260624_067_balance_sheet_current_earnings.sql`.
+1. Apply the migrations above through `20260625_068_accounting_permission_hardening.sql`.
 2. Set Supabase secrets.
 3. Register the PesaPal IPN URL and set `PESAPAL_IPN_ID`.
 4. Deploy the three Edge Functions.

@@ -1,13 +1,15 @@
 # Accounting Core Handoff
 
-Last updated: 2026-06-24  
+Last updated: 2026-06-25
 Branch: `accounting-core-safety`  
 Remote: `origin/accounting-core-safety`  
-Latest commit: `ee45a2b Include current earnings in balance sheet`
+Latest pushed commit before permission hardening: `d5df9c9 Fix meta injection path resolution`
 
 ## Current Status
 
-This branch is pushed and ready for merge/deploy for the current accounting/PesaPal batch.
+This branch was merged to `main` via PR #55 and the Edge Functions were redeployed for the current accounting/PesaPal batch.
+
+Additional local hardening is implemented in migration `068`; it has not been applied live yet.
 
 Verified live after migrations through `067`:
 
@@ -20,6 +22,11 @@ Verified live after migrations through `067`:
 - Invoice journal entries now post on invoice issue/created date, not due date.
 - Balance Sheet now includes Current Earnings under Equity and shows `Balanced`.
 - Chrome verified Admin Accounts and Admin Invoices on desktop and mobile.
+- Supabase Edge Functions redeployed after merge:
+  - `stk-push`
+  - `payment-callback --no-verify-jwt`
+  - `generate-pdf`
+- `main` CI initially failed in `scripts/inject-meta.mjs` under Node 18 after Vite built successfully; commit `d5df9c9` fixed path resolution and the rerun passed.
 
 Final verification commands passed:
 
@@ -116,7 +123,7 @@ Important behavior:
 
 ## Migrations Applied
 
-These migrations were part of this branch and have been applied live through `067`:
+These migrations were part of this branch. Migrations `053` through `067` have been applied live; `068` is the next local hardening migration:
 
 ```text
 053 accounting payment safety
@@ -134,6 +141,7 @@ These migrations were part of this branch and have been applied live through `06
 065 refund cumulative guard
 066 invoice ledger entry date
 067 balance sheet current earnings
+068 accounting permission hardening (local next migration; not live-applied in this handoff)
 ```
 
 Runbook details are in:
@@ -233,7 +241,7 @@ reviews/accounting-core-safety-review-5.md
 
 ### 1. Merge and deploy this branch
 
-Merge `accounting-core-safety` after normal repo review. Deploy frontend and edge functions.
+Status: completed for the `067` batch. PR #55 was merged to `main`; Edge Functions were deployed. Live smoke is intentionally deferred until local validation of the next phase is complete.
 
 Post-deploy smoke:
 
@@ -261,6 +269,16 @@ notification_outbox
 ```
 
 Confirm non-admin roles cannot mutate accounting records directly.
+
+Current local implementation: `supabase/migrations/20260625_068_accounting_permission_hardening.sql`.
+
+The migration:
+
+- revokes default `PUBLIC`/`anon` execute from accounting security-definer RPCs,
+- keeps admin UI RPCs available to authenticated users while relying on their admin checks,
+- makes payment-completion/provider-callback and notification-attempt RPCs service-role only,
+- removes direct authenticated writes to core accounting tables except `contacts`, which the current admin UI upserts directly,
+- leaves reads protected by existing RLS policies.
 
 ### 3. Split large admin UI files
 
