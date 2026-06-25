@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,9 +36,13 @@ import {
   allocateCustomerPayment,
   createSupplierBill,
   getAccountingSetup,
+  getCustomerPaymentAllocationOptions,
   getLedgerOverview,
   getOperationalAccounting,
   postBalancedJournalEntry,
+  postExpenseLedgerEntry,
+  postInvoiceLedgerEntry,
+  postPaymentReceivedLedgerEntry,
   recordSupplierBillPayment,
   recordCustomerRefund,
   reversePostedJournalEntry,
@@ -68,6 +72,8 @@ interface AccountPayment {
   checkout_request_id?: string;
   mpesa_receipt_number?: string;
   result_desc?: string;
+  unapplied_amount?: number | string;
+  posted_journal_entry_id?: string;
 }
 
 interface AccountExpense {
@@ -78,6 +84,7 @@ interface AccountExpense {
   expense_date: string;
   payment_method: ExpensePaymentMethod;
   status: string;
+  posted_journal_entry_id?: string;
 }
 
 interface AgingInvoice {
@@ -91,6 +98,7 @@ interface AgingInvoice {
   due_at?: string;
   status: string;
   created_at: string;
+  posted_journal_entry_id?: string;
 }
 
 interface AccountOrder {
@@ -142,7 +150,6 @@ const formatDate = (value?: string | null): string => {
 };
 
 const getInvoiceDueDate = (invoice: AgingInvoice): string | undefined => invoice.due_date ?? invoice.due_at;
-const normalizeName = (value?: string | null): string => value?.trim().toLowerCase() ?? '';
 
 const STATUS_EVENT_LABELS: Record<string, string> = {
   initial_insert: 'Payment record created',
@@ -208,7 +215,7 @@ const formatStatusTrigger = (value?: string | null): string => {
 async function fetchAccountSummary() {
   const [ordersRes, paymentsRes, expensesRes] = await Promise.all([
     supabase.from('orders').select('total, status, created_at, customer_name'),
-    supabase.from('payments').select('id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, payer_phone_matches_intent'),
+    supabase.from('payments').select('id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, payer_phone_matches_intent, unapplied_amount, posted_journal_entry_id'),
     supabase.from('expenses').select('id, amount, category, expense_date, payment_method, status, description'),
   ]);
 
@@ -234,7 +241,7 @@ async function fetchExpenses() {
 async function fetchPaymentsReceived(from?: string, to?: string) {
   let q = supabase
     .from('payments')
-    .select('id, invoice_id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, phone_number, payer_phone_number, payer_phone_matches_intent, merchant_request_id, checkout_request_id, mpesa_receipt_number, result_desc')
+    .select('id, invoice_id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, phone_number, payer_phone_number, payer_phone_matches_intent, merchant_request_id, checkout_request_id, mpesa_receipt_number, result_desc, unapplied_amount, posted_journal_entry_id')
     .eq('status', 'completed')
     .order('created_at', { ascending: false });
   if (from) q = q.gte('created_at', from);
@@ -277,7 +284,7 @@ async function fetchSalesByItem(): Promise<SalesByItemRow[]> {
 async function fetchAgingSummary() {
   const { data } = await supabase
     .from('invoices')
-    .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at')
+    .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id')
     .neq('status', 'paid');
   return (data ?? []) as AgingInvoice[];
 }
@@ -462,6 +469,7 @@ export const Accounts = () => {
 
   const bills = operationalAccounting?.bills ?? [];
   const refunds = operationalAccounting?.refunds ?? [];
+  const customerCredits = operationalAccounting?.customerCredits ?? [];
   const refundableAmount = refundTarget
     ? Math.max(
       toAmount(refundTarget.amount) - refunds
@@ -506,6 +514,12 @@ export const Accounts = () => {
     queryKey: ['payments', selectedPayment?.id, 'events'],
     queryFn: () => fetchPaymentEvents(selectedPayment!.id),
     enabled: Boolean(selectedPayment?.id),
+  });
+
+  const { data: allocationOptions, isLoading: allocationOptionsLoading } = useQuery({
+    queryKey: ['payments', allocationTarget?.id, 'allocation-options'],
+    queryFn: () => getCustomerPaymentAllocationOptions(allocationTarget!.id),
+    enabled: Boolean(allocationTarget?.id),
   });
 
   const { data: salesByItem = [] } = useQuery({
@@ -654,6 +668,48 @@ export const Accounts = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const postInvoiceMutation = useMutation({
+    mutationFn: postInvoiceLedgerEntry,
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to post invoice');
+        return;
+      }
+      toast.success(result.idempotent ? 'Invoice already posted' : 'Invoice posted');
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const postPaymentMutation = useMutation({
+    mutationFn: postPaymentReceivedLedgerEntry,
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to post payment');
+        return;
+      }
+      toast.success(result.idempotent ? 'Payment already posted' : 'Payment posted');
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const postExpenseMutation = useMutation({
+    mutationFn: postExpenseLedgerEntry,
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to post expense');
+        return;
+      }
+      toast.success(result.idempotent ? 'Expense already posted' : 'Expense posted');
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const replayOutboxMutation = useMutation({
     mutationFn: replayNotificationOutbox,
     onSuccess: (result) => {
@@ -666,6 +722,19 @@ export const Accounts = () => {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  useEffect(() => {
+    if (!allocationTarget || !allocationOptions) return;
+    setAllocationRows(
+      allocationOptions.allocations.length > 0
+        ? allocationOptions.allocations.map((allocation) => ({
+          id: crypto.randomUUID(),
+          invoiceId: allocation.invoiceId,
+          amount: String(allocation.amountAllocated),
+        }))
+        : [makeAllocationRow()],
+    );
+  }, [allocationOptions, allocationTarget]);
 
   // Aging buckets
   const now = new Date();
@@ -711,6 +780,14 @@ export const Accounts = () => {
 
   const salesByPersonData = Object.entries(salesByPerson).map(([name, total]) => ({ name, total }));
   const expenseAccounts = chartAccounts.filter((account) => account.accountType === 'expense');
+  const openUnpostedInvoices = agingData.filter((invoice) => (
+    invoice.status !== 'draft'
+    && invoice.status !== 'cancelled'
+    && !invoice.posted_journal_entry_id
+    && toAmount(invoice.total) > 0
+  ));
+  const unpostedPayments = paymentsReceived.filter((payment) => !payment.posted_journal_entry_id && toAmount(payment.amount) > 0);
+  const unpostedExpenses = expenses.filter((expense) => expense.status !== 'rejected' && !expense.posted_journal_entry_id && toAmount(expense.amount) > 0);
 
   const formatCurrency = (value: number | undefined) => `KES ${(value ?? 0).toLocaleString()}`;
   const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
@@ -740,6 +817,12 @@ export const Accounts = () => {
   const removeAllocationRow = (id: string) => {
     setAllocationRows((current) => (current.length === 1 ? current : current.filter((row) => row.id !== id)));
   };
+
+  const allocationInvoiceOptions = allocationOptions?.openInvoices ?? [];
+  const allocationRowsTotal = allocationRows.reduce((sum, row) => sum + toAmount(row.amount), 0);
+  const allocationRemaining = allocationOptions
+    ? Math.max(allocationOptions.payment.amount - allocationRowsTotal, 0)
+    : Math.max(toAmount(allocationTarget?.amount) - allocationRowsTotal, 0);
 
   return (
     <div className="space-y-6">
@@ -790,6 +873,7 @@ export const Accounts = () => {
           <TabsTrigger value="aging">Aging Summary</TabsTrigger>
           <TabsTrigger value="payables">Payables & Bills</TabsTrigger>
           <TabsTrigger value="refunds">Credits & Refunds</TabsTrigger>
+          <TabsTrigger value="posting">Posting Gaps</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="outbox">Outbox</TabsTrigger>
         </TabsList>
@@ -865,6 +949,8 @@ export const Accounts = () => {
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">{p.customer_name ?? 'Customer'}</p>
                           {p.provider && <Badge variant="outline" className="text-xs">{formatPaymentProvider(p.provider)}</Badge>}
+                          {toAmount(p.unapplied_amount) > 0 && <Badge variant="secondary" className="text-xs">Credit {formatCurrency(toAmount(p.unapplied_amount))}</Badge>}
+                          {p.posted_journal_entry_id && <Badge variant="outline" className="text-xs">Posted</Badge>}
                           {p.payer_phone_matches_intent === false && <Badge variant="destructive" className="text-xs">Phone mismatch</Badge>}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -873,7 +959,22 @@ export const Accounts = () => {
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="font-semibold text-green-600">KES {toAmount(p.amount).toLocaleString()}</span>
+                        <div className="text-right">
+                          <p className="font-semibold text-green-600">KES {toAmount(p.amount).toLocaleString()}</p>
+                          {toAmount(p.unapplied_amount) > 0 && <p className="text-xs text-muted-foreground">Unapplied {formatCurrency(toAmount(p.unapplied_amount))}</p>}
+                        </div>
+                        {toAmount(p.unapplied_amount) > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setAllocationTarget(p);
+                              setAllocationRows([makeAllocationRow()]);
+                            }}
+                          >
+                            Apply
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" onClick={() => setSelectedPayment(p)}>
                           <GitCommitHorizontal className="h-3 w-3 mr-1" /> View trail
                         </Button>
@@ -1045,10 +1146,66 @@ export const Accounts = () => {
               <CardTitle>Customer Credits & Refunds</CardTitle>
             </CardHeader>
             <CardContent>
-              {refunds.length === 0 && (operationalAccounting?.creditNotes.length ?? 0) === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-12">No credit notes or refunds recorded yet</p>
+              {customerCredits.length === 0 && refunds.length === 0 && (operationalAccounting?.creditNotes.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-12">No customer credits, credit notes, or refunds recorded yet</p>
               ) : (
                 <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Customer Credit Balances</p>
+                    {customerCredits.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No unapplied customer payments</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {customerCredits.map((credit) => (
+                          <div key={credit.paymentId} className="rounded-lg border p-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-semibold">{credit.customerName ?? 'Customer'}</p>
+                                  {credit.provider && <Badge variant="outline">{formatPaymentProvider(credit.provider)}</Badge>}
+                                  {credit.postedJournalEntryId && <Badge variant="outline">Posted</Badge>}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Received {formatDate(credit.createdAt)} · Total {formatCurrency(credit.amount)} · Allocated {formatCurrency(credit.allocatedAmount)}
+                                </p>
+                                {credit.providerReference && <p className="text-xs text-muted-foreground">Reference: {credit.providerReference}</p>}
+                              </div>
+                              <div className="flex items-center gap-3 sm:justify-end">
+                                <div className="text-right">
+                                  <p className="font-semibold">{formatCurrency(credit.unappliedAmount)}</p>
+                                  <p className="text-xs text-muted-foreground">Available</p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    const payment = paymentsReceived.find((item) => item.id === credit.paymentId);
+                                    setAllocationTarget(payment ?? {
+                                      id: credit.paymentId,
+                                      amount: credit.amount,
+                                      status: 'completed',
+                                      created_at: credit.createdAt,
+                                      method: credit.method,
+                                      customer_name: credit.customerName,
+                                      provider: credit.provider,
+                                      unapplied_amount: credit.unappliedAmount,
+                                      posted_journal_entry_id: credit.postedJournalEntryId,
+                                    });
+                                    setAllocationRows([makeAllocationRow()]);
+                                  }}
+                                >
+                                  Apply
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
                   <div>
                     <p className="text-sm font-medium mb-2">Credit Notes</p>
                     {(operationalAccounting?.creditNotes.length ?? 0) === 0 ? (
@@ -1109,6 +1266,108 @@ export const Accounts = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ---- POSTING GAPS ---- */}
+        <TabsContent value="posting" className="mt-4">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Unposted Invoices</CardTitle></CardHeader>
+              <CardContent>
+                {openUnpostedInvoices.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No invoice posting gaps</p>
+                ) : (
+                  <div className="space-y-2">
+                    {openUnpostedInvoices.map((invoice) => (
+                      <div key={invoice.id} className="rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{invoice.invoice_number}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {invoice.customer_name} · {formatDate(invoice.created_at)} · {formatCurrency(toAmount(invoice.total))}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={postInvoiceMutation.isPending}
+                            onClick={() => postInvoiceMutation.mutate(invoice.id)}
+                          >
+                            Post
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Unposted Payments</CardTitle></CardHeader>
+              <CardContent>
+                {unpostedPayments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No payment posting gaps</p>
+                ) : (
+                  <div className="space-y-2">
+                    {unpostedPayments.map((payment) => (
+                      <div key={payment.id} className="rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{payment.customer_name ?? 'Customer'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(payment.created_at)} · {formatCurrency(toAmount(payment.amount))}
+                              {toAmount(payment.unapplied_amount) > 0 ? ` · Credit ${formatCurrency(toAmount(payment.unapplied_amount))}` : ''}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={postPaymentMutation.isPending}
+                            onClick={() => postPaymentMutation.mutate(payment.id)}
+                          >
+                            Post
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-base">Unposted Expenses</CardTitle></CardHeader>
+              <CardContent>
+                {unpostedExpenses.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No expense posting gaps</p>
+                ) : (
+                  <div className="space-y-2">
+                    {unpostedExpenses.map((expense) => (
+                      <div key={expense.id} className="rounded-lg border p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium">{expense.description}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {humanizeCode(expense.category)} · {formatDate(expense.expense_date)} · {formatCurrency(toAmount(expense.amount))}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={postExpenseMutation.isPending}
+                            onClick={() => postExpenseMutation.mutate(expense.id)}
+                          >
+                            Post
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ---- CONTACTS ---- */}
@@ -1848,18 +2107,24 @@ export const Accounts = () => {
           </DialogHeader>
           {allocationTarget && (
             <div className="space-y-4 py-2">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <div className="rounded-lg bg-muted p-3">
                   <p className="text-xs text-muted-foreground">Payment</p>
-                  <p className="font-semibold">{formatCurrency(toAmount(allocationTarget.amount))}</p>
+                  <p className="font-semibold">{formatCurrency(allocationOptions?.payment.amount ?? toAmount(allocationTarget.amount))}</p>
                 </div>
                 <div className="rounded-lg bg-muted p-3">
-                  <p className="text-xs text-muted-foreground">Allocated In This Form</p>
-                  <p className="font-semibold">
-                    {formatCurrency(allocationRows.reduce((sum, row) => sum + toAmount(row.amount), 0))}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Current Total</p>
+                  <p className="font-semibold">{formatCurrency(allocationRowsTotal)}</p>
+                </div>
+                <div className="rounded-lg bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Unapplied After Save</p>
+                  <p className="font-semibold">{formatCurrency(allocationRemaining)}</p>
                 </div>
               </div>
+              {allocationOptionsLoading && <p className="text-sm text-muted-foreground">Loading allocation options...</p>}
+              {!allocationOptionsLoading && allocationInvoiceOptions.length === 0 && (
+                <p className="rounded-lg border p-3 text-sm text-muted-foreground">No open invoices are available for this customer.</p>
+              )}
               <div className="space-y-3">
                 {allocationRows.map((row, index) => (
                   <div key={row.id} className="rounded-lg border p-3 space-y-3">
@@ -1881,15 +2146,10 @@ export const Accounts = () => {
                         <Select value={row.invoiceId} onValueChange={(value) => updateAllocationRow(row.id, { invoiceId: value })}>
                           <SelectTrigger><SelectValue placeholder="Select open invoice" /></SelectTrigger>
                           <SelectContent>
-                            {agingData
-                              .filter((invoice) => {
-                                const hasBalance = toAmount(invoice.balance ?? Math.max(toAmount(invoice.total) - toAmount(invoice.paid_amount), 0)) > 0;
-                                const paymentCustomer = normalizeName(allocationTarget?.customer_name);
-                                return hasBalance && (!paymentCustomer || normalizeName(invoice.customer_name) === paymentCustomer);
-                              })
+                            {allocationInvoiceOptions
                               .map((invoice) => (
-                                <SelectItem key={invoice.id} value={invoice.id}>
-                                  {invoice.invoice_number} · {invoice.customer_name} · {formatCurrency(toAmount(invoice.balance ?? Math.max(toAmount(invoice.total) - toAmount(invoice.paid_amount), 0)))}
+                                <SelectItem key={invoice.invoiceId} value={invoice.invoiceId}>
+                                  {invoice.invoiceNumber} · {invoice.customerName ?? 'Customer'} · {formatCurrency(invoice.balance + invoice.currentPaymentAllocation)}
                                 </SelectItem>
                               ))}
                           </SelectContent>
@@ -1901,9 +2161,23 @@ export const Accounts = () => {
                           type="number"
                           min="1"
                           step="0.01"
+                          max={allocationInvoiceOptions.find((invoice) => invoice.invoiceId === row.invoiceId)
+                            ? allocationInvoiceOptions.find((invoice) => invoice.invoiceId === row.invoiceId)!.balance
+                              + allocationInvoiceOptions.find((invoice) => invoice.invoiceId === row.invoiceId)!.currentPaymentAllocation
+                            : undefined}
                           value={row.amount}
                           onChange={(event) => updateAllocationRow(row.id, { amount: event.target.value })}
                         />
+                        {row.invoiceId && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Available on invoice: {formatCurrency(
+                              (() => {
+                                const invoice = allocationInvoiceOptions.find((item) => item.invoiceId === row.invoiceId);
+                                return invoice ? invoice.balance + invoice.currentPaymentAllocation : 0;
+                              })(),
+                            )}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1926,13 +2200,27 @@ export const Accounts = () => {
               onClick={() => {
                 if (!allocationTarget) return;
                 const totalAllocated = allocationRows.reduce((sum, row) => sum + toAmount(row.amount), 0);
-                if (totalAllocated <= 0 || totalAllocated > toAmount(allocationTarget.amount)) {
+                const paymentAmount = allocationOptions?.payment.amount ?? toAmount(allocationTarget.amount);
+                if (totalAllocated <= 0 || totalAllocated > paymentAmount) {
                   toast.error('Allocation total must be greater than zero and within the payment amount');
                   return;
                 }
                 const hasInvalidRow = allocationRows.some((row) => !row.invoiceId || toAmount(row.amount) <= 0);
                 if (hasInvalidRow) {
                   toast.error('Every allocation row needs an invoice and amount');
+                  return;
+                }
+                const invoiceIds = allocationRows.map((row) => row.invoiceId);
+                if (new Set(invoiceIds).size !== invoiceIds.length) {
+                  toast.error('Each invoice can appear only once in an allocation');
+                  return;
+                }
+                const exceedsInvoiceBalance = allocationRows.some((row) => {
+                  const invoice = allocationInvoiceOptions.find((item) => item.invoiceId === row.invoiceId);
+                  return !invoice || toAmount(row.amount) > invoice.balance + invoice.currentPaymentAllocation;
+                });
+                if (exceedsInvoiceBalance) {
+                  toast.error('Allocation cannot exceed an invoice balance');
                   return;
                 }
                 allocationMutation.mutate({

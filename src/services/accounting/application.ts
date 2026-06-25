@@ -73,16 +73,18 @@ export async function saveAccountingContact(input: Partial<Contact> & { name: st
 }
 
 export async function getOperationalAccounting() {
-  const [bills, creditNotes, refunds] = await Promise.all([
+  const [bills, creditNotes, refunds, customerCredits] = await Promise.all([
     repository.listBills(),
     repository.listCreditNotes(),
     repository.listCustomerRefunds(),
+    repository.listCustomerCreditBalances(),
   ]);
 
   return {
     bills,
     creditNotes,
     refunds,
+    customerCredits,
   };
 }
 
@@ -191,9 +193,19 @@ export async function allocateCustomerPayment(input: AllocateCustomerPaymentInpu
   return repository.allocateCustomerPayment(input);
 }
 
+export async function getCustomerPaymentAllocationOptions(paymentId: string) {
+  if (!paymentId) return null;
+  return repository.getCustomerPaymentAllocationOptions(paymentId);
+}
+
 export async function postInvoiceLedgerEntry(invoiceId: string) {
   if (!invoiceId) return { success: false, error: 'Invoice is required' };
   return repository.postInvoiceToLedger(invoiceId);
+}
+
+export async function postPaymentReceivedLedgerEntry(paymentId: string) {
+  if (!paymentId) return { success: false, error: 'Payment is required' };
+  return repository.postPaymentReceivedToLedger(paymentId);
 }
 
 export async function postExpenseLedgerEntry(expenseId: string) {

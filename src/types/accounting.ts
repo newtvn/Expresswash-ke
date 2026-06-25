@@ -189,6 +189,56 @@ export interface AllocateCustomerPaymentInput {
   allocations: PaymentAllocationInput[];
 }
 
+export interface CustomerPaymentAllocationOption {
+  invoiceId: string;
+  invoiceNumber: string;
+  customerName?: string;
+  total: number;
+  paidAmount: number;
+  balance: number;
+  currentPaymentAllocation: number;
+  dueDate?: string;
+  status: string;
+}
+
+export interface ExistingCustomerPaymentAllocation {
+  invoiceId: string;
+  invoiceNumber: string;
+  customerName?: string;
+  amountAllocated: number;
+  invoiceBalance: number;
+  allocatedAt?: string;
+}
+
+export interface CustomerPaymentAllocationOptions {
+  payment: {
+    id: string;
+    amount: number;
+    allocatedAmount: number;
+    unappliedAmount: number;
+    customerId?: string;
+    customerName?: string;
+    status: string;
+    postedJournalEntryId?: string;
+  };
+  allocations: ExistingCustomerPaymentAllocation[];
+  openInvoices: CustomerPaymentAllocationOption[];
+}
+
+export interface CustomerCreditBalance {
+  paymentId: string;
+  customerId?: string;
+  customerName?: string;
+  amount: number;
+  allocatedAmount: number;
+  unappliedAmount: number;
+  method?: string;
+  provider?: string;
+  providerReference?: string;
+  createdAt: string;
+  postedJournalEntryId?: string;
+}
+
 export interface AccountingOperationResult {
   success: boolean;
   error?: string;
