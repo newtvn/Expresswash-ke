@@ -123,7 +123,7 @@ Important behavior:
 
 ## Migrations Applied
 
-These migrations were part of this branch. Migrations `053` through `067` have been applied live; `068` is the next local hardening migration:
+These migrations were part of this branch. Migrations `053` through `070` have been applied live; `071` is the next scheduler migration:
 
 ```text
 053 accounting payment safety
@@ -141,8 +141,13 @@ These migrations were part of this branch. Migrations `053` through `067` have b
 065 refund cumulative guard
 066 invoice ledger entry date
 067 balance sheet current earnings
-068 accounting permission hardening (local next migration; not live-applied in this handoff)
+068 accounting permission hardening
+069 customer credit allocation workflow
+070 notification outbox worker claim
+071 schedule notification outbox worker (verified locally; apply after notification-worker deploy)
 ```
+
+Local migration filenames have been normalized to Supabase CLI-compatible timestamp versions so a fresh local reset can replay the full chain. For live, apply only the next unapplied migration SQL, using the live migration history as the source of truth.
 
 Runbook details are in:
 
@@ -158,6 +163,7 @@ Deploy/redeploy these after merge if production needs the latest branch state:
 supabase functions deploy stk-push
 supabase functions deploy payment-callback --no-verify-jwt
 supabase functions deploy generate-pdf
+supabase functions deploy notification-worker
 ```
 
 Required Supabase secrets:
@@ -170,6 +176,10 @@ PESAPAL_CONSUMER_SECRET
 PESAPAL_IPN_ID
 SITE_URL
 PESAPAL_CANCELLATION_URL
+WHATSAPP_WEBHOOK_URL (optional; otherwise WhatsApp outbox falls back to SMS if configured)
+WHATSAPP_WEBHOOK_TOKEN (optional)
+RESEND_API_KEY (for email outbox delivery)
+AFRICASTALKING_API_KEY / AFRICASTALKING_USERNAME / AFRICASTALKING_SENDER_ID (for SMS fallback)
 ```
 
 Do not commit real provider secrets. Rotate credentials before production if the chat/logs are visible beyond the implementation team.
@@ -203,6 +213,7 @@ Key admin workflows now available:
   - Chart of Accounts,
   - Journal Entries.
 - Notification outbox visibility/replay foundation.
+- Notification worker foundation for service-role outbox processing and delivery attempts.
 
 ## Live Verification Already Done
 
@@ -270,7 +281,7 @@ notification_outbox
 
 Confirm non-admin roles cannot mutate accounting records directly.
 
-Current local implementation: `supabase/migrations/20260625_068_accounting_permission_hardening.sql`.
+Current local implementation: `supabase/migrations/20260625000001_068_accounting_permission_hardening.sql`.
 
 The migration:
 
@@ -279,6 +290,13 @@ The migration:
 - makes payment-completion/provider-callback and notification-attempt RPCs service-role only,
 - removes direct authenticated writes to core accounting tables except `contacts`, which the current admin UI upserts directly,
 - leaves reads protected by existing RLS policies.
+
+Local verification completed after the migration-chain repair:
+
+- `supabase db reset --local` replays from the new baseline through `068`.
+- `supabase db lint --local` passes with only the existing `v_tier` and `v_default_fees` warnings.
+- Chrome DevTools local smoke passed against `http://127.0.0.1:8080`: admin login, Admin Accounts reports, Balance Sheet `Balanced`, Payables & Bills, Payments Received, Credits & Refunds, Contacts, Outbox, and Admin Invoices all rendered against local Supabase.
+- Permission probes confirmed anon has zero direct grants on accounting/outbox tables; authenticated has read grants plus contact upsert only; provider callback/payment-completion/notification-attempt RPCs are service-role only.
 
 ### 3. Split large admin UI files
 
@@ -365,7 +383,8 @@ Ready for this batch:
 
 - Branch is pushed.
 - Migrations through `067` applied and verified.
-- Tests passed.
-- Chrome verification passed.
+- Local migration chain through `068` resets cleanly.
+- Tests passed locally.
+- Chrome verification passed locally and previously live through `067`.
 - PR review completed locally.
 - No known critical or important blockers remain.

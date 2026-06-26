@@ -6,60 +6,74 @@ This branch prepares the accounting/payment foundation for the next Zoho-like fi
 
 Run these in order on Supabase before deploying the updated Edge Functions:
 
-1. `supabase/migrations/20260622_053_accounting_payment_safety.sql`
+For the existing live database, migrations through `067` were already applied before the local-first `068` hardening pass. Do not replay the local baseline or renamed historical migration chain on live. Apply only the next unapplied migration SQL for the target database's migration history.
+
+Current local migration filenames use Supabase CLI timestamp versions so `supabase db reset --local` can replay the full project from scratch.
+
+1. `supabase/migrations/20260622000001_053_accounting_payment_safety.sql`
    - Adds atomic invoice payment recording.
    - Updates payment callback completion so paid invoices receive correct `paid_amount` and `balance`.
-2. `supabase/migrations/20260622_054_restore_zone_delivery_fees.sql`
+2. `supabase/migrations/20260622000002_054_restore_zone_delivery_fees.sql`
    - Restores positive delivery fees for existing zones.
    - Adds a check constraint preventing zero/negative zone delivery fees.
-3. `supabase/migrations/20260622_055_payment_provider_abstraction.sql`
+3. `supabase/migrations/20260622000003_055_payment_provider_abstraction.sql`
    - Adds `payments.provider`, `provider_payment_id`, `provider_reference`, `provider_status`, and `provider_metadata`.
    - Replaces `process_payment_callback(...)` with provider-aware, row-locked, idempotent callback processing.
-4. `supabase/migrations/20260623_056_accounting_core_schema.sql`
+4. `supabase/migrations/20260623000001_056_accounting_core_schema.sql`
    - Adds canonical contacts, tax rates, chart of accounts, accounting items, invoice lines, payment allocations, bills/payables, payment-made allocations, credit notes, journal entries, and journal lines.
    - Backfills contacts from customer profiles and invoice lines from existing invoice items where possible.
    - Adds `post_journal_entry(...)` and `reverse_journal_entry(...)` with enforced balanced debits/credits.
-5. `supabase/migrations/20260623_057_accounting_report_functions.sql`
+5. `supabase/migrations/20260623000002_057_accounting_report_functions.sql`
    - Adds ledger-backed P&L, balance sheet, VAT summary, receivables aging, and payables aging RPCs.
    - These reports are additive and do not replace the older operational dashboard RPCs yet.
-6. `supabase/migrations/20260623_058_notification_outbox_replay.sql`
+6. `supabase/migrations/20260623000003_058_notification_outbox_replay.sql`
    - Adds a durable notification outbox, delivery-attempt history, enqueue RPC, attempt marker RPC, and replay RPC.
    - This is the foundation for WhatsApp/email/SMS delivery workers without sending inside finance request handlers.
-7. `supabase/migrations/20260623_059_payment_payer_phone_audit.sql`
+7. `supabase/migrations/20260623000004_059_payment_payer_phone_audit.sql`
    - Stores the provider-observed payer phone separately from the phone entered in our checkout UI.
    - Flags phone mismatches as audit metadata without rejecting legitimate third-party payments.
-8. `supabase/migrations/20260623_060_operational_accounting_workflows.sql`
+8. `supabase/migrations/20260623000005_060_operational_accounting_workflows.sql`
    - Adds posted journal references to invoices, payments, and expenses.
    - Adds RPCs for invoice posting, payment-received posting, supplier bill creation, bill posting, bill payment recording, payment-made posting, credit-note creation/posting, and expense posting.
    - Replaces `record_invoice_payment(...)` so manual invoice payments create payment allocations and ledger entries in one transaction.
    - Replaces `complete_payment_transaction(...)` so completed online payments allocate to linked invoices and post ledger entries when invoices exist.
-9. `supabase/migrations/20260623_061_cash_flow_and_outbox_admin.sql`
+9. `supabase/migrations/20260623000006_061_cash_flow_and_outbox_admin.sql`
    - Adds a ledger-backed cash-flow RPC for admin reporting.
    - Keeps notification outbox replay available from the admin UI through the existing replay RPC.
-10. `supabase/migrations/20260624_062_non_blocking_payment_notifications.sql`
+10. `supabase/migrations/20260624000001_062_non_blocking_payment_notifications.sql`
     - Replaces the legacy payment notification trigger so notification/template/preference failures cannot roll back financial payment records.
     - Keeps payment confirmation notification failures visible as Postgres warnings while preserving the payment, allocation, and ledger transaction.
-11. `supabase/migrations/20260624_063_invoice_payment_credit_balance.sql`
+11. `supabase/migrations/20260624000002_063_invoice_payment_credit_balance.sql`
     - Replaces manual invoice payment recording so it subtracts from the current open balance, preserving previously-applied credit notes.
     - Backfills affected credited invoices to `total - paid_amount - applied_credit_notes`.
-12. `supabase/migrations/20260624_064_invoice_editor_allocation_refunds.sql`
+12. `supabase/migrations/20260624000003_064_invoice_editor_allocation_refunds.sql`
     - Adds transaction-safe invoice creation/update RPCs backed by canonical `invoice_lines`.
     - Adds `payments.unapplied_amount`, multi-invoice allocation RPC support, and `customer_refunds`.
     - Adds refund posting to the ledger without rewriting original payment history.
-13. `supabase/migrations/20260624_065_refund_cumulative_guard.sql`
+13. `supabase/migrations/20260624000004_065_refund_cumulative_guard.sql`
     - Replaces `record_customer_refund(...)` so cumulative refunds cannot exceed the original payment amount or invoice paid amount.
     - Keeps the refund ledger posting balanced while preserving the original payment history.
-14. `supabase/migrations/20260624_066_invoice_ledger_entry_date.sql`
+14. `supabase/migrations/20260624000005_066_invoice_ledger_entry_date.sql`
     - Replaces `post_invoice_to_ledger(...)` so invoice ledger entries use the invoice issue date instead of payment due date.
     - Repairs existing posted invoice journal entries that were incorrectly dated after their invoice issue/creation date.
-15. `supabase/migrations/20260624_067_balance_sheet_current_earnings.sql`
+15. `supabase/migrations/20260624000006_067_balance_sheet_current_earnings.sql`
     - Replaces `get_ledger_balance_sheet(...)` so current income/expense earnings are shown as an equity component until books are closed to retained earnings.
     - Fixes false out-of-balance report badges when the ledger is balanced but current earnings have not been closed.
-16. `supabase/migrations/20260625_068_accounting_permission_hardening.sql`
+16. `supabase/migrations/20260625000001_068_accounting_permission_hardening.sql`
     - Removes PostgreSQL's default public execute surface from accounting security-definer RPCs.
     - Keeps admin UI workflows callable only through authenticated RPCs with admin checks.
     - Restricts provider callback and notification-attempt worker RPCs to `service_role`.
     - Removes direct authenticated writes to core accounting tables except contact upserts; bills, allocations, refunds, credit notes, ledger entries, and outbox changes go through RPCs.
+17. `supabase/migrations/20260625000002_069_customer_credit_allocation_workflow.sql`
+    - Adds Customer Credits as a liability account for unapplied customer payments.
+    - Adds admin RPCs for customer credit balances and payment allocation options.
+    - Keeps later credit application ledger-safe with adjustment journal entries rather than rewriting posted payment journals.
+18. `supabase/migrations/20260626000001_070_notification_outbox_worker_claim.sql`
+    - Adds a service-role-only claim RPC for notification workers.
+    - Atomically claims due pending/failed outbox rows and stale processing rows, using `FOR UPDATE SKIP LOCKED`.
+19. `supabase/migrations/20260626000002_071_schedule_notification_outbox_worker.sql`
+    - Adds the `process-notification-outbox` cron job.
+    - Calls `notification-worker` every minute through `pg_net` with the `service_role_key` vault secret.
 
 ## Supabase Secrets
 
@@ -73,7 +87,13 @@ supabase secrets set \
   PESAPAL_CONSUMER_SECRET="<set-from-pesapal>" \
   PESAPAL_IPN_ID="<registered-ipn-id>" \
   SITE_URL="https://your-production-site" \
-  PESAPAL_CANCELLATION_URL="https://your-production-site/portal/orders"
+  PESAPAL_CANCELLATION_URL="https://your-production-site/portal/orders" \
+  RESEND_API_KEY="<set-for-email-delivery>" \
+  WHATSAPP_WEBHOOK_URL="<optional-whatsapp-provider-webhook>" \
+  WHATSAPP_WEBHOOK_TOKEN="<optional-whatsapp-provider-token>" \
+  AFRICASTALKING_API_KEY="<set-for-sms-or-whatsapp-fallback>" \
+  AFRICASTALKING_USERNAME="<set-for-sms-or-whatsapp-fallback>" \
+  AFRICASTALKING_SENDER_ID="<optional-sender-id>"
 ```
 
 For sandbox testing, use:
@@ -121,11 +141,13 @@ Deploy after migrations and secrets are in place:
 
 ```bash
 supabase functions deploy stk-push
-supabase functions deploy payment-callback
+supabase functions deploy payment-callback --no-verify-jwt
 supabase functions deploy generate-pdf
+supabase functions deploy notification-worker
 ```
 
 `stk-push` remains the public function name for frontend compatibility, but internally it is now a provider-backed payment start endpoint.
+`notification-worker` must be called with the service-role bearer token. Apply migration `071` only after migration `070` is applied and the function is deployed.
 
 ## Architecture Applied
 
@@ -141,7 +163,7 @@ The payment flow follows the two transcript constraints:
 
 ## Post-Deploy Test Checklist
 
-1. Apply the migrations above through `20260625_068_accounting_permission_hardening.sql`.
+1. Apply the next unapplied accounting migration through `20260625000001_068_accounting_permission_hardening.sql`, without replaying the local baseline on an existing live database.
 2. Set Supabase secrets.
 3. Register the PesaPal IPN URL and set `PESAPAL_IPN_ID`.
 4. Deploy the three Edge Functions.
@@ -197,7 +219,6 @@ This branch still does not finish the full Zoho-like accounting product. The fou
 - Advanced payment allocation UI for one payment across multiple invoices.
 - Customer credit balance handling beyond refund recording.
 - More complete posting automation for all existing legacy expenses and historical records.
-- Notification delivery worker for WhatsApp/email/SMS.
-- WhatsApp PDF/link delivery using the notification outbox.
+- Live provider verification for WhatsApp PDF/link delivery using the notification outbox.
 
 Because payment credentials were shared in chat, consider rotating them before production if this conversation or logs are accessible beyond the implementation team.

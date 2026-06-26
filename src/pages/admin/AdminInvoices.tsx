@@ -8,18 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
   FileText, Plus, Download, MessageSquare, CheckCircle2, Clock, AlertCircle,
-  Search, Eye, Edit2, Trash2,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
+import { InvoiceListTabs } from '@/components/admin/invoices/InvoiceListTabs';
 import {
   createAccountingInvoice,
   createInvoiceCreditNote,
@@ -32,10 +32,10 @@ import type { AccountingItem, ChartAccount, Contact, InvoiceLineInput, TaxRate }
 
 // ---------- Types ----------
 
-type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'pending' | 'partial' | 'partially_paid' | 'overdue' | 'cancelled';
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'pending' | 'partial' | 'partially_paid' | 'overdue' | 'cancelled';
 type PaymentMethod = 'mpesa' | 'cash' | 'card' | 'bank_transfer' | 'qr_code';
 
-interface Invoice {
+export interface Invoice {
   id: string;
   invoice_number: string;
   order_id?: string;
@@ -66,7 +66,7 @@ interface Invoice {
   notes?: string;
 }
 
-interface InvoiceTemplate {
+export interface InvoiceTemplate {
   id: string;
   name: string;
   header_text: string;
@@ -674,184 +674,35 @@ export const AdminInvoices = () => {
         ))}
       </div>
 
-      <Tabs defaultValue="all-invoices">
-        <TabsList>
-          <TabsTrigger value="all-invoices">All Invoices</TabsTrigger>
-          <TabsTrigger value="overdue">Overdue</TabsTrigger>
-          <TabsTrigger value="templates">Templates</TabsTrigger>
-        </TabsList>
-
-        {/* ALL INVOICES */}
-        <TabsContent value="all-invoices" className="mt-4 space-y-4">
-          <div className="flex flex-wrap gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-9 w-64" placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">Loading invoices...</p>
-          ) : filtered.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground"><FileText className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No invoices found</p></CardContent></Card>
-          ) : (
-            <div className="space-y-2">
-              {filtered.map((inv) => {
-                const st = STATUS_CONFIG[inv.status];
-                return (
-                  <Card key={inv.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => setSelectedInvoice(inv)}>
-                    <CardContent className="py-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{inv.invoice_number}</span>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${st.className}`}>
-                              <st.icon className="h-3 w-3" />
-                              {st.label}
-                            </span>
-                            {inv.posted_journal_entry_id && <Badge variant="outline" className="text-xs">Posted</Badge>}
-                            {inv.order_tracking_code && (
-                              <Badge variant="outline" className="text-xs">#{inv.order_tracking_code}</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-0.5">{inv.customer_name}</p>
-                          {isPartialStatus(inv.status) && (
-                            <p className="text-xs text-blue-600 mt-0.5">
-                              Paid: KES {inv.paid_amount.toLocaleString()} · Balance: KES {inv.balance.toLocaleString()}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="font-bold">KES {inv.total.toLocaleString()}</p>
-                            <p className="text-xs text-muted-foreground">Due {formatDate(inv.due_date)}</p>
-                          </div>
-                          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              title="Update payment"
-                              onClick={() => { setSelectedInvoice(inv); setPaymentAmount(''); setPaymentDialogOpen(true); }}
-                            >
-                              <Edit2 className="h-3 w-3 mr-1" /> Payment
-                            </Button>
-                            {invoiceCanBeEdited(inv) && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                title="Edit invoice"
-                                onClick={() => openEditInvoiceDialog(inv)}
-                              >
-                                Edit
-                              </Button>
-                            )}
-                            {!inv.posted_journal_entry_id && inv.status !== 'draft' && inv.status !== 'cancelled' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={postInvoiceMutation.isPending}
-                                title="Post to ledger"
-                                onClick={() => postInvoiceMutation.mutate(inv.id)}
-                              >
-                                Post
-                              </Button>
-                            )}
-                            {inv.customer_phone && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                title="Queue WhatsApp invoice"
-                                disabled={whatsappOutboxMutation.isPending}
-                                onClick={() => whatsappOutboxMutation.mutate(inv)}
-                              >
-                                <MessageSquare className="h-3 w-3" />
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              title="Download PDF"
-                              disabled={pdfMutation.isPending}
-                              onClick={() => pdfMutation.mutate(inv.id)}
-                            >
-                              <Download className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* OVERDUE */}
-        <TabsContent value="overdue" className="mt-4">
-          <div className="space-y-2">
-            {invoices.filter((i) => i.status === 'overdue' || isPastDue(i)).map((inv) => (
-              <Card key={inv.id} className="border-red-200">
-                <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{inv.invoice_number}</span>
-                      <Badge variant="destructive" className="text-xs">Overdue</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{inv.customer_name}</p>
-                    <p className="text-xs text-red-600 mt-0.5">Due: {formatDate(inv.due_date)} · Balance: KES {inv.balance.toLocaleString()}</p>
-                  </div>
-                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                    {inv.customer_phone && (
-                      <Button size="sm" variant="outline" onClick={() => openWhatsApp(inv.customer_phone!, inv.invoice_number)}>
-                        <MessageSquare className="h-3 w-3 mr-1" /> Remind
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" onClick={() => { setSelectedInvoice(inv); setPaymentAmount(String(inv.balance)); setPaymentDialogOpen(true); }}>
-                      Mark Paid
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {invoices.filter((i) => i.status === 'overdue' || isPastDue(i)).length === 0 && (
-              <Card><CardContent className="py-12 text-center text-muted-foreground"><CheckCircle2 className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No overdue invoices</p></CardContent></Card>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* TEMPLATES */}
-        <TabsContent value="templates" className="mt-4">
-          <div className="space-y-3">
-            <Button onClick={() => setTemplateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" /> New Template
-            </Button>
-            {templates.length === 0 ? (
-              <Card><CardContent className="py-12 text-center text-muted-foreground"><FileText className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No templates yet</p></CardContent></Card>
-            ) : templates.map((t) => (
-              <Card key={t.id}>
-                <CardContent className="py-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{t.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{t.payment_terms}</p>
-                  </div>
-                  <Button variant="ghost" size="sm"><Eye className="h-4 w-4" /></Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+      <InvoiceListTabs
+        invoices={invoices}
+        filtered={filtered}
+        templates={templates}
+        isLoading={isLoading}
+        search={search}
+        statusFilter={statusFilter}
+        postInvoicePending={postInvoiceMutation.isPending}
+        whatsappPending={whatsappOutboxMutation.isPending}
+        pdfPending={pdfMutation.isPending}
+        setSearch={setSearch}
+        setStatusFilter={setStatusFilter}
+        formatDate={formatDate}
+        invoiceCanBeEdited={invoiceCanBeEdited}
+        isPartialStatus={isPartialStatus}
+        isPastDue={isPastDue}
+        onSelectInvoice={setSelectedInvoice}
+        onRecordPayment={(invoice, amount = '') => {
+          setSelectedInvoice(invoice);
+          setPaymentAmount(amount);
+          setPaymentDialogOpen(true);
+        }}
+        onEditInvoice={openEditInvoiceDialog}
+        onPostInvoice={(invoiceId) => postInvoiceMutation.mutate(invoiceId)}
+        onQueueWhatsApp={(invoice) => whatsappOutboxMutation.mutate(invoice)}
+        onDownloadPdf={(invoiceId) => pdfMutation.mutate(invoiceId)}
+        onOpenTemplateDialog={() => setTemplateDialogOpen(true)}
+        onOpenWhatsAppReminder={openWhatsApp}
+      />
 
       {/* View Invoice Dialog */}
       {selectedInvoice && !paymentDialogOpen && !creditDialogOpen && !invoiceDialogOpen && (

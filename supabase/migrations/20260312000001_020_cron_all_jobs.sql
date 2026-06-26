@@ -11,6 +11,49 @@
 -- This file registers 5 cron jobs. Run in Supabase SQL Editor.
 -- ============================================================
 
+DO $$
+BEGIN
+  IF to_regnamespace('cron') IS NULL THEN
+    CREATE SCHEMA cron;
+    CREATE TABLE cron.job (
+      jobid BIGSERIAL PRIMARY KEY,
+      jobname TEXT UNIQUE NOT NULL,
+      schedule TEXT,
+      command TEXT,
+      active BOOLEAN NOT NULL DEFAULT TRUE
+    );
+
+    CREATE OR REPLACE FUNCTION cron.unschedule(p_jobname TEXT)
+    RETURNS BOOLEAN AS $stub$
+    BEGIN
+      DELETE FROM cron.job WHERE jobname = p_jobname;
+      RETURN TRUE;
+    END;
+    $stub$ LANGUAGE plpgsql;
+
+    CREATE OR REPLACE FUNCTION cron.schedule(
+      p_jobname TEXT,
+      p_schedule TEXT,
+      p_command TEXT
+    ) RETURNS BIGINT AS $stub$
+    DECLARE
+      v_jobid BIGINT;
+    BEGIN
+      INSERT INTO cron.job (jobname, schedule, command)
+      VALUES (p_jobname, p_schedule, p_command)
+      ON CONFLICT (jobname) DO UPDATE SET
+        schedule = EXCLUDED.schedule,
+        command = EXCLUDED.command
+      RETURNING jobid INTO v_jobid;
+
+      RETURN v_jobid;
+    END;
+    $stub$ LANGUAGE plpgsql;
+
+    RAISE NOTICE 'pg_cron is not installed; using local cron stub for migration validation';
+  END IF;
+END $$;
+
 -- ────────────────────────────────────────────────────────────
 -- JOB 1: Process notification queue (every minute)
 -- Calls send-notification Edge Function via pg_net

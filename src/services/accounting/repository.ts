@@ -12,6 +12,8 @@ import type {
   CreateCreditNoteInput,
   CreateInvoiceInput,
   CreditNote,
+  CustomerCreditBalance,
+  CustomerPaymentAllocationOptions,
   CustomerRefund,
   JournalEntry,
   JournalEntryInput,
@@ -203,6 +205,60 @@ function mapCustomerRefund(row: Record<string, unknown>): CustomerRefund {
     status: row.status as CustomerRefund['status'],
     postedJournalEntryId: (row.posted_journal_entry_id as string) ?? undefined,
     createdAt: row.created_at as string,
+  };
+}
+
+function mapAllocationOptions(payload: Record<string, unknown>): CustomerPaymentAllocationOptions {
+  const payment = (payload.payment ?? {}) as Record<string, unknown>;
+  const allocations = (payload.allocations ?? []) as Record<string, unknown>[];
+  const openInvoices = (payload.open_invoices ?? []) as Record<string, unknown>[];
+
+  return {
+    payment: {
+      id: payment.id as string,
+      amount: Number(payment.amount) || 0,
+      allocatedAmount: Number(payment.allocated_amount) || 0,
+      unappliedAmount: Number(payment.unapplied_amount) || 0,
+      customerId: (payment.customer_id as string) ?? undefined,
+      customerName: (payment.customer_name as string) ?? undefined,
+      status: (payment.status as string) ?? 'completed',
+      postedJournalEntryId: (payment.posted_journal_entry_id as string) ?? undefined,
+    },
+    allocations: allocations.map((allocation) => ({
+      invoiceId: allocation.invoice_id as string,
+      invoiceNumber: allocation.invoice_number as string,
+      customerName: (allocation.customer_name as string) ?? undefined,
+      amountAllocated: Number(allocation.amount_allocated) || 0,
+      invoiceBalance: Number(allocation.invoice_balance) || 0,
+      allocatedAt: (allocation.allocated_at as string) ?? undefined,
+    })),
+    openInvoices: openInvoices.map((invoice) => ({
+      invoiceId: invoice.invoice_id as string,
+      invoiceNumber: invoice.invoice_number as string,
+      customerName: (invoice.customer_name as string) ?? undefined,
+      total: Number(invoice.total) || 0,
+      paidAmount: Number(invoice.paid_amount) || 0,
+      balance: Number(invoice.balance) || 0,
+      currentPaymentAllocation: Number(invoice.current_payment_allocation) || 0,
+      dueDate: (invoice.due_date as string) ?? undefined,
+      status: (invoice.status as string) ?? 'pending',
+    })),
+  };
+}
+
+function mapCustomerCreditBalance(row: Record<string, unknown>): CustomerCreditBalance {
+  return {
+    paymentId: row.payment_id as string,
+    customerId: (row.customer_id as string) ?? undefined,
+    customerName: (row.customer_name as string) ?? undefined,
+    amount: Number(row.amount) || 0,
+    allocatedAmount: Number(row.allocated_amount) || 0,
+    unappliedAmount: Number(row.unapplied_amount) || 0,
+    method: (row.method as string) ?? undefined,
+    provider: (row.provider as string) ?? undefined,
+    providerReference: (row.provider_reference as string) ?? undefined,
+    createdAt: row.created_at as string,
+    postedJournalEntryId: (row.posted_journal_entry_id as string) ?? undefined,
   };
 }
 
@@ -502,6 +558,26 @@ export async function allocateCustomerPayment(input: AllocateCustomerPaymentInpu
   return mapOperationResult(data, 'Failed to allocate payment');
 }
 
+export async function getCustomerPaymentAllocationOptions(paymentId: string): Promise<CustomerPaymentAllocationOptions | null> {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_customer_payment_allocation_options', { p_payment_id: paymentId }),
+    { maxRetries: 2 },
+  );
+
+  if (error || !data) return null;
+  return mapAllocationOptions(data as Record<string, unknown>);
+}
+
+export async function listCustomerCreditBalances(): Promise<CustomerCreditBalance[]> {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('list_customer_credit_balances'),
+    { maxRetries: 2 },
+  );
+
+  if (error || !data) return [];
+  return ((data ?? []) as Record<string, unknown>[]).map(mapCustomerCreditBalance);
+}
+
 export async function postInvoiceToLedger(invoiceId: string): Promise<AccountingOperationResult> {
   const { data, error } = await retrySupabaseQuery(
     () => supabase.rpc('post_invoice_to_ledger', { p_invoice_id: invoiceId }),
@@ -510,6 +586,16 @@ export async function postInvoiceToLedger(invoiceId: string): Promise<Accounting
 
   if (error) return failedOperation(error, 'Failed to post invoice');
   return mapOperationResult(data, 'Failed to post invoice');
+}
+
+export async function postPaymentReceivedToLedger(paymentId: string): Promise<AccountingOperationResult> {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('post_payment_received_to_ledger', { p_payment_id: paymentId }),
+    { maxRetries: 2 },
+  );
+
+  if (error) return failedOperation(error, 'Failed to post payment');
+  return mapOperationResult(data, 'Failed to post payment');
 }
 
 export async function postExpenseToLedger(expenseId: string): Promise<AccountingOperationResult> {
