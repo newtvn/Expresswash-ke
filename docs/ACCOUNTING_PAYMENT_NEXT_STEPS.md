@@ -71,6 +71,9 @@ Current local migration filenames use Supabase CLI timestamp versions so `supaba
 18. `supabase/migrations/20260626000001_070_notification_outbox_worker_claim.sql`
     - Adds a service-role-only claim RPC for notification workers.
     - Atomically claims due pending/failed outbox rows and stale processing rows, using `FOR UPDATE SKIP LOCKED`.
+19. `supabase/migrations/20260626000002_071_schedule_notification_outbox_worker.sql`
+    - Adds the `process-notification-outbox` cron job.
+    - Calls `notification-worker` every minute through `pg_net` with the `service_role_key` vault secret.
 
 ## Supabase Secrets
 
@@ -144,7 +147,7 @@ supabase functions deploy notification-worker
 ```
 
 `stk-push` remains the public function name for frontend compatibility, but internally it is now a provider-backed payment start endpoint.
-`notification-worker` must be called with the service-role bearer token and should be scheduled only after migration `070` is applied.
+`notification-worker` must be called with the service-role bearer token. Apply migration `071` only after migration `070` is applied and the function is deployed.
 
 ## Architecture Applied
 
@@ -216,7 +219,6 @@ This branch still does not finish the full Zoho-like accounting product. The fou
 - Advanced payment allocation UI for one payment across multiple invoices.
 - Customer credit balance handling beyond refund recording.
 - More complete posting automation for all existing legacy expenses and historical records.
-- Notification delivery worker scheduling/cron for WhatsApp/email/SMS.
 - Live provider verification for WhatsApp PDF/link delivery using the notification outbox.
 
 Because payment credentials were shared in chat, consider rotating them before production if this conversation or logs are accessible beyond the implementation team.

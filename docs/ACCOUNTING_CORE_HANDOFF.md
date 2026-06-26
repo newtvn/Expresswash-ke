@@ -123,7 +123,7 @@ Important behavior:
 
 ## Migrations Applied
 
-These migrations were part of this branch. Migrations `053` through `069` have been applied live; `070` is the next notification-worker migration:
+These migrations were part of this branch. Migrations `053` through `070` have been applied live; `071` is the next scheduler migration:
 
 ```text
 053 accounting payment safety
@@ -143,7 +143,8 @@ These migrations were part of this branch. Migrations `053` through `069` have b
 067 balance sheet current earnings
 068 accounting permission hardening
 069 customer credit allocation workflow
-070 notification outbox worker claim (verified locally; apply before invoking notification-worker)
+070 notification outbox worker claim
+071 schedule notification outbox worker (verified locally; apply after notification-worker deploy)
 ```
 
 Local migration filenames have been normalized to Supabase CLI-compatible timestamp versions so a fresh local reset can replay the full chain. For live, apply only the next unapplied migration SQL, using the live migration history as the source of truth.
