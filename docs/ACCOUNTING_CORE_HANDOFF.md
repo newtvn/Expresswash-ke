@@ -123,7 +123,7 @@ Important behavior:
 
 ## Migrations Applied
 
-These migrations were part of this branch. Migrations `053` through `067` have been applied live; `068` is the next hardening migration:
+These migrations were part of this branch. Migrations `053` through `069` have been applied live; `070` is the next notification-worker migration:
 
 ```text
 053 accounting payment safety
@@ -141,10 +141,12 @@ These migrations were part of this branch. Migrations `053` through `067` have b
 065 refund cumulative guard
 066 invoice ledger entry date
 067 balance sheet current earnings
-068 accounting permission hardening (verified locally; not live-applied in this handoff)
+068 accounting permission hardening
+069 customer credit allocation workflow
+070 notification outbox worker claim (verified locally; apply before invoking notification-worker)
 ```
 
-Local migration filenames have been normalized to Supabase CLI-compatible timestamp versions so a fresh local reset can replay the full chain. The live database already has migrations through `067`, so do not apply the new baseline or replay historical local-bootstrap migrations against live. For live, apply only the new `068` hardening SQL, using the live migration history as the source of truth.
+Local migration filenames have been normalized to Supabase CLI-compatible timestamp versions so a fresh local reset can replay the full chain. For live, apply only the next unapplied migration SQL, using the live migration history as the source of truth.
 
 Runbook details are in:
 
@@ -160,6 +162,7 @@ Deploy/redeploy these after merge if production needs the latest branch state:
 supabase functions deploy stk-push
 supabase functions deploy payment-callback --no-verify-jwt
 supabase functions deploy generate-pdf
+supabase functions deploy notification-worker
 ```
 
 Required Supabase secrets:
@@ -172,6 +175,10 @@ PESAPAL_CONSUMER_SECRET
 PESAPAL_IPN_ID
 SITE_URL
 PESAPAL_CANCELLATION_URL
+WHATSAPP_WEBHOOK_URL (optional; otherwise WhatsApp outbox falls back to SMS if configured)
+WHATSAPP_WEBHOOK_TOKEN (optional)
+RESEND_API_KEY (for email outbox delivery)
+AFRICASTALKING_API_KEY / AFRICASTALKING_USERNAME / AFRICASTALKING_SENDER_ID (for SMS fallback)
 ```
 
 Do not commit real provider secrets. Rotate credentials before production if the chat/logs are visible beyond the implementation team.
@@ -205,6 +212,7 @@ Key admin workflows now available:
   - Chart of Accounts,
   - Journal Entries.
 - Notification outbox visibility/replay foundation.
+- Notification worker foundation for service-role outbox processing and delivery attempts.
 
 ## Live Verification Already Done
 

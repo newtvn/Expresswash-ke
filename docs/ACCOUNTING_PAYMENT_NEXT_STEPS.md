@@ -64,6 +64,13 @@ Current local migration filenames use Supabase CLI timestamp versions so `supaba
     - Keeps admin UI workflows callable only through authenticated RPCs with admin checks.
     - Restricts provider callback and notification-attempt worker RPCs to `service_role`.
     - Removes direct authenticated writes to core accounting tables except contact upserts; bills, allocations, refunds, credit notes, ledger entries, and outbox changes go through RPCs.
+17. `supabase/migrations/20260625000002_069_customer_credit_allocation_workflow.sql`
+    - Adds Customer Credits as a liability account for unapplied customer payments.
+    - Adds admin RPCs for customer credit balances and payment allocation options.
+    - Keeps later credit application ledger-safe with adjustment journal entries rather than rewriting posted payment journals.
+18. `supabase/migrations/20260626000001_070_notification_outbox_worker_claim.sql`
+    - Adds a service-role-only claim RPC for notification workers.
+    - Atomically claims due pending/failed outbox rows and stale processing rows, using `FOR UPDATE SKIP LOCKED`.
 
 ## Supabase Secrets
 
@@ -77,7 +84,13 @@ supabase secrets set \
   PESAPAL_CONSUMER_SECRET="<set-from-pesapal>" \
   PESAPAL_IPN_ID="<registered-ipn-id>" \
   SITE_URL="https://your-production-site" \
-  PESAPAL_CANCELLATION_URL="https://your-production-site/portal/orders"
+  PESAPAL_CANCELLATION_URL="https://your-production-site/portal/orders" \
+  RESEND_API_KEY="<set-for-email-delivery>" \
+  WHATSAPP_WEBHOOK_URL="<optional-whatsapp-provider-webhook>" \
+  WHATSAPP_WEBHOOK_TOKEN="<optional-whatsapp-provider-token>" \
+  AFRICASTALKING_API_KEY="<set-for-sms-or-whatsapp-fallback>" \
+  AFRICASTALKING_USERNAME="<set-for-sms-or-whatsapp-fallback>" \
+  AFRICASTALKING_SENDER_ID="<optional-sender-id>"
 ```
 
 For sandbox testing, use:
@@ -125,11 +138,13 @@ Deploy after migrations and secrets are in place:
 
 ```bash
 supabase functions deploy stk-push
-supabase functions deploy payment-callback
+supabase functions deploy payment-callback --no-verify-jwt
 supabase functions deploy generate-pdf
+supabase functions deploy notification-worker
 ```
 
 `stk-push` remains the public function name for frontend compatibility, but internally it is now a provider-backed payment start endpoint.
+`notification-worker` must be called with the service-role bearer token and should be scheduled only after migration `070` is applied.
 
 ## Architecture Applied
 
@@ -201,7 +216,7 @@ This branch still does not finish the full Zoho-like accounting product. The fou
 - Advanced payment allocation UI for one payment across multiple invoices.
 - Customer credit balance handling beyond refund recording.
 - More complete posting automation for all existing legacy expenses and historical records.
-- Notification delivery worker for WhatsApp/email/SMS.
-- WhatsApp PDF/link delivery using the notification outbox.
+- Notification delivery worker scheduling/cron for WhatsApp/email/SMS.
+- Live provider verification for WhatsApp PDF/link delivery using the notification outbox.
 
 Because payment credentials were shared in chat, consider rotating them before production if this conversation or logs are accessible beyond the implementation team.
