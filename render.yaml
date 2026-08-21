@@ -1,0 +1,66 @@
+# Render Blueprint — Expresswash / Express Carpets frontend
+#
+# React + Vite SPA served as a static site on Render's CDN.
+# The service name matches the already-created service (expresswash-web), so
+# applying this Blueprint ADOPTS that service rather than creating a duplicate.
+#
+# This Blueprint exists because the Render MCP's create_static_site cannot set
+# `routes` or `headers`. Those two blocks are the whole point of this file:
+#   - routes:  SPA fallback + the prerendered SEO pages (ported from vercel.json)
+#   - headers: the CSP + security headers (ported from vercel.json)
+#
+# Backend is unchanged: Supabase (DB + Edge Functions + Auth) stays as-is.
+
+services:
+  - type: web
+    name: expresswash-web
+    runtime: static
+    repo: https://github.com/newtvn/Expresswash-ke
+    branch: main
+    buildCommand: npm install && npm run build   # runs `vite build && node scripts/inject-meta.mjs`
+    staticPublishPath: ./dist
+    autoDeploy: true
+    envVars:
+      # Public client values — already set on the service. sync:false keeps the
+      # dashboard values on Blueprint apply (kept out of git even though they ship
+      # in the frontend bundle).
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(), microphone=(), camera=(), payment=()
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains; preload
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://*.supabase.co https://pay.pesapal.com https://cybqa.pesapal.com wss://*.supabase.co https://accounts.google.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://*.supabase.co https://pay.pesapal.com https://cybqa.pesapal.com;"
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    routes:
+      # Prerendered SEO pages (must mirror vercel.json rewrites)
+      - { type: rewrite, source: /track,    destination: /track/index.html }
+      - { type: rewrite, source: /privacy,  destination: /privacy/index.html }
+      - { type: rewrite, source: /terms,    destination: /terms/index.html }
+      - { type: rewrite, source: /faq,      destination: /faq/index.html }
+      - { type: rewrite, source: /pricing,  destination: /pricing/index.html }
+      - { type: rewrite, source: /contact,  destination: /contact/index.html }
+      - { type: rewrite, source: /services, destination: /services/index.html }
+      # SPA fallback — existing files (incl. /assets/*) are served before this
+      - { type: rewrite, source: /*, destination: /index.html }
