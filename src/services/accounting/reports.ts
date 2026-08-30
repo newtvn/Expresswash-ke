@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
+import { toBusinessParam } from '@/types/business';
 import type {
   AgingReport,
   AgingReportItem,
@@ -80,11 +81,12 @@ function mapCashFlowRows(rows: unknown): CashFlowRow[] {
   });
 }
 
-export async function getLedgerProfitAndLoss(from?: string, to?: string): Promise<LedgerProfitAndLossReport> {
+export async function getLedgerProfitAndLoss(from?: string, to?: string, business?: string): Promise<LedgerProfitAndLossReport> {
   const { data, error } = await retrySupabaseQuery(
     () => supabase.rpc('get_ledger_profit_and_loss', {
       p_from: from ?? null,
       p_to: to ?? null,
+      p_business: toBusinessParam(business),
     }),
     { maxRetries: 2 },
   );
@@ -102,11 +104,12 @@ export async function getLedgerProfitAndLoss(from?: string, to?: string): Promis
   };
 }
 
-export async function getLedgerCashFlow(from?: string, to?: string): Promise<LedgerCashFlowReport> {
+export async function getLedgerCashFlow(from?: string, to?: string, business?: string): Promise<LedgerCashFlowReport> {
   const { data, error } = await retrySupabaseQuery(
     () => supabase.rpc('get_ledger_cash_flow', {
       p_from: from ?? null,
       p_to: to ?? null,
+      p_business: toBusinessParam(business),
     }),
     { maxRetries: 2 },
   );
@@ -124,9 +127,9 @@ export async function getLedgerCashFlow(from?: string, to?: string): Promise<Led
   };
 }
 
-export async function getLedgerBalanceSheet(asOf?: string): Promise<LedgerBalanceSheetReport> {
+export async function getLedgerBalanceSheet(asOf?: string, business?: string): Promise<LedgerBalanceSheetReport> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.rpc('get_ledger_balance_sheet', { p_as_of: asOf ?? null }),
+    () => supabase.rpc('get_ledger_balance_sheet', { p_as_of: asOf ?? null, p_business: toBusinessParam(business) }),
     { maxRetries: 2 },
   );
 
@@ -144,11 +147,12 @@ export async function getLedgerBalanceSheet(asOf?: string): Promise<LedgerBalanc
   };
 }
 
-export async function getVatSummary(from?: string, to?: string): Promise<VatSummaryReport> {
+export async function getVatSummary(from?: string, to?: string, business?: string): Promise<VatSummaryReport> {
   const { data, error } = await retrySupabaseQuery(
     () => supabase.rpc('get_vat_summary', {
       p_from: from ?? null,
       p_to: to ?? null,
+      p_business: toBusinessParam(business),
     }),
     { maxRetries: 2 },
   );
@@ -164,18 +168,18 @@ export async function getVatSummary(from?: string, to?: string): Promise<VatSumm
   };
 }
 
-export async function getReceivablesAging(asOf?: string): Promise<AgingReport> {
+export async function getReceivablesAging(asOf?: string, business?: string): Promise<AgingReport> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.rpc('get_receivables_aging', { p_as_of: asOf ?? null }),
+    () => supabase.rpc('get_receivables_aging', { p_as_of: asOf ?? null, p_business: toBusinessParam(business) }),
     { maxRetries: 2 },
   );
 
   return mapAgingReport(error ? null : data);
 }
 
-export async function getPayablesAging(asOf?: string): Promise<AgingReport> {
+export async function getPayablesAging(asOf?: string, business?: string): Promise<AgingReport> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.rpc('get_payables_aging', { p_as_of: asOf ?? null }),
+    () => supabase.rpc('get_payables_aging', { p_as_of: asOf ?? null, p_business: toBusinessParam(business) }),
     { maxRetries: 2 },
   );
 

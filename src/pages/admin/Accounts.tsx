@@ -22,7 +22,9 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
+import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
 import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
+import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import {
   getLedgerCashFlow,
   getLedgerBalanceSheet,
@@ -296,6 +298,7 @@ async function addExpense(payload: {
   expense_date: string;
   payment_method: ExpensePaymentMethod;
   created_by: string;
+  business?: string;
 }) {
   const { error } = await supabase.from('expenses').insert(payload);
   if (error) throw new Error(error.message);
@@ -457,9 +460,15 @@ export const Accounts = () => {
   const contacts = accountingSetup?.contacts ?? [];
   const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
 
+  // Business scope for reports/overview (super_admin can switch; keyed so a switch refetches).
+  const selectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
+  const isConsolidated = selectedBusiness === BUSINESS_ALL;
+  const consolidatedWriteHint = 'Select a specific business to create records';
+
   const { data: ledgerOverview } = useQuery({
-    queryKey: ['accounting', 'ledger-overview'],
-    queryFn: getLedgerOverview,
+    queryKey: ['accounting', 'ledger-overview', selectedBusiness],
+    queryFn: () => getLedgerOverview(selectedBusiness),
   });
 
   const { data: operationalAccounting } = useQuery({
@@ -481,33 +490,33 @@ export const Accounts = () => {
   const billTotal = billForm.lines.reduce((sum, line) => sum + toAmount(line.amount) + toAmount(line.taxAmount), 0);
 
   const { data: profitAndLoss } = useQuery({
-    queryKey: ['accounting', 'reports', 'profit-loss', reportFrom, reportTo],
-    queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'profit-loss', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: balanceSheet } = useQuery({
-    queryKey: ['accounting', 'reports', 'balance-sheet', reportTo],
-    queryFn: () => getLedgerBalanceSheet(reportTo),
+    queryKey: ['accounting', 'reports', 'balance-sheet', selectedBusiness, reportTo],
+    queryFn: () => getLedgerBalanceSheet(reportTo, selectedBusiness),
   });
 
   const { data: vatSummary } = useQuery({
-    queryKey: ['accounting', 'reports', 'vat', reportFrom, reportTo],
-    queryFn: () => getVatSummary(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'vat', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getVatSummary(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: cashFlow } = useQuery({
-    queryKey: ['accounting', 'reports', 'cash-flow', reportFrom, reportTo],
-    queryFn: () => getLedgerCashFlow(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'cash-flow', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getLedgerCashFlow(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: receivablesAging } = useQuery({
-    queryKey: ['accounting', 'reports', 'receivables-aging', reportTo],
-    queryFn: () => getReceivablesAging(reportTo),
+    queryKey: ['accounting', 'reports', 'receivables-aging', selectedBusiness, reportTo],
+    queryFn: () => getReceivablesAging(reportTo, selectedBusiness),
   });
 
   const { data: payablesAging } = useQuery({
-    queryKey: ['accounting', 'reports', 'payables-aging', reportTo],
-    queryFn: () => getPayablesAging(reportTo),
+    queryKey: ['accounting', 'reports', 'payables-aging', selectedBusiness, reportTo],
+    queryFn: () => getPayablesAging(reportTo, selectedBusiness),
   });
 
   const { data: selectedPaymentEvents = [], isLoading: selectedPaymentEventsLoading } = useQuery({
@@ -827,17 +836,18 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <BusinessSwitcher />
           <Button variant="outline" onClick={() => setAddContactOpen(true)}>
             <Users className="w-4 h-4 mr-2" /> Contact
           </Button>
-          <Button variant="outline" onClick={() => setAddBillOpen(true)}>
+          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Bill
           </Button>
-          <Button variant="outline" onClick={() => setAddExpenseOpen(true)}>
+          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Add Expense
           </Button>
-          <Button variant="outline" onClick={() => setAddJournalOpen(true)}>
+          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddJournalOpen(true)}>
             <FileText className="w-4 h-4 mr-2" /> Journal Entry
           </Button>
         </div>
@@ -1634,6 +1644,7 @@ export const Accounts = () => {
                   dueDate: billForm.dueDate || undefined,
                   notes: billForm.notes || undefined,
                   post: true,
+                  businessId: selectedBusiness,
                   lines: billForm.lines.map((line) => ({
                     description: line.description,
                     quantity: 1,
@@ -1788,6 +1799,7 @@ export const Accounts = () => {
                   expense_date: expenseForm.expense_date,
                   payment_method: expenseForm.payment_method,
                   created_by: user.id,
+                  business: selectedBusiness,
                 });
               }}
             >

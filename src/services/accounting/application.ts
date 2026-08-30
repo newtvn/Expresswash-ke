@@ -52,10 +52,10 @@ export async function reversePostedJournalEntry(id: string, entryDate: string, m
   return repository.reverseJournalEntry(id, entryDate, memo);
 }
 
-export async function getLedgerOverview() {
+export async function getLedgerOverview(business?: string) {
   const [entries, balances] = await Promise.all([
     repository.listJournalEntries(),
-    repository.listAccountBalances(),
+    repository.listAccountBalances(business),
   ]);
 
   return {

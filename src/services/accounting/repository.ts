@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { retrySupabaseQuery } from '@/lib/retryUtils';
+import { toBusinessParam } from '@/types/business';
 import type {
   AccountBalance,
   AllocateCustomerPaymentInput,
@@ -380,9 +381,11 @@ export async function listJournalEntries(limit = 50): Promise<JournalEntry[]> {
   return data.map(mapJournalEntry);
 }
 
-export async function listAccountBalances(): Promise<AccountBalance[]> {
+export async function listAccountBalances(business?: string): Promise<AccountBalance[]> {
+  // Reads go through the SECURITY DEFINER RPC, not the ledger_account_balances
+  // view (direct SELECT was revoked to close the cross-business read leak).
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.from('ledger_account_balances').select('*').order('code'),
+    () => supabase.rpc('get_ledger_account_balances', { p_business: toBusinessParam(business) }).order('code'),
     { maxRetries: 2 },
   );
 
@@ -423,6 +426,7 @@ export async function createBill(input: CreateBillInput): Promise<AccountingOper
         metadata: line.metadata ?? {},
       })),
       p_post: input.post ?? true,
+      p_business: input.businessId ?? null,
     }),
     { maxRetries: 2 },
   );
@@ -441,6 +445,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Accounti
       p_lines: mapInvoiceLinesInput(input.lines),
       p_status: input.status ?? 'pending',
       p_post: input.post ?? false,
+      p_business: input.businessId ?? null,
     }),
     { maxRetries: 2 },
   );
