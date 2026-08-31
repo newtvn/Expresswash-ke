@@ -152,6 +152,17 @@ const formatDate = (value?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
 
+function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const escape = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const getInvoiceDueDate = (invoice: AgingInvoice): string | undefined => invoice.due_date ?? invoice.due_at;
 
 const STATUS_EVENT_LABELS: Record<string, string> = {
@@ -370,7 +381,6 @@ export const Accounts = () => {
   const { user } = useAuthStore();
   const qc = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
-  const [agingView, setAgingView] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [addJournalOpen, setAddJournalOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
@@ -862,7 +872,7 @@ export const Accounts = () => {
         <div className="flex flex-wrap items-center gap-2">
           <BusinessSwitcher />
           <Button variant="outline" onClick={() => setAddContactOpen(true)}>
-            <Users className="w-4 h-4 mr-2" /> Contact
+            <Users className="w-4 h-4 mr-2" /> Add Contact
           </Button>
           <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Add Bill
@@ -957,7 +967,14 @@ export const Accounts = () => {
                           {humanizeCode(e.category)} · {formatDate(e.expense_date)} · {formatPaymentMethod(e.payment_method)}
                         </p>
                       </div>
-                      <span className="font-semibold text-red-600">KES {toAmount(e.amount).toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        {e.status && e.status !== 'approved' && (
+                          <Badge variant={e.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{e.status}</Badge>
+                        )}
+                        <span className={`font-semibold ${e.status === 'rejected' ? 'text-muted-foreground line-through' : 'text-red-600'}`}>
+                          {formatCurrency(toAmount(e.amount))}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -970,7 +987,25 @@ export const Accounts = () => {
         <TabsContent value="payments" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
             <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-            <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" /> Export</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={paymentsReceived.length === 0}
+              onClick={() => downloadCsv(
+                `payments-${selectedBusiness}-${new Date().toISOString().split('T')[0]}.csv`,
+                ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
+                paymentsReceived.map((p) => [
+                  formatDate(p.created_at),
+                  p.customer_name ?? '',
+                  toAmount(p.amount),
+                  p.method ?? '',
+                  p.mpesa_receipt_number ?? p.checkout_request_id ?? '',
+                  p.status ?? '',
+                ]),
+              )}
+            >
+              <Download className="h-4 w-4 mr-1" /> Export
+            </Button>
           </div>
           <Card>
             <CardContent className="pt-4">
@@ -1031,15 +1066,6 @@ export const Accounts = () => {
         {/* ---- AGING SUMMARY ---- */}
         <TabsContent value="aging" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
-            <Select value={agingView} onValueChange={(v) => setAgingView(v as typeof agingView)}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-              </SelectContent>
-            </Select>
             <DateRangePicker date={dateRange} onDateChange={setDateRange} />
           </div>
 
@@ -1485,6 +1511,7 @@ export const Accounts = () => {
                           size="sm"
                           variant="outline"
                           disabled={!canReplayOutbox(item) || replayOutboxMutation.isPending}
+                          title={!canReplayOutbox(item) ? 'Only failed or dead-letter notifications can be replayed' : undefined}
                           onClick={() => replayOutboxMutation.mutate(item.id)}
                         >
                           Replay
@@ -1603,6 +1630,8 @@ export const Accounts = () => {
                       type="button"
                       size="sm"
                       variant="ghost"
+                      aria-label="Remove line"
+                      title="Remove line"
                       disabled={billForm.lines.length === 1}
                       onClick={() => removeBillLine(line.id)}
                     >
@@ -1771,7 +1800,7 @@ export const Accounts = () => {
       <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Expense / Bill</DialogTitle>
+            <DialogTitle>Add Expense</DialogTitle>
             <DialogDescription>Record a new expense or bill manually</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -2185,6 +2214,8 @@ export const Accounts = () => {
                         type="button"
                         size="sm"
                         variant="ghost"
+                        aria-label="Remove allocation"
+                        title="Remove allocation"
                         disabled={allocationRows.length === 1}
                         onClick={() => removeAllocationRow(row.id)}
                       >

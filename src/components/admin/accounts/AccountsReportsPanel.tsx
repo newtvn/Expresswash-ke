@@ -2,6 +2,10 @@ import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieCh
 import { Package, User, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
@@ -237,7 +241,10 @@ export function AccountsReportsPanel({
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <Card>
-          <CardHeader><CardTitle className="text-base">Chart of Accounts</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">Chart of Accounts</CardTitle>
+            <p className="text-xs text-muted-foreground">Shared across all businesses — one set of books.</p>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {[
@@ -278,11 +285,27 @@ export function AccountsReportsPanel({
                         {entry.memo && <p className="text-xs mt-1">{entry.memo}</p>}
                       </div>
                       {entry.status === 'posted' && (
-                        <Button size="sm" variant="outline" disabled={reversePending || writesDisabled}
-                          title={writesDisabled ? 'Select a specific business to reverse entries' : undefined}
-                          onClick={() => onReverseJournalEntry(entry)}>
-                          Reverse
-                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button size="sm" variant="outline" disabled={reversePending || writesDisabled}
+                              title={writesDisabled ? 'Select a specific business to reverse entries' : undefined}>
+                              Reverse
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Reverse {entry.entryNumber}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This posts an offsetting journal entry to cancel it out. The original stays on
+                                record marked reversed. This can't be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onReverseJournalEntry(entry)}>Reverse entry</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
                     </div>
                   </div>
