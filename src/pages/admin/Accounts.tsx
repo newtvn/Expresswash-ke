@@ -15,9 +15,12 @@ import {
 } from '@/components/ui/dialog';
 import {
   DollarSign, TrendingUp, TrendingDown, AlertCircle, Plus, Download,
-  FileText, Users, GitCommitHorizontal,
+  FileText, Users, GitCommitHorizontal, ChevronDown,
   RotateCcw, Trash2,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
@@ -25,6 +28,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
 import { toBusinessParam } from '@/types/business';
 import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
+import { LedgerJournalEntries } from '@/components/admin/accounts/LedgerJournalEntries';
 import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import {
   getLedgerCashFlow,
@@ -871,22 +875,36 @@ export const Accounts = () => {
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
         <div className="flex flex-wrap items-center gap-2">
           <BusinessSwitcher />
-          <Button variant="outline" onClick={() => setAddContactOpen(true)}>
-            <Users className="w-4 h-4 mr-2" /> Add Contact
-          </Button>
-          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Bill
-          </Button>
-          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Expense
-          </Button>
-          <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddJournalOpen(true)}>
-            <FileText className="w-4 h-4 mr-2" /> Journal Entry
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" /> New <ChevronDown className="w-4 h-4 ml-1 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={() => setAddContactOpen(true)}>
+                <Users className="w-4 h-4 mr-2" /> Contact
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddBillOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Bill
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddExpenseOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Expense
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddJournalOpen(true)}>
+                <FileText className="w-4 h-4 mr-2" /> Journal Entry
+              </DropdownMenuItem>
+              {isConsolidated && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">{consolidatedWriteHint}</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHeader>
 
       {/* KPI Summary */}
+      <p className="-mb-3 text-xs text-muted-foreground">Ledger totals · {reportRangeLabel}</p>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Revenue', value: profitAndLoss?.totalIncome ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
@@ -911,6 +929,7 @@ export const Accounts = () => {
       <Tabs defaultValue="reports">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
           <TabsTrigger value="expenses">Purchases & Expenses</TabsTrigger>
           <TabsTrigger value="payments">Payments Received</TabsTrigger>
           <TabsTrigger value="aging">Aging Summary</TabsTrigger>
@@ -926,8 +945,6 @@ export const Accounts = () => {
           <AccountsReportsPanel
             dateRange={dateRange}
             reportRangeLabel={reportRangeLabel}
-            chartAccounts={chartAccounts}
-            entries={ledgerOverview?.entries ?? []}
             orders={summary?.orders ?? []}
             salesByPersonData={salesByPersonData}
             salesByItem={salesByItem}
@@ -936,10 +953,17 @@ export const Accounts = () => {
             balanceSheet={balanceSheet}
             vatSummary={vatSummary}
             cashFlow={cashFlow}
-            reversePending={reverseJournalMutation.isPending}
-            writesDisabled={isConsolidated}
             setDateRange={setDateRange}
             formatCurrency={formatCurrency}
+          />
+        </TabsContent>
+
+        {/* ---- LEDGER ---- */}
+        <TabsContent value="ledger" className="mt-4">
+          <LedgerJournalEntries
+            entries={ledgerOverview?.entries ?? []}
+            reversePending={reverseJournalMutation.isPending}
+            writesDisabled={isConsolidated}
             formatDate={formatDate}
             onReverseJournalEntry={(entry) => reverseJournalMutation.mutate(entry)}
           />
@@ -1010,7 +1034,7 @@ export const Accounts = () => {
           <Card>
             <CardContent className="pt-4">
               {paymentsReceived.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-12">No payments in selected period</p>
+                <p className="text-sm text-muted-foreground text-center py-12">No payments received in this period. Adjust the date range, or record a payment from an invoice.</p>
               ) : (
                 <div className="space-y-2">
                   {paymentsReceived.map((p) => (
@@ -1044,7 +1068,7 @@ export const Accounts = () => {
                               setAllocationRows([makeAllocationRow()]);
                             }}
                           >
-                            Apply
+                            Allocate
                           </Button>
                         )}
                         <Button size="sm" variant="outline" onClick={() => setSelectedPayment(p)}>
@@ -1065,10 +1089,18 @@ export const Accounts = () => {
 
         {/* ---- AGING SUMMARY ---- */}
         <TabsContent value="aging" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="aging-asof" className="text-sm text-muted-foreground">As of</Label>
+            <Input
+              id="aging-asof"
+              type="date"
+              className="w-44"
+              value={reportTo ?? ''}
+              onChange={(e) => setDateRange({ from: dateRange.from, to: e.target.value ? new Date(e.target.value) : undefined })}
+            />
           </div>
 
+          <p className="text-xs text-muted-foreground">Receivables outstanding by age, as of {reportTo ?? 'today'}.</p>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[
               { label: 'Current', amount: receivablesAging?.current ?? agingBuckets.current.reduce((s, i) => s + toAmount(i.balance ?? Math.max(toAmount(i.total) - toAmount(i.paid_amount), 0)), 0), color: 'text-green-600' },
@@ -1081,19 +1113,16 @@ export const Accounts = () => {
                 <CardContent className="py-4 text-center">
                   <p className="text-xs text-muted-foreground">{bucket.label}</p>
                   <p className={`text-2xl font-bold ${bucket.color}`}>{formatCurrency(bucket.amount)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Receivables aging
-                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Overdue Invoice Detail</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Open Invoices</CardTitle></CardHeader>
             <CardContent>
               {(receivablesAging?.items.length ?? 0) === 0 && agingData.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No overdue invoices</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No open invoices — all receivables are settled.</p>
               ) : (receivablesAging?.items.length ?? 0) > 0 ? (
                 <div className="space-y-2">
                   {receivablesAging!.items.map((inv) => (
@@ -1132,7 +1161,7 @@ export const Accounts = () => {
         <TabsContent value="payables" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Overdue Bills & Payables</CardTitle>
+              <CardTitle>Bills & Payables</CardTitle>
               <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add Bill
               </Button>
@@ -1198,7 +1227,7 @@ export const Accounts = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">No bills recorded</p>
+                <p className="text-sm text-muted-foreground text-center py-12">No bills yet. Add a supplier contact, then create a bill to track what you owe.</p>
               )}
             </CardContent>
           </Card>
@@ -1357,11 +1386,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postInvoiceMutation.isPending || isConsolidated}
+                            disabled={isConsolidated || (postInvoiceMutation.isPending && postInvoiceMutation.variables === invoice.id)}
                             title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postInvoiceMutation.mutate(invoice.id)}
                           >
-                            Post
+                            {postInvoiceMutation.isPending && postInvoiceMutation.variables === invoice.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
@@ -1391,11 +1420,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postPaymentMutation.isPending || isConsolidated}
+                            disabled={isConsolidated || (postPaymentMutation.isPending && postPaymentMutation.variables === payment.id)}
                             title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postPaymentMutation.mutate(payment.id)}
                           >
-                            Post
+                            {postPaymentMutation.isPending && postPaymentMutation.variables === payment.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
@@ -1424,11 +1453,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postExpenseMutation.isPending || isConsolidated}
+                            disabled={isConsolidated || (postExpenseMutation.isPending && postExpenseMutation.variables === expense.id)}
                             title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postExpenseMutation.mutate(expense.id)}
                           >
-                            Post
+                            {postExpenseMutation.isPending && postExpenseMutation.variables === expense.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
