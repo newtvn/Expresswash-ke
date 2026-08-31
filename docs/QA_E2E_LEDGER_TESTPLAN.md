@@ -168,15 +168,37 @@ SELECT record_invoice_payment('<invoice_id>', 11600, 'mpesa');
 **Expected** (H1 on `Payment received`): DR **M-Pesa (1020) 11,600** / CR **Accounts Receivable (1100) 11,600**.
 Invoice now `paid` (`SELECT status, balance FROM invoices WHERE id='<invoice_id>';` → paid, 0).
 
-### A3 — Overpayment creates a customer credit
-New invoice for 5,000, pay 6,000:
+### A3 — Customer credit via re-allocation (the supported credit path)
+`record_invoice_payment` **intentionally rejects overpaying a single invoice** (it caps
+at the invoice balance — a safety guard; attempting `record_invoice_payment(inv, 6000)`
+on a 5,000 balance correctly returns `success:false, "… exceeds invoice balance"`). A
+customer credit is instead created by the **allocation workflow**: record a payment, then
+allocate it to *less* than its amount — the remainder posts to Customer Credits (2200).
 ```sql
-SELECT create_invoice_with_lines('11111111-1111-1111-1111-111111111111',CURRENT_DATE,CURRENT_DATE,'A3 invoice',
-  jsonb_build_array(jsonb_build_object('description','Sofa','quantity',1,'unit_price',5000)), 'pending', true, 'expresswash');
--- then, with the new invoice id:
-SELECT record_invoice_payment('<invoice_id>', 6000, 'mpesa');
+-- invoice 5,000, posted
+SELECT (create_invoice_with_lines('11111111-1111-1111-1111-111111111111',CURRENT_DATE,CURRENT_DATE,'A3 invoice',
+  jsonb_build_array(jsonb_build_object('description','Sofa','quantity',1,'unit_price',5000)),'pending',true,'expresswash'))->>'invoice_id' AS inv \gset
+-- pay it in full
+SELECT (record_invoice_payment(:'inv',5000,'mpesa'))->>'payment_id' AS pay \gset
+-- re-allocate only 3,000 to the invoice -> 2,000 becomes customer credit
+SELECT allocate_customer_payment(:'pay', jsonb_build_array(jsonb_build_object('invoice_id',:'inv','amount',3000)));
 ```
-**Expected**: DR M-Pesa 6,000 / CR AR 5,000 / CR **Customer Credits (2200) 1,000**. H3 balances.
+**Expected** — the payment's NET position across its two entries (payment_received + the
+allocation manual_adjustment):
+- DR **M-Pesa (1020) 5,000** / CR **Accounts Receivable (1100) 3,000** / CR **Customer Credits (2200) 2,000**
+- Invoice back to `partial`, balance 2,000; payment `unapplied_amount = 2,000`.
+- `SELECT list_customer_credit_balances();` shows the 2,000 unapplied. H3 → 0 imbalances.
+```sql
+SELECT coa.code, coa.name, ROUND(SUM(l.debit-l.credit),2) AS net
+FROM ledger_journal_entries e JOIN ledger_journal_lines l ON l.journal_entry_id=e.id
+JOIN chart_of_accounts coa ON coa.id=l.account_id
+WHERE e.source_id = :'pay' AND e.source_type IN ('payment_received','manual_adjustment')
+GROUP BY coa.code, coa.name ORDER BY coa.code;   -- 1020 +5000, 1100 -3000, 2200 -2000
+```
+> Direct overpayment on a single invoice is a deliberate non-feature; if the product
+> later wants it, that's an enhancement, not a ledger defect — integrity (H2/H3) holds.
+> Benign in test: a `notify_on_payment skipped … recipient_id` WARNING may appear because
+> test contacts aren't linked to real app users; it's caught and does not affect the ledger.
 
 ### A4 — Create & post a bill with input VAT
 ```sql
@@ -213,9 +235,12 @@ SELECT post_expense_to_ledger('<expense_id>');
 **Expected** (H1 on `A7 mops`): DR **Cleaning Supplies (5000) 500** / CR **Cash (1000) 500**. `business=expresswash`.
 
 ### A8 — Customer refund
-Refund 1,000 against the A3 payment (find it: `SELECT id FROM payments WHERE notes IS NULL AND amount=6000 ORDER BY created_at DESC LIMIT 1;` or by invoice):
+Refund 1,000 against the A1 invoice / A2 payment:
 ```sql
-SELECT record_customer_refund('<A3_invoice_id>', '<A3_payment_id>', 1000, 'mpesa');
+SELECT record_customer_refund(
+  (SELECT id FROM invoices WHERE notes='A1 invoice'),
+  (SELECT id FROM payments WHERE invoice_id=(SELECT id FROM invoices WHERE notes='A1 invoice') ORDER BY created_at DESC LIMIT 1),
+  1000, 'mpesa');
 ```
 **Expected** (H1 on `Customer refund`): DR **Accounts Receivable (1100) 1,000** / CR **M-Pesa (1020) 1,000**. `business=expresswash` (via the manual_adjustment→source resolution).
 
