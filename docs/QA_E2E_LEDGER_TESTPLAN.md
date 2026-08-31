@@ -217,9 +217,16 @@ SELECT record_bill_payment('<bill_id>', 5800, 'bank_transfer');
 **Expected** (H1 on `Payment made`): DR **Accounts Payable (2000) 5,800** / CR **Bank (1010) 5,800**.
 
 ### A6 — Credit note against an invoice
-Use the A1 invoice id:
+Create a dedicated open VAT invoice, then credit it. Do not use A1 here: A1 was paid
+in A2, and `create_credit_note_for_invoice` correctly caps a credit note at the
+invoice's current open balance.
 ```sql
-SELECT create_credit_note_for_invoice('<A1_invoice_id>', 2900, 'Partial credit');
+SELECT (create_invoice_with_lines(
+  '11111111-1111-1111-1111-111111111111',CURRENT_DATE,CURRENT_DATE,'A6 invoice',
+  jsonb_build_array(jsonb_build_object(
+    'description','Credit-note test','quantity',1,'unit_price',10000,'tax_amount',1600)),
+  'pending',true,'expresswash'))->>'invoice_id' AS inv \gset
+SELECT create_credit_note_for_invoice(:'inv', 2900, 'Partial credit');
 ```
 **Expected** (H1 on `Credit note posted`): DR **Sales Revenue (4000) 2,500** / DR **VAT Payable (2100) 400** (proportional) / CR **Accounts Receivable (1100) 2,900**. *(Exact VAT split depends on the credit amount; confirm debits = credit = 2,900 and it balances.)*
 
