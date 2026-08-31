@@ -948,7 +948,7 @@ export const Accounts = () => {
             orders={summary?.orders ?? []}
             salesByPersonData={salesByPersonData}
             salesByItem={salesByItem}
-            showOperationalSales={selectedBusiness === 'expresswash' || selectedBusiness === BUSINESS_ALL}
+            showOperationalSales={selectedBusiness === 'expresswash'}
             profitAndLoss={profitAndLoss}
             balanceSheet={balanceSheet}
             vatSummary={vatSummary}
