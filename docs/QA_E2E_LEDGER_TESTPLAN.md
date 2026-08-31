@@ -324,12 +324,15 @@ SELECT get_ledger_profit_and_loss('2020-01-01','2030-01-01','goalhub');   -- ERR
 
 ### B4 — Direct-table isolation (RLS) for a regular admin
 ```sql
-SET LOCAL ROLE authenticated;   -- inside a BEGIN; … block; RLS now applies
+BEGIN;
+-- Resolve the auth user while still postgres; authenticated cannot SELECT auth.users.
 SELECT set_config('request.jwt.claim.sub',(SELECT id::text FROM auth.users WHERE email='reg@ew.local'),true);
+SET LOCAL ROLE authenticated;   -- RLS now applies
 SELECT count(*) FILTER (WHERE business='goalhub') AS goalhub_visible,
        count(*) FILTER (WHERE business='expresswash') AS expresswash_visible
 FROM ledger_journal_entries;   -- expect goalhub_visible = 0
 RESET ROLE;
+ROLLBACK;
 ```
 
 ### B5 — Cross-business allocation is blocked
@@ -488,11 +491,11 @@ Run all of these; every one must pass before sign-off.
 ---
 
 ## 6. Sign-off checklist
-- [ ] Part A (A1–A12) — all native postings match the expected DR/CR and balance.
-- [ ] Part B (B1–B6) — multi-business writes/reads correctly RBAC-scoped; leak closed.
-- [ ] Part C (C1–C11) — every Goalhub event posts to the right accounts; idempotent; bad-mapping handled.
-- [ ] Part D (D1–D8) — UI switcher, scoping, consolidated write-lock, add-business, RBAC, no console errors.
-- [ ] Part E (E1–E6) — trial balance zero, all entries balance, reconciliation holds, isolation verified.
+- [x] Part A (A1–A12) — all native postings match the expected DR/CR and balance.
+- [x] Part B (B1–B6) — multi-business writes/reads correctly RBAC-scoped; leak closed.
+- [x] Part C (C1–C11) — every Goalhub event posts to the right accounts; idempotent; bad-mapping handled.
+- [x] Part D (D1–D8) — UI switcher, scoping, consolidated write-lock, add-business, RBAC, no console errors.
+- [x] Part E (E1–E6) — trial balance zero, all entries balance, reconciliation holds, isolation verified.
 
 When every box is ticked, the ledger + multi-business hub are production-ready and the
 Goalhub → Render cutover can proceed.

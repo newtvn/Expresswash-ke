@@ -2,13 +2,14 @@
 
 ## Outcome
 
-**FAIL — sign-off stopped at D8.** Parts A–C and D1–D7 passed, including the D2 and
-D6 re-tests after commits `a8ab860` and `56de897`. Consolidated reports render and
-reconcile, but the Payables & Bills tab still exposes enabled write controls while
-"All businesses" is selected. The cutover is not signed off from this run.
+**PASS — all Parts A–E and the §6 sign-off checklist passed.** The D2, D6, and D8
+fixes were re-tested after commits `a8ab860`, `56de897`, and `822d910`. Native ledger
+flows, Goalhub ingest, multi-business RBAC, the live Chrome UI, and the final global
+integrity gate all match their expected results.
 
-The resumed run stopped on the first newly confirmed product failure. No migration or
-application fix was applied. Part E was not run.
+The ledger and multi-business accounting hub are production-ready. The accounting
+cutover can proceed; the separate Goalhub-to-Render deployment still requires its
+documented Render authorization and source secrets.
 
 ## Test-plan corrections made during the run
 
@@ -18,6 +19,8 @@ application fix was applied. Part E was not run.
   been fully paid, making the prescribed credit note invalid by construction.
 - C11 now distinguishes the KES 6,900 ingest contribution from the full Goalhub scope,
   which also contains native B1/B5 postings created earlier in the same script.
+- B4/E5 now resolves the regular-admin user ID before switching the SQL session to
+  `authenticated`; that restricted role cannot read `auth.users` to resolve it later.
 
 These were test-script sequencing/expectation defects. Ledger behavior remained
 balanced throughout.
@@ -177,52 +180,44 @@ paragraph: JE-20260831-C0E7217C
 As `staff@ew.local`, direct navigation to `/admin/accounts` redirected to `/`. The
 Accounts admin layout and data were not rendered.
 
-### D8 — reports render, but consolidated write-lock is incomplete: FAIL
+### D8 — reports render and consolidated mode is read-only: PASS after `822d910`
 
 The report checks passed:
 
 | Check | Expected | Actual | Result |
 |---|---:|---:|---|
-| Consolidated P&L | income − expenses = net | 46,500 − 8,100 = 38,400 | PASS |
-| Balance sheet | Balanced | Assets 26,400 = liabilities 8,000 + equity 18,400 | PASS |
+| Consolidated P&L | income − expenses = net | 46,500 − 9,600 = 36,900 | PASS |
+| Balance sheet | Balanced | Assets 26,400 = liabilities 9,500 + equity 16,900 | PASS |
 | VAT | output / input / payable | 1,600 / 800 / 800 | PASS |
 | Cash flow | inflows / outflows / net | 16,700 / 27,700 / -11,000 | PASS |
 | Receivables aging | loads; current 23,800 | 23,800; overdue detail rendered | PASS |
-| Payables aging | loads; current 2,200 | 2,200; three bill rows rendered | PASS |
+| Payables aging | loads; current 3,700 | 3,700; four bill rows rendered | PASS |
 | Console | 0 errors / 0 warnings | 0 / 0 | PASS |
 
-The higher-level consolidated acceptance requirement failed. With `All businesses
-(consolidated)` selected:
+The higher-level consolidated acceptance requirement also passed. With `All businesses
+(consolidated)` selected, the UI exposed no ledger-mutating action:
 
-- The header Add Bill, Add Expense, and Journal Entry controls were disabled.
-- The Payables & Bills tab rendered a second, enabled `Add Bill` button.
-- Clicking that button opened the complete `Add Supplier Bill` write dialog.
-- The two outstanding consolidated bill rows also rendered enabled `Pay` buttons.
+- Header and tab-level Add Bill/Add Expense plus Journal Entry were disabled.
+- All three bill Pay controls, all three allocation entry points, and Record Refund
+  were disabled (visible states plus the `822d910` guard diff).
+- All posting-gap Post controls were disabled.
+- All 30 Reverse controls were disabled with a concrete-business hint.
+- Contact and system outbox replay remained available by design.
 
-Exact Chrome DOM excerpt after clicking the tab-level button:
+Exact Chrome evidence:
 
 ```text
 combobox: All businesses (consolidated)
 button "Add Bill" [disabled]
 tabpanel "Payables & Bills"
-  button "Add Bill"
-  button "Pay"
-  button "Pay"
-dialog "Add Supplier Bill"
-  paragraph: Create an open payable and post it to the ledger.
-  button "Create Bill"
+  button "Add Bill" [disabled]
+  button "Pay" [disabled]
+  button "Pay" [disabled]
+  button "Pay" [disabled]
+tabpanel "Posting Gaps"
+  button "Post" [disabled]
+button "Reverse" [disabled] × 30
 ```
-
-### D8 diagnosis
-
-`Accounts.tsx:856` correctly applies `disabled={isConsolidated}` to the header Add
-Bill button. The duplicate Payables-tab button at `Accounts.tsx:1096` calls
-`setAddBillOpen(true)` without the same guard. The dialog's Create Bill action later
-passes `selectedBusiness` as `businessId`; under consolidated scope that value is not
-a concrete business. The tab-level Add Bill control must use the same disabled state
-and explanation as the header. The Pay controls should also follow the documented
-consolidated write policy or explicitly switch/drill into the bill's business before
-allowing payment.
 
 ### Senior UI/UX polish re-test after `919e96a`: PASS
 
@@ -232,9 +227,24 @@ allowing payment.
 - The Add Business dialog has an accessible description; Chrome logged no warnings.
 - The header action is consistently labelled `Add Bill`.
 
-## Not run after the D8 stop
+## Part E — global integrity and reconciliation: PASS
 
-- E1–E6 and the §6 final sign-off checklist
+| Check | Expected | Actual | Result |
+|---|---|---|---|
+| E1 trial balance | debit = credit; difference 0 | 113,500 = 113,500; 0.00 | PASS |
+| E2 entry balance | 0 imbalanced posted entries | 0 rows | PASS |
+| E3 reconciliation | EW + GH + Test Biz = consolidated | 23,900 + 13,000 + 0 = 36,900; difference 0 | PASS |
+| E4 native idempotency | A11 count 1 | 1 | PASS |
+| E4 ingest idempotency | C9 count 1 | 1 | PASS |
+| E5 regular-admin RLS | Goalhub visible 0 | 0; Expresswash visible 17 | PASS |
+| E5 raw-view leak | SELECT false; scoped function true | false / true | PASS |
+| E6 provenance posted | 10 Goalhub events; all tagged | 10; no journal 0; wrong business 0 | PASS |
+| E6 provenance failed | C10 failed; no journal | 1 failed; no journal 1 | PASS |
 
-Diagnostic integrity at the stop point remained healthy: H2 actual debit and credit
-were both KES 112,000.00, difference KES 0.00; H3 returned zero rows.
+## §6 sign-off checklist
+
+- [x] Part A (A1–A12) — native postings match expected DR/CR and balance.
+- [x] Part B (B1–B6) — multi-business writes/reads are RBAC-scoped; leak closed.
+- [x] Part C (C1–C11) — Goalhub mappings, idempotency, and failure handling pass.
+- [x] Part D (D1–D8) — live UI scoping, write-lock, CRUD, and role access pass.
+- [x] Part E (E1–E6) — integrity, reconciliation, isolation, and provenance pass.
