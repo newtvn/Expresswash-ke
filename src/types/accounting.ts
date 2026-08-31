@@ -109,6 +109,8 @@ export interface CreateInvoiceInput {
   status?: 'draft' | 'pending' | 'sent';
   post?: boolean;
   lines: InvoiceLineInput[];
+  /** Business slug (super_admin only); omit for the caller's own business. */
+  businessId?: string;
 }
 
 export interface UpdateInvoiceInput extends CreateInvoiceInput {
@@ -122,6 +124,8 @@ export interface CreateBillInput {
   notes?: string;
   lines: BillLineInput[];
   post?: boolean;
+  /** Business slug (super_admin only); omit for the caller's own business. */
+  businessId?: string;
 }
 
 export interface RecordBillPaymentInput {
@@ -275,6 +279,8 @@ export interface JournalEntryInput {
   entryDate: string;
   memo?: string;
   lines: JournalLineInput[];
+  /** Business slug this entry belongs to; required for manual entries to be per-business scoped. */
+  businessId?: string;
 }
 
 export interface JournalEntry {

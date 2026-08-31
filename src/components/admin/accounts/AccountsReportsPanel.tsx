@@ -1,13 +1,10 @@
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Package, User, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import type {
-  ChartAccount,
-  JournalEntry,
   LedgerBalanceSheetReport,
   LedgerCashFlowReport,
   LedgerProfitAndLossReport,
@@ -25,23 +22,18 @@ const CHART_COLORS = ['#2563eb', '#16a34a', '#dc2626', '#d97706', '#7c3aed'];
 interface AccountsReportsPanelProps {
   dateRange: DateRange;
   reportRangeLabel: string;
-  chartAccounts: ChartAccount[];
-  entries: JournalEntry[];
   orders: SalesOrderRow[];
   salesByPersonData: SalesByPersonRow[];
   salesByItem: SalesByItemRow[];
+  /** Operational sales widgets are Expresswash-specific; hide them for other businesses. */
+  showOperationalSales?: boolean;
   profitAndLoss?: LedgerProfitAndLossReport;
   balanceSheet?: LedgerBalanceSheetReport;
   vatSummary?: VatSummaryReport;
   cashFlow?: LedgerCashFlowReport;
-  reversePending: boolean;
   setDateRange: (range: DateRange) => void;
   formatCurrency: (value: number | undefined) => string;
-  formatDate: (value?: string | null) => string;
-  onReverseJournalEntry: (entry: JournalEntry) => void;
 }
-
-const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
 
 function ReportRows({
   title,
@@ -76,27 +68,17 @@ function ReportRows({
 export function AccountsReportsPanel({
   dateRange,
   reportRangeLabel,
-  chartAccounts,
-  entries,
   orders,
   salesByPersonData,
   salesByItem,
+  showOperationalSales = true,
   profitAndLoss,
   balanceSheet,
   vatSummary,
   cashFlow,
-  reversePending,
   setDateRange,
   formatCurrency,
-  formatDate,
-  onReverseJournalEntry,
 }: AccountsReportsPanelProps) {
-  const incomeAccounts = chartAccounts.filter((account) => account.accountType === 'income');
-  const expenseAccounts = chartAccounts.filter((account) => account.accountType === 'expense');
-  const assetAccounts = chartAccounts.filter((account) => account.accountType === 'asset');
-  const liabilityAccounts = chartAccounts.filter((account) => account.accountType === 'liability');
-  const equityAccounts = chartAccounts.filter((account) => account.accountType === 'equity');
-
   return (
     <div className="mt-4 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -229,62 +211,7 @@ export function AccountsReportsPanel({
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader><CardTitle className="text-base">Chart of Accounts</CardTitle></CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {[
-                { label: 'Assets', data: assetAccounts },
-                { label: 'Liabilities', data: liabilityAccounts },
-                { label: 'Equity', data: equityAccounts },
-                { label: 'Income', data: incomeAccounts },
-                { label: 'Expenses', data: expenseAccounts },
-              ].map((group) => (
-                <div key={group.label} className="rounded-lg border p-3">
-                  <p className="text-xs font-medium uppercase text-muted-foreground">{group.label}</p>
-                  <div className="mt-2 space-y-1">
-                    {group.data.map((account) => (
-                      <p key={account.id} className="text-sm">{formatAccount(account)}</p>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle className="text-base">Journal Entries</CardTitle></CardHeader>
-          <CardContent>
-            {entries.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No posted journal entries yet</p>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {entries.map((entry) => (
-                  <div key={entry.id} className="rounded-lg border p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold">{entry.entryNumber}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.sourceType.replace('_', ' ')} · {formatDate(entry.entryDate)} · {entry.status}
-                        </p>
-                        {entry.memo && <p className="text-xs mt-1">{entry.memo}</p>}
-                      </div>
-                      {entry.status === 'posted' && (
-                        <Button size="sm" variant="outline" disabled={reversePending} onClick={() => onReverseJournalEntry(entry)}>
-                          Reverse
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
+      {showOperationalSales && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Sales by Customer</CardTitle></CardHeader>
@@ -349,6 +276,7 @@ export function AccountsReportsPanel({
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }

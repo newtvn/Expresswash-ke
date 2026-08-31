@@ -52,10 +52,10 @@ export async function reversePostedJournalEntry(id: string, entryDate: string, m
   return repository.reverseJournalEntry(id, entryDate, memo);
 }
 
-export async function getLedgerOverview() {
+export async function getLedgerOverview(business?: string) {
   const [entries, balances] = await Promise.all([
-    repository.listJournalEntries(),
-    repository.listAccountBalances(),
+    repository.listJournalEntries(50, business),
+    repository.listAccountBalances(business),
   ]);
 
   return {
@@ -72,10 +72,13 @@ export async function saveAccountingContact(input: Partial<Contact> & { name: st
   return repository.saveContact(input);
 }
 
-export async function getOperationalAccounting() {
+export async function getOperationalAccounting(business?: string) {
+  // Bills and credit notes carry a business slug and are scoped. customer_refunds
+  // has no business column and list_customer_credit_balances is a global RPC, so
+  // those two remain unscoped until the backend gains a business dimension for them.
   const [bills, creditNotes, refunds, customerCredits] = await Promise.all([
-    repository.listBills(),
-    repository.listCreditNotes(),
+    repository.listBills(100, business),
+    repository.listCreditNotes(100, business),
     repository.listCustomerRefunds(),
     repository.listCustomerCreditBalances(),
   ]);

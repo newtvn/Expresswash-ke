@@ -15,14 +15,21 @@ import {
 } from '@/components/ui/dialog';
 import {
   DollarSign, TrendingUp, TrendingDown, AlertCircle, Plus, Download,
-  FileText, Users, GitCommitHorizontal,
+  FileText, Users, GitCommitHorizontal, ChevronDown,
   RotateCcw, Trash2,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
+import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
+import { toBusinessParam } from '@/types/business';
 import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
+import { LedgerJournalEntries } from '@/components/admin/accounts/LedgerJournalEntries';
+import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import {
   getLedgerCashFlow,
   getLedgerBalanceSheet,
@@ -149,6 +156,17 @@ const formatDate = (value?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
 
+function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const escape = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const getInvoiceDueDate = (invoice: AgingInvoice): string | undefined => invoice.due_date ?? invoice.due_at;
 
 const STATUS_EVENT_LABELS: Record<string, string> = {
@@ -233,17 +251,22 @@ async function fetchAccountSummary() {
   return { totalRevenue, totalExpenses, outstanding, netProfit: totalRevenue - totalExpenses, payments, expenses, orders };
 }
 
-async function fetchExpenses() {
-  const { data } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+async function fetchExpenses(business?: string) {
+  const biz = toBusinessParam(business);
+  let q = supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+  if (biz) q = q.eq('business', biz);
+  const { data } = await q;
   return (data ?? []) as AccountExpense[];
 }
 
-async function fetchPaymentsReceived(from?: string, to?: string) {
+async function fetchPaymentsReceived(from?: string, to?: string, business?: string) {
+  const biz = toBusinessParam(business);
   let q = supabase
     .from('payments')
     .select('id, invoice_id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, phone_number, payer_phone_number, payer_phone_matches_intent, merchant_request_id, checkout_request_id, mpesa_receipt_number, result_desc, unapplied_amount, posted_journal_entry_id')
     .eq('status', 'completed')
     .order('created_at', { ascending: false });
+  if (biz) q = q.eq('business', biz);
   if (from) q = q.gte('created_at', from);
   if (to) q = q.lte('created_at', to + 'T23:59:59');
   const { data } = await q;
@@ -281,11 +304,14 @@ async function fetchSalesByItem(): Promise<SalesByItemRow[]> {
     .slice(0, 10);
 }
 
-async function fetchAgingSummary() {
-  const { data } = await supabase
+async function fetchAgingSummary(business?: string) {
+  const biz = toBusinessParam(business);
+  let q = supabase
     .from('invoices')
     .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id')
     .neq('status', 'paid');
+  if (biz) q = q.eq('business', biz);
+  const { data } = await q;
   return (data ?? []) as AgingInvoice[];
 }
 
@@ -296,18 +322,20 @@ async function addExpense(payload: {
   expense_date: string;
   payment_method: ExpensePaymentMethod;
   created_by: string;
+  business?: string;
 }) {
   const { error } = await supabase.from('expenses').insert(payload);
   if (error) throw new Error(error.message);
 }
 
 async function addJournalEntry(payload: {
-  debitAccountId: string; creditAccountId: string; amount: number; description: string; date: string;
+  debitAccountId: string; creditAccountId: string; amount: number; description: string; date: string; businessId?: string;
 }) {
   const result = await postBalancedJournalEntry({
     sourceType: 'manual_adjustment',
     entryDate: payload.date,
     memo: payload.description,
+    businessId: payload.businessId,
     lines: [
       { accountId: payload.debitAccountId, debit: payload.amount, description: payload.description },
       { accountId: payload.creditAccountId, credit: payload.amount, description: payload.description },
@@ -357,7 +385,6 @@ export const Accounts = () => {
   const { user } = useAuthStore();
   const qc = useQueryClient();
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
-  const [agingView, setAgingView] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
   const [addJournalOpen, setAddJournalOpen] = useState(false);
   const [addContactOpen, setAddContactOpen] = useState(false);
@@ -421,6 +448,17 @@ export const Accounts = () => {
     date: new Date().toISOString().split('T')[0],
   });
 
+  // Business scope for reports/overview/operational lists (super_admin can switch).
+  // Non-super-admins are Expresswash-only: never honor a persisted cross-business scope
+  // (e.g. left over from a super_admin session on this browser) — force expresswash so a
+  // regular admin can't send an unauthorized scope that the backend would reject.
+  const rawSelectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
+  // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
+  const isConsolidated = selectedBusiness === BUSINESS_ALL;
+  const consolidatedWriteHint = 'Select a specific business to create records';
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['accounts', 'summary'],
     queryFn: fetchAccountSummary,
@@ -428,21 +466,22 @@ export const Accounts = () => {
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ['accounts', 'expenses'],
-    queryFn: fetchExpenses,
+    queryKey: ['accounts', 'expenses', selectedBusiness],
+    queryFn: () => fetchExpenses(selectedBusiness),
   });
 
   const { data: paymentsReceived = [] } = useQuery({
-    queryKey: ['accounts', 'payments', dateRange.from?.toISOString().split('T')[0], dateRange.to?.toISOString().split('T')[0]],
+    queryKey: ['accounts', 'payments', selectedBusiness, dateRange.from?.toISOString().split('T')[0], dateRange.to?.toISOString().split('T')[0]],
     queryFn: () => fetchPaymentsReceived(
       dateRange.from?.toISOString().split('T')[0],
       dateRange.to?.toISOString().split('T')[0],
+      selectedBusiness,
     ),
   });
 
   const { data: agingData = [] } = useQuery({
-    queryKey: ['accounts', 'aging'],
-    queryFn: fetchAgingSummary,
+    queryKey: ['accounts', 'aging', selectedBusiness],
+    queryFn: () => fetchAgingSummary(selectedBusiness),
   });
 
   const reportFrom = dateRange.from?.toISOString().split('T')[0];
@@ -458,13 +497,13 @@ export const Accounts = () => {
   const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
 
   const { data: ledgerOverview } = useQuery({
-    queryKey: ['accounting', 'ledger-overview'],
-    queryFn: getLedgerOverview,
+    queryKey: ['accounting', 'ledger-overview', selectedBusiness],
+    queryFn: () => getLedgerOverview(selectedBusiness),
   });
 
   const { data: operationalAccounting } = useQuery({
-    queryKey: ['accounting', 'operational'],
-    queryFn: getOperationalAccounting,
+    queryKey: ['accounting', 'operational', selectedBusiness],
+    queryFn: () => getOperationalAccounting(selectedBusiness),
   });
 
   const bills = operationalAccounting?.bills ?? [];
@@ -481,34 +520,41 @@ export const Accounts = () => {
   const billTotal = billForm.lines.reduce((sum, line) => sum + toAmount(line.amount) + toAmount(line.taxAmount), 0);
 
   const { data: profitAndLoss } = useQuery({
-    queryKey: ['accounting', 'reports', 'profit-loss', reportFrom, reportTo],
-    queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'profit-loss', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: balanceSheet } = useQuery({
-    queryKey: ['accounting', 'reports', 'balance-sheet', reportTo],
-    queryFn: () => getLedgerBalanceSheet(reportTo),
+    queryKey: ['accounting', 'reports', 'balance-sheet', selectedBusiness, reportTo],
+    queryFn: () => getLedgerBalanceSheet(reportTo, selectedBusiness),
   });
 
   const { data: vatSummary } = useQuery({
-    queryKey: ['accounting', 'reports', 'vat', reportFrom, reportTo],
-    queryFn: () => getVatSummary(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'vat', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getVatSummary(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: cashFlow } = useQuery({
-    queryKey: ['accounting', 'reports', 'cash-flow', reportFrom, reportTo],
-    queryFn: () => getLedgerCashFlow(reportFrom, reportTo),
+    queryKey: ['accounting', 'reports', 'cash-flow', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getLedgerCashFlow(reportFrom, reportTo, selectedBusiness),
   });
 
   const { data: receivablesAging } = useQuery({
-    queryKey: ['accounting', 'reports', 'receivables-aging', reportTo],
-    queryFn: () => getReceivablesAging(reportTo),
+    queryKey: ['accounting', 'reports', 'receivables-aging', selectedBusiness, reportTo],
+    queryFn: () => getReceivablesAging(reportTo, selectedBusiness),
   });
 
   const { data: payablesAging } = useQuery({
-    queryKey: ['accounting', 'reports', 'payables-aging', reportTo],
-    queryFn: () => getPayablesAging(reportTo),
+    queryKey: ['accounting', 'reports', 'payables-aging', selectedBusiness, reportTo],
+    queryFn: () => getPayablesAging(reportTo, selectedBusiness),
   });
+
+  // KPI cards mirror the (business-scoped) ledger reports so they stay consistent with the
+  // report cards below and re-scope with the switcher. Outstanding = total receivables.
+  const arOutstanding = receivablesAging
+    ? receivablesAging.current + receivablesAging.days1To30 + receivablesAging.days31To60
+      + receivablesAging.days61To90 + receivablesAging.days90Plus
+    : 0;
 
   const { data: selectedPaymentEvents = [], isLoading: selectedPaymentEventsLoading } = useQuery({
     queryKey: ['payments', selectedPayment?.id, 'events'],
@@ -535,7 +581,7 @@ export const Accounts = () => {
   const addExpenseMutation = useMutation({
     mutationFn: addExpense,
     onSuccess: () => {
-      toast.success('Expense added');
+      toast.success('Expense added — pending approval');
       setAddExpenseOpen(false);
       setExpenseForm({
         description: '',
@@ -827,29 +873,44 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => setAddContactOpen(true)}>
-            <Users className="w-4 h-4 mr-2" /> Contact
-          </Button>
-          <Button variant="outline" onClick={() => setAddBillOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Bill
-          </Button>
-          <Button variant="outline" onClick={() => setAddExpenseOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Expense
-          </Button>
-          <Button variant="outline" onClick={() => setAddJournalOpen(true)}>
-            <FileText className="w-4 h-4 mr-2" /> Journal Entry
-          </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <BusinessSwitcher />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" /> New <ChevronDown className="w-4 h-4 ml-1 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={() => setAddContactOpen(true)}>
+                <Users className="w-4 h-4 mr-2" /> Contact
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddBillOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Bill
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddExpenseOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" /> Expense
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddJournalOpen(true)}>
+                <FileText className="w-4 h-4 mr-2" /> Journal Entry
+              </DropdownMenuItem>
+              {isConsolidated && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">{consolidatedWriteHint}</p>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </PageHeader>
 
       {/* KPI Summary */}
+      <p className="-mb-3 text-xs text-muted-foreground">Ledger totals · {reportRangeLabel}</p>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: summary?.totalRevenue ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Total Expenses', value: summary?.totalExpenses ?? 0, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: 'Net Profit', value: summary?.netProfit ?? 0, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Outstanding', value: summary?.outstanding ?? 0, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Total Revenue', value: profitAndLoss?.totalIncome ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Total Expenses', value: profitAndLoss?.totalExpenses ?? 0, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Net Profit', value: profitAndLoss?.netProfit ?? 0, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Outstanding', value: arOutstanding, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((kpi) => (
           <Card key={kpi.label}>
             <CardContent className="py-4 flex items-center gap-4">
@@ -868,6 +929,7 @@ export const Accounts = () => {
       <Tabs defaultValue="reports">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="ledger">Ledger</TabsTrigger>
           <TabsTrigger value="expenses">Purchases & Expenses</TabsTrigger>
           <TabsTrigger value="payments">Payments Received</TabsTrigger>
           <TabsTrigger value="aging">Aging Summary</TabsTrigger>
@@ -883,18 +945,25 @@ export const Accounts = () => {
           <AccountsReportsPanel
             dateRange={dateRange}
             reportRangeLabel={reportRangeLabel}
-            chartAccounts={chartAccounts}
-            entries={ledgerOverview?.entries ?? []}
             orders={summary?.orders ?? []}
             salesByPersonData={salesByPersonData}
             salesByItem={salesByItem}
+            showOperationalSales={selectedBusiness === 'expresswash'}
             profitAndLoss={profitAndLoss}
             balanceSheet={balanceSheet}
             vatSummary={vatSummary}
             cashFlow={cashFlow}
-            reversePending={reverseJournalMutation.isPending}
             setDateRange={setDateRange}
             formatCurrency={formatCurrency}
+          />
+        </TabsContent>
+
+        {/* ---- LEDGER ---- */}
+        <TabsContent value="ledger" className="mt-4">
+          <LedgerJournalEntries
+            entries={ledgerOverview?.entries ?? []}
+            reversePending={reverseJournalMutation.isPending}
+            writesDisabled={isConsolidated}
             formatDate={formatDate}
             onReverseJournalEntry={(entry) => reverseJournalMutation.mutate(entry)}
           />
@@ -905,7 +974,7 @@ export const Accounts = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Purchases & Expenses</CardTitle>
-              <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
+              <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add
               </Button>
             </CardHeader>
@@ -922,7 +991,14 @@ export const Accounts = () => {
                           {humanizeCode(e.category)} · {formatDate(e.expense_date)} · {formatPaymentMethod(e.payment_method)}
                         </p>
                       </div>
-                      <span className="font-semibold text-red-600">KES {toAmount(e.amount).toLocaleString()}</span>
+                      <div className="flex items-center gap-3">
+                        {e.status && e.status !== 'approved' && (
+                          <Badge variant={e.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{e.status}</Badge>
+                        )}
+                        <span className={`font-semibold ${e.status === 'rejected' ? 'text-muted-foreground line-through' : 'text-red-600'}`}>
+                          {formatCurrency(toAmount(e.amount))}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -935,12 +1011,30 @@ export const Accounts = () => {
         <TabsContent value="payments" className="mt-4 space-y-4">
           <div className="flex items-center gap-3">
             <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-            <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-1" /> Export</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={paymentsReceived.length === 0}
+              onClick={() => downloadCsv(
+                `payments-${selectedBusiness}-${new Date().toISOString().split('T')[0]}.csv`,
+                ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
+                paymentsReceived.map((p) => [
+                  formatDate(p.created_at),
+                  p.customer_name ?? '',
+                  toAmount(p.amount),
+                  p.method ?? '',
+                  p.mpesa_receipt_number ?? p.checkout_request_id ?? '',
+                  p.status ?? '',
+                ]),
+              )}
+            >
+              <Download className="h-4 w-4 mr-1" /> Export
+            </Button>
           </div>
           <Card>
             <CardContent className="pt-4">
               {paymentsReceived.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-12">No payments in selected period</p>
+                <p className="text-sm text-muted-foreground text-center py-12">No payments received in this period. Adjust the date range, or record a payment from an invoice.</p>
               ) : (
                 <div className="space-y-2">
                   {paymentsReceived.map((p) => (
@@ -967,12 +1061,14 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => {
                               setAllocationTarget(p);
                               setAllocationRows([makeAllocationRow()]);
                             }}
                           >
-                            Apply
+                            Allocate
                           </Button>
                         )}
                         <Button size="sm" variant="outline" onClick={() => setSelectedPayment(p)}>
@@ -993,19 +1089,18 @@ export const Accounts = () => {
 
         {/* ---- AGING SUMMARY ---- */}
         <TabsContent value="aging" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <Select value={agingView} onValueChange={(v) => setAgingView(v as typeof agingView)}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-                <SelectItem value="yearly">Yearly</SelectItem>
-              </SelectContent>
-            </Select>
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="aging-asof" className="text-sm text-muted-foreground">As of</Label>
+            <Input
+              id="aging-asof"
+              type="date"
+              className="w-44"
+              value={reportTo ?? ''}
+              onChange={(e) => setDateRange({ from: dateRange.from, to: e.target.value ? new Date(e.target.value) : undefined })}
+            />
           </div>
 
+          <p className="text-xs text-muted-foreground">Receivables outstanding by age, as of {reportTo ?? 'today'}.</p>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             {[
               { label: 'Current', amount: receivablesAging?.current ?? agingBuckets.current.reduce((s, i) => s + toAmount(i.balance ?? Math.max(toAmount(i.total) - toAmount(i.paid_amount), 0)), 0), color: 'text-green-600' },
@@ -1018,19 +1113,16 @@ export const Accounts = () => {
                 <CardContent className="py-4 text-center">
                   <p className="text-xs text-muted-foreground">{bucket.label}</p>
                   <p className={`text-2xl font-bold ${bucket.color}`}>{formatCurrency(bucket.amount)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Receivables aging
-                  </p>
                 </CardContent>
               </Card>
             ))}
           </div>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">Overdue Invoice Detail</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Open Invoices</CardTitle></CardHeader>
             <CardContent>
               {(receivablesAging?.items.length ?? 0) === 0 && agingData.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">No overdue invoices</p>
+                <p className="text-sm text-muted-foreground text-center py-8">No open invoices — all receivables are settled.</p>
               ) : (receivablesAging?.items.length ?? 0) > 0 ? (
                 <div className="space-y-2">
                   {receivablesAging!.items.map((inv) => (
@@ -1069,8 +1161,8 @@ export const Accounts = () => {
         <TabsContent value="payables" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Overdue Bills & Payables</CardTitle>
-              <Button size="sm" onClick={() => setAddBillOpen(true)}>
+              <CardTitle>Bills & Payables</CardTitle>
+              <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add Bill
               </Button>
             </CardHeader>
@@ -1100,6 +1192,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => {
                               setBillPaymentTarget(bill);
                               setBillPaymentForm({ amount: String(bill.balanceDue), method: 'bank_transfer', reference: '' });
@@ -1133,7 +1227,7 @@ export const Accounts = () => {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground text-center py-12">No bills recorded</p>
+                <p className="text-sm text-muted-foreground text-center py-12">No bills yet. Add a supplier contact, then create a bill to track what you owe.</p>
               )}
             </CardContent>
           </Card>
@@ -1178,6 +1272,8 @@ export const Accounts = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={isConsolidated}
+                                  title={isConsolidated ? consolidatedWriteHint : undefined}
                                   onClick={() => {
                                     const payment = paymentsReceived.find((item) => item.id === credit.paymentId);
                                     setAllocationTarget(payment ?? {
@@ -1290,10 +1386,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postInvoiceMutation.isPending}
+                            disabled={isConsolidated || (postInvoiceMutation.isPending && postInvoiceMutation.variables === invoice.id)}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postInvoiceMutation.mutate(invoice.id)}
                           >
-                            Post
+                            {postInvoiceMutation.isPending && postInvoiceMutation.variables === invoice.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
@@ -1323,10 +1420,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postPaymentMutation.isPending}
+                            disabled={isConsolidated || (postPaymentMutation.isPending && postPaymentMutation.variables === payment.id)}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postPaymentMutation.mutate(payment.id)}
                           >
-                            Post
+                            {postPaymentMutation.isPending && postPaymentMutation.variables === payment.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
@@ -1355,10 +1453,11 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postExpenseMutation.isPending}
+                            disabled={isConsolidated || (postExpenseMutation.isPending && postExpenseMutation.variables === expense.id)}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postExpenseMutation.mutate(expense.id)}
                           >
-                            Post
+                            {postExpenseMutation.isPending && postExpenseMutation.variables === expense.id ? 'Posting…' : 'Post'}
                           </Button>
                         </div>
                       </div>
@@ -1441,6 +1540,7 @@ export const Accounts = () => {
                           size="sm"
                           variant="outline"
                           disabled={!canReplayOutbox(item) || replayOutboxMutation.isPending}
+                          title={!canReplayOutbox(item) ? 'Only failed or dead-letter notifications can be replayed' : undefined}
                           onClick={() => replayOutboxMutation.mutate(item.id)}
                         >
                           Replay
@@ -1465,13 +1565,13 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Name *</Label>
-                <Input value={contactForm.name} onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier or customer name" />
+                <Label htmlFor="contact-name">Name *</Label>
+                <Input id="contact-name" required value={contactForm.name} onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier or customer name" />
               </div>
               <div>
-                <Label>Type *</Label>
+                <Label htmlFor="contact-type">Type *</Label>
                 <Select value={contactForm.contactType} onValueChange={(v) => setContactForm((p) => ({ ...p, contactType: v as Contact['contactType'] }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="contact-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="customer">Customer</SelectItem>
                     <SelectItem value="supplier">Supplier</SelectItem>
@@ -1482,17 +1582,17 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Phone</Label>
-                <Input value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+254..." />
+                <Label htmlFor="contact-phone">Phone</Label>
+                <Input id="contact-phone" value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+254..." />
               </div>
               <div>
-                <Label>Email</Label>
-                <Input type="email" value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} placeholder="name@example.com" />
+                <Label htmlFor="contact-email">Email</Label>
+                <Input id="contact-email" type="email" value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} placeholder="name@example.com" />
               </div>
             </div>
             <div>
-              <Label>Tax PIN / VAT Number</Label>
-              <Input value={contactForm.taxPin} onChange={(e) => setContactForm((p) => ({ ...p, taxPin: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="contact-taxpin">Tax PIN / VAT Number</Label>
+              <Input id="contact-taxpin" value={contactForm.taxPin} onChange={(e) => setContactForm((p) => ({ ...p, taxPin: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>
@@ -1525,9 +1625,9 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Supplier *</Label>
+                <Label htmlFor="bill-supplier">Supplier *</Label>
                 <Select value={billForm.supplierContactId} onValueChange={(v) => setBillForm((p) => ({ ...p, supplierContactId: v }))}>
-                  <SelectTrigger><SelectValue placeholder={suppliers.length ? 'Select supplier' : 'Create a supplier first'} /></SelectTrigger>
+                  <SelectTrigger id="bill-supplier"><SelectValue placeholder={suppliers.length ? 'Select supplier' : 'Create a supplier first'} /></SelectTrigger>
                   <SelectContent>
                     {suppliers.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
@@ -1559,6 +1659,8 @@ export const Accounts = () => {
                       type="button"
                       size="sm"
                       variant="ghost"
+                      aria-label="Remove line"
+                      title="Remove line"
                       disabled={billForm.lines.length === 1}
                       onClick={() => removeBillLine(line.id)}
                     >
@@ -1634,6 +1736,7 @@ export const Accounts = () => {
                   dueDate: billForm.dueDate || undefined,
                   notes: billForm.notes || undefined,
                   post: true,
+                  businessId: toBusinessParam(selectedBusiness) ?? undefined,
                   lines: billForm.lines.map((line) => ({
                     description: line.description,
                     quantity: 1,
@@ -1675,14 +1778,14 @@ export const Accounts = () => {
                 </div>
               </div>
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="1" step="0.01" max={billPaymentTarget.balanceDue} value={billPaymentForm.amount} onChange={(e) => setBillPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
+                <Label htmlFor="billpay-amount">Amount (KES) *</Label>
+                <Input id="billpay-amount" type="number" min="1" step="0.01" required max={billPaymentTarget.balanceDue} value={billPaymentForm.amount} onChange={(e) => setBillPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Method *</Label>
+                  <Label htmlFor="billpay-method">Method *</Label>
                   <Select value={billPaymentForm.method} onValueChange={(v) => setBillPaymentForm((p) => ({ ...p, method: v as ExpensePaymentMethod }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="billpay-method"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PAYMENT_METHODS.map((method) => (
                         <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
@@ -1691,8 +1794,8 @@ export const Accounts = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>Reference</Label>
-                  <Input value={billPaymentForm.reference} onChange={(e) => setBillPaymentForm((p) => ({ ...p, reference: e.target.value }))} placeholder="Transaction reference" />
+                  <Label htmlFor="billpay-reference">Reference</Label>
+                  <Input id="billpay-reference" value={billPaymentForm.reference} onChange={(e) => setBillPaymentForm((p) => ({ ...p, reference: e.target.value }))} placeholder="Transaction reference" />
                 </div>
               </div>
             </div>
@@ -1726,19 +1829,19 @@ export const Accounts = () => {
       <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Expense / Bill</DialogTitle>
+            <DialogTitle>Add Expense</DialogTitle>
             <DialogDescription>Record a new expense or bill manually</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Description *</Label>
-                <Input value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="e.g. Driver salary" />
+                <Label htmlFor="expense-description">Description *</Label>
+                <Input id="expense-description" required value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="e.g. Driver salary" />
               </div>
               <div>
-                <Label>Category *</Label>
+                <Label htmlFor="expense-category">Category *</Label>
                 <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm((p) => ({ ...p, category: v as ExpenseCategory }))}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectTrigger id="expense-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {EXPENSE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                   </SelectContent>
@@ -1747,18 +1850,18 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
+                <Label htmlFor="expense-amount">Amount (KES) *</Label>
+                <Input id="expense-amount" type="number" min="0" step="0.01" required value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
               </div>
               <div>
-                <Label>Date *</Label>
-                <Input type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm((p) => ({ ...p, expense_date: e.target.value }))} />
+                <Label htmlFor="expense-date">Date *</Label>
+                <Input id="expense-date" type="date" required value={expenseForm.expense_date} onChange={(e) => setExpenseForm((p) => ({ ...p, expense_date: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Payment Method *</Label>
+              <Label htmlFor="expense-method">Payment Method *</Label>
               <Select value={expenseForm.payment_method} onValueChange={(v) => setExpenseForm((p) => ({ ...p, payment_method: v as ExpensePaymentMethod }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="expense-method"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((method) => (
                     <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
@@ -1767,8 +1870,8 @@ export const Accounts = () => {
               </Select>
             </div>
             <div>
-              <Label>Notes</Label>
-              <Textarea value={expenseForm.notes} onChange={(e) => setExpenseForm((p) => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Optional notes..." />
+              <Label htmlFor="expense-notes">Notes</Label>
+              <Textarea id="expense-notes" value={expenseForm.notes} onChange={(e) => setExpenseForm((p) => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Optional notes..." />
               <p className="mt-1 text-xs text-muted-foreground">Notes are appended to the description until expenses have a dedicated notes field.</p>
             </div>
           </div>
@@ -1788,6 +1891,7 @@ export const Accounts = () => {
                   expense_date: expenseForm.expense_date,
                   payment_method: expenseForm.payment_method,
                   created_by: user.id,
+                  business: toBusinessParam(selectedBusiness) ?? undefined,
                 });
               }}
             >
@@ -1807,9 +1911,9 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Debit Account *</Label>
+                <Label htmlFor="je-debit">Debit Account *</Label>
                 <Select value={journalForm.debitAccountId} onValueChange={(v) => setJournalForm((p) => ({ ...p, debitAccountId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectTrigger id="je-debit"><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
                     {chartAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>{formatAccount(account)}</SelectItem>
@@ -1818,9 +1922,9 @@ export const Accounts = () => {
                 </Select>
               </div>
               <div>
-                <Label>Credit Account *</Label>
+                <Label htmlFor="je-credit">Credit Account *</Label>
                 <Select value={journalForm.creditAccountId} onValueChange={(v) => setJournalForm((p) => ({ ...p, creditAccountId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectTrigger id="je-credit"><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
                     {chartAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>{formatAccount(account)}</SelectItem>
@@ -1831,17 +1935,17 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="0" step="0.01" value={journalForm.amount} onChange={(e) => setJournalForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
+                <Label htmlFor="je-amount">Amount (KES) *</Label>
+                <Input id="je-amount" type="number" min="0" step="0.01" required value={journalForm.amount} onChange={(e) => setJournalForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
               </div>
               <div>
-                <Label>Date *</Label>
-                <Input type="date" value={journalForm.date} onChange={(e) => setJournalForm((p) => ({ ...p, date: e.target.value }))} />
+                <Label htmlFor="je-date">Date *</Label>
+                <Input id="je-date" type="date" required value={journalForm.date} onChange={(e) => setJournalForm((p) => ({ ...p, date: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Memo *</Label>
-              <Input value={journalForm.description} onChange={(e) => setJournalForm((p) => ({ ...p, description: e.target.value }))} placeholder="Entry description" />
+              <Label htmlFor="je-memo">Memo *</Label>
+              <Input id="je-memo" required value={journalForm.description} onChange={(e) => setJournalForm((p) => ({ ...p, description: e.target.value }))} placeholder="Entry description" />
             </div>
             <p className="text-xs text-muted-foreground">
               The backend rejects unbalanced entries. This form posts one debit line and one matching credit line.
@@ -1867,6 +1971,7 @@ export const Accounts = () => {
                   amount,
                   description: journalForm.description,
                   date: journalForm.date,
+                  businessId: toBusinessParam(selectedBusiness) ?? undefined,
                 });
               }}
             >
@@ -1933,6 +2038,8 @@ export const Accounts = () => {
                 <Button
                   variant="outline"
                   className="mr-2"
+                  disabled={isConsolidated}
+                  title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => {
                     setAllocationTarget(selectedPayment);
                     setAllocationRows([makeAllocationRow()]);
@@ -1942,6 +2049,8 @@ export const Accounts = () => {
                 </Button>
                 <Button
                   variant="outline"
+                  disabled={isConsolidated}
+                  title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => {
                     const alreadyRefunded = refunds
                       .filter((refund) => refund.status !== 'void' && refund.paymentId === selectedPayment.id)
@@ -2134,6 +2243,8 @@ export const Accounts = () => {
                         type="button"
                         size="sm"
                         variant="ghost"
+                        aria-label="Remove allocation"
+                        title="Remove allocation"
                         disabled={allocationRows.length === 1}
                         onClick={() => removeAllocationRow(row.id)}
                       >

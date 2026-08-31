@@ -18,6 +18,7 @@ interface AuthState {
   hasRole: (role: UserRole) => boolean;
   hasAnyRole: (roles: UserRole[]) => boolean;
   isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
   isCustomer: () => boolean;
   isDriver: () => boolean;
   isWarehouseStaff: () => boolean;
@@ -109,6 +110,8 @@ export const useAuthStore = create<AuthState>()(
         const role = get().user?.role;
         return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
       },
+
+      isSuperAdmin: () => get().user?.role === UserRole.SUPER_ADMIN,
 
       isCustomer: () => get().user?.role === UserRole.CUSTOMER,
       isDriver: () => get().user?.role === UserRole.DRIVER,
