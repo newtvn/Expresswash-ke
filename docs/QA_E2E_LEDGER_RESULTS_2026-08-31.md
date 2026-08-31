@@ -2,13 +2,13 @@
 
 ## Outcome
 
-**FAIL — sign-off stopped at D2.** Parts A–C and D1 passed. The detailed Goalhub
-ledger reports re-scoped correctly, but the four Accounts KPI cards and the journal
-entry list did not follow the selected business. The cutover is not signed off from
-this run.
+**FAIL — sign-off stopped at D6.** Parts A–C and D1–D5 passed, including the D2
+re-test after commit `a8ab860`. A regular admin who follows a super-admin in the same
+browser inherits the super-admin's persisted business selection even though the UI
+labels the scope as Expresswash. The cutover is not signed off from this run.
 
 The run stopped on the first confirmed product failure. No migration or application
-fix was applied. D3–D8 and Part E were not run.
+fix was applied. D7–D8 and Part E were not run.
 
 ## Test-plan corrections made during the run
 
@@ -93,55 +93,118 @@ B1/B5 test invoices.
 
 ### D1 — super-admin switcher: PASS
 
-Chrome showed exactly one switcher with:
+Chrome showed exactly one switcher with All businesses (consolidated), Expresswash,
+Goalhub, and an Add business button. The selected scope persisted across reload.
 
-- All businesses (consolidated)
-- Expresswash
-- Goalhub
-- Add business button
+### D2 — scope switches all numbers: PASS after `a8ab860`
 
-### D2 — scope switches all numbers: FAIL
+| Scope | Revenue | Expenses | Net | Outstanding | Actual / expected | Result |
+|---|---:|---:|---:|---:|---|---|
+| Expresswash | 32,500 | 5,900 | 26,600 | 20,800 | Exact; P&L and KPI cards match | PASS |
+| Goalhub | 14,000 | 0 | 14,000 | 3,000 | Exact; P&L and KPI cards match | PASS |
+| Consolidated | 46,500 | 5,900 | 40,600 | 23,800 | Exact sum of businesses | PASS |
 
-The detailed reports did switch successfully:
+The Expresswash journal panel contained no Goalhub ingest memos; the Goalhub panel
+contained no Expresswash memos. Consolidated mode disabled Bill, Add Expense, and
+Journal Entry while leaving Contact enabled. Chrome console errors: **0**.
 
-| Report | Expected | Actual | Result |
+### D3 — create business-tagged bills: PASS
+
+| UI action | Expected | Actual | Result |
+|---|---|---|---|
+| Goalhub bill | KES 1,000; `business=goalhub` | `D3 Goalhub UI bill`; 1,000; goalhub | PASS |
+| Expresswash bill | KES 1,200; `business=expresswash` | `D3 Expresswash UI bill`; 1,200; expresswash | PASS |
+
+The success toasts were `Bill BILL-20260831-31D653 created` and
+`Bill BILL-20260831-A5C32E created`. Both bills posted and remained isolated to the
+selected business.
+
+### D4 — create business-tagged expenses: PASS
+
+| UI action | Expected business | Actual amount / business / status | Result |
+|---|---|---|---|
+| Expresswash expense | expresswash | KES 300 / expresswash / pending | PASS |
+| Goalhub expense | goalhub | KES 400 / goalhub / pending | PASS |
+
+Both UI submissions showed `Expense added`. Pending expenses correctly did not change
+posted-ledger KPIs.
+
+### D5 — add a business: PASS
+
+The UI showed `Added Test Biz`; the switcher immediately listed exactly one Test Biz
+option. Database actual: `testbiz | Test Biz | active=true`.
+
+### D6 — regular admin has no switcher: FAIL
+
+Browser reproduction:
+
+1. As `super@ew.local`, create Test Biz; the UI selects and persists `testbiz`.
+2. Log out in the same Chrome session.
+3. Sign in as `reg@ew.local` and navigate to `/admin/accounts`.
+
+The role controls were correct: there was no business combobox and no Add Business
+button, and the header rendered the static label `Expresswash`. The data scope was
+wrong:
+
+| Check | Expected | Actual | Result |
 |---|---:|---:|---|
-| Expresswash P&L income / expense / net | 22,500 / 5,500 / 17,000 | 22,500 / 5,500 / 17,000 | PASS |
-| Goalhub P&L income / expense / net | 10,000 / 0 / 10,000 | 10,000 / 0 / 10,000 | PASS |
-| Goalhub balance sheet | Balanced | Balanced | PASS |
-| Goalhub ingest accounts | 1021 7,900; 2210 1,000; income 6,900 | Exact values rendered | PASS |
+| Revenue | KES 32,500 | KES 0 | FAIL |
+| Expenses | KES 7,100 | KES 0 | FAIL |
+| Net | KES 25,400 | KES 0 | FAIL |
+| Outstanding | KES 20,800 | KES 0 | FAIL |
+| Journal entries | Expresswash rows; no Goalhub rows | No rows | FAIL |
 
-But after selecting Goalhub and waiting two seconds, the summary cards remained the
-unscoped combined operational values:
+Exact Chrome DOM excerpt:
 
-| KPI | Expresswash expected | Goalhub expected | Actual while Goalhub selected | Result |
-|---|---:|---:|---:|---|
-| Total Revenue | 16,600 | 100 | 16,700 | FAIL |
-| Total Expenses | 500 | 0 | 500 | FAIL |
-| Net Profit | 16,100 | 100 | 16,200 | FAIL |
-| Outstanding | -16,600 | -100 | -16,700 | FAIL |
+```text
+text: Expresswash
+paragraph: Total Revenue
+paragraph: KES 0
+paragraph: Total Expenses
+paragraph: KES 0
+paragraph: Net Profit
+paragraph: KES 0
+paragraph: Outstanding
+paragraph: KES 0
+heading "Journal Entries"
+paragraph: No posted journal entries yet
+```
 
-The Journal Entries panel also remained unscoped: while Goalhub was selected, it
-rendered Expresswash `JE-…` rows alongside Goalhub `IJE-…` rows. Database counts at
-that point were 12 posted Expresswash entries and 11 posted Goalhub entries.
+### D6 diagnosis
 
-Chrome console errors: **0**.
+This is a persisted client-scope defect, not a ledger or RLS defect:
 
-### Diagnosis
+- `businessStore.ts:19,30-31` defaults to Expresswash but persists
+  `selectedBusiness` globally under `expresswash-business`, independent of user/role.
+- `BusinessSwitcher.tsx:32-38` renders a static Expresswash badge for regular admins
+  but does not reset the persisted selection to Expresswash.
+- `Accounts.tsx:464,469-519` reads that stale selection directly for every ledger
+  query. In this run it remained `testbiz`, whose correct balances are zero, while the
+  header falsely said Expresswash.
 
-`Accounts.tsx` keys the ledger report queries by `selectedBusiness`, so the detailed
-reports refetch correctly. The KPI query is instead fixed at `['accounts','summary']`;
-`fetchAccountSummary()` reads all `payments` and `expenses` without a business filter.
-It therefore never refetches or re-scopes when the switcher changes.
+The required fix is to derive an effective scope from authorization: non-super-admins
+must always query `expresswash` regardless of persisted state (and ideally clear or
+namespace persisted scope on identity/role changes). The browser sequence above must
+then be re-run before continuing D7.
 
-The journal list has the same gap: `getLedgerOverview(business)` passes the business to
-`listAccountBalances(business)` but calls `listJournalEntries()` without it. A
-super-admin consequently receives all businesses' rows in every selected scope.
+### Senior UI/UX observations (non-blocking)
 
-## Not run after the D2 stop
+- The expense dialog title `Add Expense / Bill` conflicts with the separate Bill
+  workflow. Use `Add Expense` and copy specific to expense posting.
+- `Expense added` omits the important `pending approval` status. This makes correctly
+  unchanged ledger KPIs look stale; the toast and resulting list state should name the
+  status and next action.
+- Sales by Customer/Admin/Item Type remain visible under Goalhub and Test Biz with
+  generic `No data yet` copy even though they are Expresswash operational widgets.
+  Hide them outside Expresswash or explicitly label their scope and purpose.
+- Chrome logged zero errors but one accessibility warning after the dialogs:
+  `Missing Description or aria-describedby={undefined} for DialogContent`. Each dialog
+  needs an accessible description.
 
-- D3–D8
+## Not run after the D6 stop
+
+- D7–D8
 - E1–E6 and the §6 final sign-off checklist
 
-Diagnostic integrity at the stop point remained healthy: posted debit and credit were
-both KES 95,400.00, difference KES 0.00; the most recent H3 returned zero rows.
+Diagnostic integrity at the stop point remained healthy: H2 actual debit and credit
+were both KES 112,000.00, difference KES 0.00; H3 returned zero rows.
