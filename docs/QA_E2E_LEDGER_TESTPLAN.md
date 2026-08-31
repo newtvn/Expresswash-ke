@@ -413,7 +413,11 @@ Run **H4** for goalhub. **Expected exact balances** (from C1–C8, verified):
 | 1021 M-Pesa - Goalhub | **7,900** | 2,400 + 1,500 + 300 + 200 + 3,500 |
 | 2210 Customer Wallet - Goalhub | **1,000** | topup 1,500 − redemption 800 + refund 500 − fine credit 200 |
 
-Goalhub P&L **net = 6,900** (income 6,900, no goalhub expenses). H3 → 0 imbalances.
+The **ingested entries'** P&L contribution is **net = 6,900** (income 6,900, no
+ingested Goalhub expenses). Because this script already creates native Goalhub invoices
+in B1 and optionally B5, the full Goalhub-scoped H4 P&L also includes those native
+postings; reconcile it as `native Goalhub net + 6,900`, rather than expecting the full
+scope to equal 6,900. H3 → 0 imbalances.
 
 ---
 
