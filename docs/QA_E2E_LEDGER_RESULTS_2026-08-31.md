@@ -2,13 +2,13 @@
 
 ## Outcome
 
-**FAIL — sign-off stopped at D6.** Parts A–C and D1–D5 passed, including the D2
-re-test after commit `a8ab860`. A regular admin who follows a super-admin in the same
-browser inherits the super-admin's persisted business selection even though the UI
-labels the scope as Expresswash. The cutover is not signed off from this run.
+**FAIL — sign-off stopped at D8.** Parts A–C and D1–D7 passed, including the D2 and
+D6 re-tests after commits `a8ab860` and `56de897`. Consolidated reports render and
+reconcile, but the Payables & Bills tab still exposes enabled write controls while
+"All businesses" is selected. The cutover is not signed off from this run.
 
-The run stopped on the first confirmed product failure. No migration or application
-fix was applied. D7–D8 and Part E were not run.
+The resumed run stopped on the first newly confirmed product failure. No migration or
+application fix was applied. Part E was not run.
 
 ## Test-plan corrections made during the run
 
@@ -134,7 +134,7 @@ posted-ledger KPIs.
 The UI showed `Added Test Biz`; the switcher immediately listed exactly one Test Biz
 option. Database actual: `testbiz | Test Biz | active=true`.
 
-### D6 — regular admin has no switcher: FAIL
+### D6 — regular admin has no switcher: PASS after `56de897`
 
 Browser reproduction:
 
@@ -142,68 +142,98 @@ Browser reproduction:
 2. Log out in the same Chrome session.
 3. Sign in as `reg@ew.local` and navigate to `/admin/accounts`.
 
-The role controls were correct: there was no business combobox and no Add Business
-button, and the header rendered the static label `Expresswash`. The data scope was
-wrong:
+The role controls and effective scope were both correct: there was no business
+combobox and no Add Business button, the header rendered the static label
+`Expresswash`, and every query returned Expresswash data despite the persisted Test
+Biz selection:
 
 | Check | Expected | Actual | Result |
 |---|---:|---:|---|
-| Revenue | KES 32,500 | KES 0 | FAIL |
-| Expenses | KES 7,100 | KES 0 | FAIL |
-| Net | KES 25,400 | KES 0 | FAIL |
-| Outstanding | KES 20,800 | KES 0 | FAIL |
-| Journal entries | Expresswash rows; no Goalhub rows | No rows | FAIL |
+| Revenue | KES 32,500 | KES 32,500 | PASS |
+| Expenses | KES 7,100 | KES 7,100 | PASS |
+| Net | KES 25,400 | KES 25,400 | PASS |
+| Outstanding | KES 20,800 | KES 20,800 | PASS |
+| Business controls | 0 switchers / 0 Add Business | 0 / 0 | PASS |
+| Journal entries | Expresswash rows; no Goalhub rows | 16 `JE-` / 0 `IJE-` | PASS |
 
 Exact Chrome DOM excerpt:
 
 ```text
 text: Expresswash
 paragraph: Total Revenue
-paragraph: KES 0
+paragraph: KES 32,500
 paragraph: Total Expenses
-paragraph: KES 0
+paragraph: KES 7,100
 paragraph: Net Profit
-paragraph: KES 0
+paragraph: KES 25,400
 paragraph: Outstanding
-paragraph: KES 0
+paragraph: KES 20,800
 heading "Journal Entries"
-paragraph: No posted journal entries yet
+paragraph: JE-20260831-C0E7217C
 ```
 
-### D6 diagnosis
+### D7 — non-admin blocked: PASS
 
-This is a persisted client-scope defect, not a ledger or RLS defect:
+As `staff@ew.local`, direct navigation to `/admin/accounts` redirected to `/`. The
+Accounts admin layout and data were not rendered.
 
-- `businessStore.ts:19,30-31` defaults to Expresswash but persists
-  `selectedBusiness` globally under `expresswash-business`, independent of user/role.
-- `BusinessSwitcher.tsx:32-38` renders a static Expresswash badge for regular admins
-  but does not reset the persisted selection to Expresswash.
-- `Accounts.tsx:464,469-519` reads that stale selection directly for every ledger
-  query. In this run it remained `testbiz`, whose correct balances are zero, while the
-  header falsely said Expresswash.
+### D8 — reports render, but consolidated write-lock is incomplete: FAIL
 
-The required fix is to derive an effective scope from authorization: non-super-admins
-must always query `expresswash` regardless of persisted state (and ideally clear or
-namespace persisted scope on identity/role changes). The browser sequence above must
-then be re-run before continuing D7.
+The report checks passed:
 
-### Senior UI/UX observations (non-blocking)
+| Check | Expected | Actual | Result |
+|---|---:|---:|---|
+| Consolidated P&L | income − expenses = net | 46,500 − 8,100 = 38,400 | PASS |
+| Balance sheet | Balanced | Assets 26,400 = liabilities 8,000 + equity 18,400 | PASS |
+| VAT | output / input / payable | 1,600 / 800 / 800 | PASS |
+| Cash flow | inflows / outflows / net | 16,700 / 27,700 / -11,000 | PASS |
+| Receivables aging | loads; current 23,800 | 23,800; overdue detail rendered | PASS |
+| Payables aging | loads; current 2,200 | 2,200; three bill rows rendered | PASS |
+| Console | 0 errors / 0 warnings | 0 / 0 | PASS |
 
-- The expense dialog title `Add Expense / Bill` conflicts with the separate Bill
-  workflow. Use `Add Expense` and copy specific to expense posting.
-- `Expense added` omits the important `pending approval` status. This makes correctly
-  unchanged ledger KPIs look stale; the toast and resulting list state should name the
-  status and next action.
-- Sales by Customer/Admin/Item Type remain visible under Goalhub and Test Biz with
-  generic `No data yet` copy even though they are Expresswash operational widgets.
-  Hide them outside Expresswash or explicitly label their scope and purpose.
-- Chrome logged zero errors but one accessibility warning after the dialogs:
-  `Missing Description or aria-describedby={undefined} for DialogContent`. Each dialog
-  needs an accessible description.
+The higher-level consolidated acceptance requirement failed. With `All businesses
+(consolidated)` selected:
 
-## Not run after the D6 stop
+- The header Add Bill, Add Expense, and Journal Entry controls were disabled.
+- The Payables & Bills tab rendered a second, enabled `Add Bill` button.
+- Clicking that button opened the complete `Add Supplier Bill` write dialog.
+- The two outstanding consolidated bill rows also rendered enabled `Pay` buttons.
 
-- D7–D8
+Exact Chrome DOM excerpt after clicking the tab-level button:
+
+```text
+combobox: All businesses (consolidated)
+button "Add Bill" [disabled]
+tabpanel "Payables & Bills"
+  button "Add Bill"
+  button "Pay"
+  button "Pay"
+dialog "Add Supplier Bill"
+  paragraph: Create an open payable and post it to the ledger.
+  button "Create Bill"
+```
+
+### D8 diagnosis
+
+`Accounts.tsx:856` correctly applies `disabled={isConsolidated}` to the header Add
+Bill button. The duplicate Payables-tab button at `Accounts.tsx:1096` calls
+`setAddBillOpen(true)` without the same guard. The dialog's Create Bill action later
+passes `selectedBusiness` as `businessId`; under consolidated scope that value is not
+a concrete business. The tab-level Add Bill control must use the same disabled state
+and explanation as the header. The Pay controls should also follow the documented
+consolidated write policy or explicitly switch/drill into the bill's business before
+allowing payment.
+
+### Senior UI/UX polish re-test after `919e96a`: PASS
+
+- Operational sales widgets are hidden for Goalhub and Test Biz and remain available
+  for Expresswash/consolidated.
+- Expense success copy now states `pending approval`.
+- The Add Business dialog has an accessible description; Chrome logged no warnings.
+- The header action is consistently labelled `Add Bill`.
+
+## Not run after the D8 stop
+
 - E1–E6 and the §6 final sign-off checklist
 
 Diagnostic integrity at the stop point remained healthy: H2 actual debit and credit
