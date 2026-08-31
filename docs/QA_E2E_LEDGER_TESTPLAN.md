@@ -490,12 +490,53 @@ Run all of these; every one must pass before sign-off.
 
 ---
 
+## PART F — UI/UX quality pass (Expresswash-first, value-first)
+
+Walk the Accounts hub as **super_admin** and **regular admin**. The bar is not "does it
+work" but "does it feel finished and earn its space." Flag anything that fails.
+
+**F1 — No dead / placeholder UI.** Every button, control, column, and card either does
+something or isn't there. Specifically verify: the Payments **Export** button downloads a
+CSV; there is no inert period selector on Aging; no button is styled-but-noop.
+
+**F2 — Empty states guide.** Each list/panel with no data shows a clear message that hints
+the next action (not a bare "No data yet"). Check every tab with an empty business.
+
+**F3 — Destructive actions confirm.** Reversing a journal entry asks for confirmation
+before posting the offsetting entry. Refunds/void surface their ledger impact.
+
+**F4 — Feedback on every mutation.** Create/pay/allocate/refund/post show a loading state
+on the acting control and a success/error toast; the acting row (not the whole list) shows
+progress. Validation errors are legible.
+
+**F5 — Consistency.** Currency via one formatter; consistent date format; button verbs and
+casing consistent (Add X, Allocate, Reverse); terminology consistent (Bill = payable,
+Invoice = receivable); header actions don't contradict tab actions.
+
+**F6 — Multi-business polish.** Under a specific business, every panel + worklist is scoped
+(reports, KPIs, journal list, bills, expenses, payments, aging). Shared/global surfaces
+(the Chart of Accounts, contacts, account pickers) are clearly labelled as shared so a user
+isn't confused by other businesses' accounts appearing. Consolidated disables all writes.
+
+**F7 — Accessibility.** Dialogs have titles + descriptions; form fields have associated
+labels; icon-only buttons have accessible names; disabled controls explain why (tooltip).
+
+**F8 — Information hierarchy.** The most-used actions are reachable without scrolling; the
+Reports tab isn't so dense that the ledger/journal list is buried; tab names read plainly.
+
+For each finding: which tab, what's wrong, and the value-first fix. A clean F-pass means the
+hub reads as a finished product to a real accounting user, not a scaffold.
+
+---
+
 ## 6. Sign-off checklist
 - [x] Part A (A1–A12) — all native postings match the expected DR/CR and balance.
 - [x] Part B (B1–B6) — multi-business writes/reads correctly RBAC-scoped; leak closed.
 - [x] Part C (C1–C11) — every Goalhub event posts to the right accounts; idempotent; bad-mapping handled.
 - [x] Part D (D1–D8) — UI switcher, scoping, consolidated write-lock, add-business, RBAC, no console errors.
 - [x] Part E (E1–E6) — trial balance zero, all entries balance, reconciliation holds, isolation verified.
+- [ ] Part F (F1–F8) — UI/UX quality: no dead UI, guiding empty states, confirmed destructive
+  actions, feedback, consistency, multi-business polish, a11y, hierarchy.
 
 When every box is ticked, the ledger + multi-business hub are production-ready and the
 Goalhub → Render cutover can proceed.
