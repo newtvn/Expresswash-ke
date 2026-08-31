@@ -9,6 +9,18 @@ and standardizing hosting on **Render**. Other apps (Goalhub first) push financi
 a shared Expresswash ledger tagged by a `business` slug; the Accounts section is becoming a
 multi-business back-office (super_admin = all businesses, admin = Expresswash only).
 
+## ✅ QA SIGN-OFF (2026-08-31)
+Pre-cutover E2E QA **passed all gates** across both platforms (Expresswash hub + Goalhub
+ingest) via `docs/QA_E2E_LEDGER_TESTPLAN.md`, driven live with chrome-mcp + psql:
+Parts A–E all green — trial balance zero, every entry balances, per-business reconciliation
+(EW + GH + others = consolidated), idempotency (native + ingest), RLS isolation, ingest
+provenance (posted vs failed), and the complete consolidated write-lock (all create/pay/
+allocate/refund/repost/reverse controls disabled). Evidence in `docs/QA_E2E_LEDGER_RESULTS_2026-08-31.md`.
+**The ledger + multi-business hub are production-ready.** Two PRs ready to merge:
+**#60** (backend B1–B3, base `main`) then **#61** (UI C, currently based on `#60`'s branch →
+retarget to `main` after #60 merges). Only remaining work: **A2 Goalhub → Render cutover**
+(blocked on Render GitHub App auth + Goalhub Supabase source URL/secrets).
+
 ## Session 2 progress (2026-08-31)
 - **Workstream A1 done** — Goalhub `render.yaml` converted to Docker runtime + preDeploy `alembic upgrade head` + starter plan; accounting connector env added (disabled). Render Postgres **`goalhub-db`** provisioned via MCP (Frankfurt, basic_256mb, PG16, id `dpg-daaba86k1f9s73ftrb70-a`). Branch `infra/goalhub-render-docker` → **PR newtvn/Goalhub#36**. Decision: DB pre-provisioned via MCP (not blueprint-managed), so it's removed from the blueprint.
 - **Workstream B (B1 + B2 + B3) done + verified** — one stacked branch `accounting/multibusiness-b1` → **PR newtvn/Expresswash-ke#60**:
