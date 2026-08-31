@@ -30,6 +30,8 @@ interface AccountsReportsPanelProps {
   orders: SalesOrderRow[];
   salesByPersonData: SalesByPersonRow[];
   salesByItem: SalesByItemRow[];
+  /** Operational sales widgets are Expresswash-specific; hide them for other businesses. */
+  showOperationalSales?: boolean;
   profitAndLoss?: LedgerProfitAndLossReport;
   balanceSheet?: LedgerBalanceSheetReport;
   vatSummary?: VatSummaryReport;
@@ -81,6 +83,7 @@ export function AccountsReportsPanel({
   orders,
   salesByPersonData,
   salesByItem,
+  showOperationalSales = true,
   profitAndLoss,
   balanceSheet,
   vatSummary,
@@ -285,6 +288,7 @@ export function AccountsReportsPanel({
         </Card>
       </div>
 
+      {showOperationalSales && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Sales by Customer</CardTitle></CardHeader>
@@ -349,6 +353,7 @@ export function AccountsReportsPanel({
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }

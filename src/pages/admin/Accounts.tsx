@@ -556,7 +556,7 @@ export const Accounts = () => {
   const addExpenseMutation = useMutation({
     mutationFn: addExpense,
     onSuccess: () => {
-      toast.success('Expense added');
+      toast.success('Expense added — pending approval');
       setAddExpenseOpen(false);
       setExpenseForm({
         description: '',
@@ -854,7 +854,7 @@ export const Accounts = () => {
             <Users className="w-4 h-4 mr-2" /> Contact
           </Button>
           <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" /> Bill
+            <Plus className="w-4 h-4 mr-2" /> Add Bill
           </Button>
           <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Add Expense
@@ -910,6 +910,7 @@ export const Accounts = () => {
             orders={summary?.orders ?? []}
             salesByPersonData={salesByPersonData}
             salesByItem={salesByItem}
+            showOperationalSales={selectedBusiness === 'expresswash' || selectedBusiness === BUSINESS_ALL}
             profitAndLoss={profitAndLoss}
             balanceSheet={balanceSheet}
             vatSummary={vatSummary}
