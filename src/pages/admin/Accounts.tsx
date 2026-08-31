@@ -461,7 +461,12 @@ export const Accounts = () => {
   const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
 
   // Business scope for reports/overview (super_admin can switch; keyed so a switch refetches).
-  const selectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  // Non-super-admins are Expresswash-only: never honor a persisted cross-business scope
+  // (e.g. left over from a super_admin session on this browser) — force expresswash so a
+  // regular admin can't send an unauthorized scope that the backend would reject.
+  const rawSelectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
   // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
   const isConsolidated = selectedBusiness === BUSINESS_ALL;
   const consolidatedWriteHint = 'Select a specific business to create records';
