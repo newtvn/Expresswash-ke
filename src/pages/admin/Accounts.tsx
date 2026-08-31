@@ -916,6 +916,7 @@ export const Accounts = () => {
             vatSummary={vatSummary}
             cashFlow={cashFlow}
             reversePending={reverseJournalMutation.isPending}
+            writesDisabled={isConsolidated}
             setDateRange={setDateRange}
             formatCurrency={formatCurrency}
             formatDate={formatDate}
@@ -928,7 +929,7 @@ export const Accounts = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Purchases & Expenses</CardTitle>
-              <Button size="sm" onClick={() => setAddExpenseOpen(true)}>
+              <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add
               </Button>
             </CardHeader>
@@ -990,6 +991,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => {
                               setAllocationTarget(p);
                               setAllocationRows([makeAllocationRow()]);
@@ -1093,7 +1096,7 @@ export const Accounts = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Overdue Bills & Payables</CardTitle>
-              <Button size="sm" onClick={() => setAddBillOpen(true)}>
+              <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add Bill
               </Button>
             </CardHeader>
@@ -1123,6 +1126,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
+                            disabled={isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => {
                               setBillPaymentTarget(bill);
                               setBillPaymentForm({ amount: String(bill.balanceDue), method: 'bank_transfer', reference: '' });
@@ -1201,6 +1206,8 @@ export const Accounts = () => {
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  disabled={isConsolidated}
+                                  title={isConsolidated ? consolidatedWriteHint : undefined}
                                   onClick={() => {
                                     const payment = paymentsReceived.find((item) => item.id === credit.paymentId);
                                     setAllocationTarget(payment ?? {
@@ -1313,7 +1320,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postInvoiceMutation.isPending}
+                            disabled={postInvoiceMutation.isPending || isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postInvoiceMutation.mutate(invoice.id)}
                           >
                             Post
@@ -1346,7 +1354,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postPaymentMutation.isPending}
+                            disabled={postPaymentMutation.isPending || isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postPaymentMutation.mutate(payment.id)}
                           >
                             Post
@@ -1378,7 +1387,8 @@ export const Accounts = () => {
                           <Button
                             size="sm"
                             variant="outline"
-                            disabled={postExpenseMutation.isPending}
+                            disabled={postExpenseMutation.isPending || isConsolidated}
+                            title={isConsolidated ? consolidatedWriteHint : undefined}
                             onClick={() => postExpenseMutation.mutate(expense.id)}
                           >
                             Post
@@ -1958,6 +1968,8 @@ export const Accounts = () => {
                 <Button
                   variant="outline"
                   className="mr-2"
+                  disabled={isConsolidated}
+                  title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => {
                     setAllocationTarget(selectedPayment);
                     setAllocationRows([makeAllocationRow()]);
@@ -1967,6 +1979,8 @@ export const Accounts = () => {
                 </Button>
                 <Button
                   variant="outline"
+                  disabled={isConsolidated}
+                  title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => {
                     const alreadyRefunded = refunds
                       .filter((refund) => refund.status !== 'void' && refund.paymentId === selectedPayment.id)

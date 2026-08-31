@@ -37,6 +37,8 @@ interface AccountsReportsPanelProps {
   vatSummary?: VatSummaryReport;
   cashFlow?: LedgerCashFlowReport;
   reversePending: boolean;
+  /** Disable ledger-mutating actions (e.g. in consolidated "all businesses" view). */
+  writesDisabled?: boolean;
   setDateRange: (range: DateRange) => void;
   formatCurrency: (value: number | undefined) => string;
   formatDate: (value?: string | null) => string;
@@ -89,6 +91,7 @@ export function AccountsReportsPanel({
   vatSummary,
   cashFlow,
   reversePending,
+  writesDisabled = false,
   setDateRange,
   formatCurrency,
   formatDate,
@@ -275,7 +278,9 @@ export function AccountsReportsPanel({
                         {entry.memo && <p className="text-xs mt-1">{entry.memo}</p>}
                       </div>
                       {entry.status === 'posted' && (
-                        <Button size="sm" variant="outline" disabled={reversePending} onClick={() => onReverseJournalEntry(entry)}>
+                        <Button size="sm" variant="outline" disabled={reversePending || writesDisabled}
+                          title={writesDisabled ? 'Select a specific business to reverse entries' : undefined}
+                          onClick={() => onReverseJournalEntry(entry)}>
                           Reverse
                         </Button>
                       )}
