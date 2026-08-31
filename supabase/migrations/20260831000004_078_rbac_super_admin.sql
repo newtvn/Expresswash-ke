@@ -61,3 +61,15 @@ $$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
 GRANT EXECUTE ON FUNCTION is_super_admin() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION accounting_effective_business(TEXT) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION accounting_can_see_business(TEXT) TO authenticated, service_role;
+
+-- Tighten the businesses registry now that is_super_admin() exists: any admin may
+-- READ it (the switcher needs the list), but only a super_admin may create/modify a
+-- business. (075 seeded it with an admin-all policy that let a regular admin mutate
+-- the registry — e.g. rename/deactivate goalhub — which contradicts the RBAC model.)
+DROP POLICY IF EXISTS "businesses_admin_all" ON businesses;
+DROP POLICY IF EXISTS "businesses_read" ON businesses;
+DROP POLICY IF EXISTS "businesses_super_admin_write" ON businesses;
+CREATE POLICY "businesses_read" ON businesses
+  FOR SELECT TO authenticated USING (accounting_is_admin());
+CREATE POLICY "businesses_super_admin_write" ON businesses
+  FOR ALL TO authenticated USING (is_super_admin()) WITH CHECK (is_super_admin());
