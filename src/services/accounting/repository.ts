@@ -367,13 +367,14 @@ export async function reverseJournalEntry(id: string, entryDate: string, memo?: 
   return { success: true, id: data as string };
 }
 
-export async function listJournalEntries(limit = 50): Promise<JournalEntry[]> {
+export async function listJournalEntries(limit = 50, business?: string): Promise<JournalEntry[]> {
+  const biz = toBusinessParam(business);
   const { data, error } = await retrySupabaseQuery(
-    () => supabase
-      .from('ledger_journal_entries')
-      .select('*')
-      .order('entry_date', { ascending: false })
-      .limit(limit),
+    () => {
+      let q = supabase.from('ledger_journal_entries').select('*');
+      if (biz) q = q.eq('business', biz);
+      return q.order('entry_date', { ascending: false }).limit(limit);
+    },
     { maxRetries: 2 },
   );
 

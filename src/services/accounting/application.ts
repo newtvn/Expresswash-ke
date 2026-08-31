@@ -54,7 +54,7 @@ export async function reversePostedJournalEntry(id: string, entryDate: string, m
 
 export async function getLedgerOverview(business?: string) {
   const [entries, balances] = await Promise.all([
-    repository.listJournalEntries(),
+    repository.listJournalEntries(50, business),
     repository.listAccountBalances(business),
   ]);
 

@@ -519,6 +519,13 @@ export const Accounts = () => {
     queryFn: () => getPayablesAging(reportTo, selectedBusiness),
   });
 
+  // KPI cards mirror the (business-scoped) ledger reports so they stay consistent with the
+  // report cards below and re-scope with the switcher. Outstanding = total receivables.
+  const arOutstanding = receivablesAging
+    ? receivablesAging.current + receivablesAging.days1To30 + receivablesAging.days31To60
+      + receivablesAging.days61To90 + receivablesAging.days90Plus
+    : 0;
+
   const { data: selectedPaymentEvents = [], isLoading: selectedPaymentEventsLoading } = useQuery({
     queryKey: ['payments', selectedPayment?.id, 'events'],
     queryFn: () => fetchPaymentEvents(selectedPayment!.id),
@@ -856,10 +863,10 @@ export const Accounts = () => {
       {/* KPI Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Revenue', value: summary?.totalRevenue ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Total Expenses', value: summary?.totalExpenses ?? 0, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: 'Net Profit', value: summary?.netProfit ?? 0, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Outstanding', value: summary?.outstanding ?? 0, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Total Revenue', value: profitAndLoss?.totalIncome ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Total Expenses', value: profitAndLoss?.totalExpenses ?? 0, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Net Profit', value: profitAndLoss?.netProfit ?? 0, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Outstanding', value: arOutstanding, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((kpi) => (
           <Card key={kpi.label}>
             <CardContent className="py-4 flex items-center gap-4">
