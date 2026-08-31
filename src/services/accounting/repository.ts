@@ -339,6 +339,7 @@ export async function postJournalEntry(input: JournalEntryInput): Promise<{ succ
         description: line.description ?? null,
         metadata: line.metadata ?? {},
       })),
+      p_business: input.businessId ?? null,
     }),
     { maxRetries: 2 },
   );
@@ -394,13 +395,14 @@ export async function listAccountBalances(business?: string): Promise<AccountBal
   return data.map(mapAccountBalance);
 }
 
-export async function listBills(limit = 100): Promise<Bill[]> {
+export async function listBills(limit = 100, business?: string): Promise<Bill[]> {
+  const biz = toBusinessParam(business);
   const { data, error } = await retrySupabaseQuery(
-    () => supabase
-      .from('bills')
-      .select('*, contacts:supplier_contact_id(name)')
-      .order('created_at', { ascending: false })
-      .limit(limit),
+    () => {
+      let q = supabase.from('bills').select('*, contacts:supplier_contact_id(name)');
+      if (biz) q = q.eq('business', biz);
+      return q.order('created_at', { ascending: false }).limit(limit);
+    },
     { maxRetries: 2 },
   );
 
@@ -489,13 +491,14 @@ export async function recordBillPayment(input: RecordBillPaymentInput): Promise<
   return mapOperationResult(data, 'Failed to record bill payment');
 }
 
-export async function listCreditNotes(limit = 100): Promise<CreditNote[]> {
+export async function listCreditNotes(limit = 100, business?: string): Promise<CreditNote[]> {
+  const biz = toBusinessParam(business);
   const { data, error } = await retrySupabaseQuery(
-    () => supabase
-      .from('credit_notes')
-      .select('*, contacts:contact_id(name)')
-      .order('created_at', { ascending: false })
-      .limit(limit),
+    () => {
+      let q = supabase.from('credit_notes').select('*, contacts:contact_id(name)');
+      if (biz) q = q.eq('business', biz);
+      return q.order('created_at', { ascending: false }).limit(limit);
+    },
     { maxRetries: 2 },
   );
 

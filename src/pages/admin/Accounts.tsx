@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
+import { toBusinessParam } from '@/types/business';
 import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
 import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import {
@@ -235,17 +236,22 @@ async function fetchAccountSummary() {
   return { totalRevenue, totalExpenses, outstanding, netProfit: totalRevenue - totalExpenses, payments, expenses, orders };
 }
 
-async function fetchExpenses() {
-  const { data } = await supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+async function fetchExpenses(business?: string) {
+  const biz = toBusinessParam(business);
+  let q = supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+  if (biz) q = q.eq('business', biz);
+  const { data } = await q;
   return (data ?? []) as AccountExpense[];
 }
 
-async function fetchPaymentsReceived(from?: string, to?: string) {
+async function fetchPaymentsReceived(from?: string, to?: string, business?: string) {
+  const biz = toBusinessParam(business);
   let q = supabase
     .from('payments')
     .select('id, invoice_id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, phone_number, payer_phone_number, payer_phone_matches_intent, merchant_request_id, checkout_request_id, mpesa_receipt_number, result_desc, unapplied_amount, posted_journal_entry_id')
     .eq('status', 'completed')
     .order('created_at', { ascending: false });
+  if (biz) q = q.eq('business', biz);
   if (from) q = q.gte('created_at', from);
   if (to) q = q.lte('created_at', to + 'T23:59:59');
   const { data } = await q;
@@ -283,11 +289,14 @@ async function fetchSalesByItem(): Promise<SalesByItemRow[]> {
     .slice(0, 10);
 }
 
-async function fetchAgingSummary() {
-  const { data } = await supabase
+async function fetchAgingSummary(business?: string) {
+  const biz = toBusinessParam(business);
+  let q = supabase
     .from('invoices')
     .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id')
     .neq('status', 'paid');
+  if (biz) q = q.eq('business', biz);
+  const { data } = await q;
   return (data ?? []) as AgingInvoice[];
 }
 
@@ -305,12 +314,13 @@ async function addExpense(payload: {
 }
 
 async function addJournalEntry(payload: {
-  debitAccountId: string; creditAccountId: string; amount: number; description: string; date: string;
+  debitAccountId: string; creditAccountId: string; amount: number; description: string; date: string; businessId?: string;
 }) {
   const result = await postBalancedJournalEntry({
     sourceType: 'manual_adjustment',
     entryDate: payload.date,
     memo: payload.description,
+    businessId: payload.businessId,
     lines: [
       { accountId: payload.debitAccountId, debit: payload.amount, description: payload.description },
       { accountId: payload.creditAccountId, credit: payload.amount, description: payload.description },
@@ -424,6 +434,17 @@ export const Accounts = () => {
     date: new Date().toISOString().split('T')[0],
   });
 
+  // Business scope for reports/overview/operational lists (super_admin can switch).
+  // Non-super-admins are Expresswash-only: never honor a persisted cross-business scope
+  // (e.g. left over from a super_admin session on this browser) — force expresswash so a
+  // regular admin can't send an unauthorized scope that the backend would reject.
+  const rawSelectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
+  // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
+  const isConsolidated = selectedBusiness === BUSINESS_ALL;
+  const consolidatedWriteHint = 'Select a specific business to create records';
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['accounts', 'summary'],
     queryFn: fetchAccountSummary,
@@ -431,21 +452,22 @@ export const Accounts = () => {
   });
 
   const { data: expenses = [] } = useQuery({
-    queryKey: ['accounts', 'expenses'],
-    queryFn: fetchExpenses,
+    queryKey: ['accounts', 'expenses', selectedBusiness],
+    queryFn: () => fetchExpenses(selectedBusiness),
   });
 
   const { data: paymentsReceived = [] } = useQuery({
-    queryKey: ['accounts', 'payments', dateRange.from?.toISOString().split('T')[0], dateRange.to?.toISOString().split('T')[0]],
+    queryKey: ['accounts', 'payments', selectedBusiness, dateRange.from?.toISOString().split('T')[0], dateRange.to?.toISOString().split('T')[0]],
     queryFn: () => fetchPaymentsReceived(
       dateRange.from?.toISOString().split('T')[0],
       dateRange.to?.toISOString().split('T')[0],
+      selectedBusiness,
     ),
   });
 
   const { data: agingData = [] } = useQuery({
-    queryKey: ['accounts', 'aging'],
-    queryFn: fetchAgingSummary,
+    queryKey: ['accounts', 'aging', selectedBusiness],
+    queryFn: () => fetchAgingSummary(selectedBusiness),
   });
 
   const reportFrom = dateRange.from?.toISOString().split('T')[0];
@@ -460,25 +482,14 @@ export const Accounts = () => {
   const contacts = accountingSetup?.contacts ?? [];
   const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
 
-  // Business scope for reports/overview (super_admin can switch; keyed so a switch refetches).
-  // Non-super-admins are Expresswash-only: never honor a persisted cross-business scope
-  // (e.g. left over from a super_admin session on this browser) — force expresswash so a
-  // regular admin can't send an unauthorized scope that the backend would reject.
-  const rawSelectedBusiness = useBusinessStore((s) => s.selectedBusiness);
-  const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
-  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
-  // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
-  const isConsolidated = selectedBusiness === BUSINESS_ALL;
-  const consolidatedWriteHint = 'Select a specific business to create records';
-
   const { data: ledgerOverview } = useQuery({
     queryKey: ['accounting', 'ledger-overview', selectedBusiness],
     queryFn: () => getLedgerOverview(selectedBusiness),
   });
 
   const { data: operationalAccounting } = useQuery({
-    queryKey: ['accounting', 'operational'],
-    queryFn: getOperationalAccounting,
+    queryKey: ['accounting', 'operational', selectedBusiness],
+    queryFn: () => getOperationalAccounting(selectedBusiness),
   });
 
   const bills = operationalAccounting?.bills ?? [];
@@ -1667,7 +1678,7 @@ export const Accounts = () => {
                   dueDate: billForm.dueDate || undefined,
                   notes: billForm.notes || undefined,
                   post: true,
-                  businessId: selectedBusiness,
+                  businessId: toBusinessParam(selectedBusiness) ?? undefined,
                   lines: billForm.lines.map((line) => ({
                     description: line.description,
                     quantity: 1,
@@ -1822,7 +1833,7 @@ export const Accounts = () => {
                   expense_date: expenseForm.expense_date,
                   payment_method: expenseForm.payment_method,
                   created_by: user.id,
-                  business: selectedBusiness,
+                  business: toBusinessParam(selectedBusiness) ?? undefined,
                 });
               }}
             >
@@ -1902,6 +1913,7 @@ export const Accounts = () => {
                   amount,
                   description: journalForm.description,
                   date: journalForm.date,
+                  businessId: toBusinessParam(selectedBusiness) ?? undefined,
                 });
               }}
             >

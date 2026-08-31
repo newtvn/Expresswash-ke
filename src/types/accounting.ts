@@ -279,6 +279,8 @@ export interface JournalEntryInput {
   entryDate: string;
   memo?: string;
   lines: JournalLineInput[];
+  /** Business slug this entry belongs to; required for manual entries to be per-business scoped. */
+  businessId?: string;
 }
 
 export interface JournalEntry {
