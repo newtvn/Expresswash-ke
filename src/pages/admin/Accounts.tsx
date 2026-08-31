@@ -1565,13 +1565,13 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Name *</Label>
-                <Input value={contactForm.name} onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier or customer name" />
+                <Label htmlFor="contact-name">Name *</Label>
+                <Input id="contact-name" required value={contactForm.name} onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier or customer name" />
               </div>
               <div>
-                <Label>Type *</Label>
+                <Label htmlFor="contact-type">Type *</Label>
                 <Select value={contactForm.contactType} onValueChange={(v) => setContactForm((p) => ({ ...p, contactType: v as Contact['contactType'] }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="contact-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="customer">Customer</SelectItem>
                     <SelectItem value="supplier">Supplier</SelectItem>
@@ -1582,17 +1582,17 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Phone</Label>
-                <Input value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+254..." />
+                <Label htmlFor="contact-phone">Phone</Label>
+                <Input id="contact-phone" value={contactForm.phone} onChange={(e) => setContactForm((p) => ({ ...p, phone: e.target.value }))} placeholder="+254..." />
               </div>
               <div>
-                <Label>Email</Label>
-                <Input type="email" value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} placeholder="name@example.com" />
+                <Label htmlFor="contact-email">Email</Label>
+                <Input id="contact-email" type="email" value={contactForm.email} onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))} placeholder="name@example.com" />
               </div>
             </div>
             <div>
-              <Label>Tax PIN / VAT Number</Label>
-              <Input value={contactForm.taxPin} onChange={(e) => setContactForm((p) => ({ ...p, taxPin: e.target.value }))} placeholder="Optional" />
+              <Label htmlFor="contact-taxpin">Tax PIN / VAT Number</Label>
+              <Input id="contact-taxpin" value={contactForm.taxPin} onChange={(e) => setContactForm((p) => ({ ...p, taxPin: e.target.value }))} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>
@@ -1625,9 +1625,9 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Supplier *</Label>
+                <Label htmlFor="bill-supplier">Supplier *</Label>
                 <Select value={billForm.supplierContactId} onValueChange={(v) => setBillForm((p) => ({ ...p, supplierContactId: v }))}>
-                  <SelectTrigger><SelectValue placeholder={suppliers.length ? 'Select supplier' : 'Create a supplier first'} /></SelectTrigger>
+                  <SelectTrigger id="bill-supplier"><SelectValue placeholder={suppliers.length ? 'Select supplier' : 'Create a supplier first'} /></SelectTrigger>
                   <SelectContent>
                     {suppliers.map((supplier) => (
                       <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
@@ -1778,14 +1778,14 @@ export const Accounts = () => {
                 </div>
               </div>
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="1" step="0.01" max={billPaymentTarget.balanceDue} value={billPaymentForm.amount} onChange={(e) => setBillPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
+                <Label htmlFor="billpay-amount">Amount (KES) *</Label>
+                <Input id="billpay-amount" type="number" min="1" step="0.01" required max={billPaymentTarget.balanceDue} value={billPaymentForm.amount} onChange={(e) => setBillPaymentForm((p) => ({ ...p, amount: e.target.value }))} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Method *</Label>
+                  <Label htmlFor="billpay-method">Method *</Label>
                   <Select value={billPaymentForm.method} onValueChange={(v) => setBillPaymentForm((p) => ({ ...p, method: v as ExpensePaymentMethod }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger id="billpay-method"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {PAYMENT_METHODS.map((method) => (
                         <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
@@ -1794,8 +1794,8 @@ export const Accounts = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>Reference</Label>
-                  <Input value={billPaymentForm.reference} onChange={(e) => setBillPaymentForm((p) => ({ ...p, reference: e.target.value }))} placeholder="Transaction reference" />
+                  <Label htmlFor="billpay-reference">Reference</Label>
+                  <Input id="billpay-reference" value={billPaymentForm.reference} onChange={(e) => setBillPaymentForm((p) => ({ ...p, reference: e.target.value }))} placeholder="Transaction reference" />
                 </div>
               </div>
             </div>
@@ -1835,13 +1835,13 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Description *</Label>
-                <Input value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="e.g. Driver salary" />
+                <Label htmlFor="expense-description">Description *</Label>
+                <Input id="expense-description" required value={expenseForm.description} onChange={(e) => setExpenseForm((p) => ({ ...p, description: e.target.value }))} placeholder="e.g. Driver salary" />
               </div>
               <div>
-                <Label>Category *</Label>
+                <Label htmlFor="expense-category">Category *</Label>
                 <Select value={expenseForm.category} onValueChange={(v) => setExpenseForm((p) => ({ ...p, category: v as ExpenseCategory }))}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectTrigger id="expense-category"><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
                     {EXPENSE_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                   </SelectContent>
@@ -1850,18 +1850,18 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="0" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
+                <Label htmlFor="expense-amount">Amount (KES) *</Label>
+                <Input id="expense-amount" type="number" min="0" step="0.01" required value={expenseForm.amount} onChange={(e) => setExpenseForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
               </div>
               <div>
-                <Label>Date *</Label>
-                <Input type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm((p) => ({ ...p, expense_date: e.target.value }))} />
+                <Label htmlFor="expense-date">Date *</Label>
+                <Input id="expense-date" type="date" required value={expenseForm.expense_date} onChange={(e) => setExpenseForm((p) => ({ ...p, expense_date: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Payment Method *</Label>
+              <Label htmlFor="expense-method">Payment Method *</Label>
               <Select value={expenseForm.payment_method} onValueChange={(v) => setExpenseForm((p) => ({ ...p, payment_method: v as ExpensePaymentMethod }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="expense-method"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PAYMENT_METHODS.map((method) => (
                     <SelectItem key={method.value} value={method.value}>{method.label}</SelectItem>
@@ -1870,8 +1870,8 @@ export const Accounts = () => {
               </Select>
             </div>
             <div>
-              <Label>Notes</Label>
-              <Textarea value={expenseForm.notes} onChange={(e) => setExpenseForm((p) => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Optional notes..." />
+              <Label htmlFor="expense-notes">Notes</Label>
+              <Textarea id="expense-notes" value={expenseForm.notes} onChange={(e) => setExpenseForm((p) => ({ ...p, notes: e.target.value }))} rows={2} placeholder="Optional notes..." />
               <p className="mt-1 text-xs text-muted-foreground">Notes are appended to the description until expenses have a dedicated notes field.</p>
             </div>
           </div>
@@ -1911,9 +1911,9 @@ export const Accounts = () => {
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Debit Account *</Label>
+                <Label htmlFor="je-debit">Debit Account *</Label>
                 <Select value={journalForm.debitAccountId} onValueChange={(v) => setJournalForm((p) => ({ ...p, debitAccountId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectTrigger id="je-debit"><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
                     {chartAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>{formatAccount(account)}</SelectItem>
@@ -1922,9 +1922,9 @@ export const Accounts = () => {
                 </Select>
               </div>
               <div>
-                <Label>Credit Account *</Label>
+                <Label htmlFor="je-credit">Credit Account *</Label>
                 <Select value={journalForm.creditAccountId} onValueChange={(v) => setJournalForm((p) => ({ ...p, creditAccountId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                  <SelectTrigger id="je-credit"><SelectValue placeholder="Select account" /></SelectTrigger>
                   <SelectContent>
                     {chartAccounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>{formatAccount(account)}</SelectItem>
@@ -1935,17 +1935,17 @@ export const Accounts = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Amount (KES) *</Label>
-                <Input type="number" min="0" step="0.01" value={journalForm.amount} onChange={(e) => setJournalForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
+                <Label htmlFor="je-amount">Amount (KES) *</Label>
+                <Input id="je-amount" type="number" min="0" step="0.01" required value={journalForm.amount} onChange={(e) => setJournalForm((p) => ({ ...p, amount: e.target.value }))} placeholder="0" />
               </div>
               <div>
-                <Label>Date *</Label>
-                <Input type="date" value={journalForm.date} onChange={(e) => setJournalForm((p) => ({ ...p, date: e.target.value }))} />
+                <Label htmlFor="je-date">Date *</Label>
+                <Input id="je-date" type="date" required value={journalForm.date} onChange={(e) => setJournalForm((p) => ({ ...p, date: e.target.value }))} />
               </div>
             </div>
             <div>
-              <Label>Memo *</Label>
-              <Input value={journalForm.description} onChange={(e) => setJournalForm((p) => ({ ...p, description: e.target.value }))} placeholder="Entry description" />
+              <Label htmlFor="je-memo">Memo *</Label>
+              <Input id="je-memo" required value={journalForm.description} onChange={(e) => setJournalForm((p) => ({ ...p, description: e.target.value }))} placeholder="Entry description" />
             </div>
             <p className="text-xs text-muted-foreground">
               The backend rejects unbalanced entries. This form posts one debit line and one matching credit line.
