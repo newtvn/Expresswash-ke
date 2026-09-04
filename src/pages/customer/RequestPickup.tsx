@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { PageHeader, LocationPickerModal } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +50,7 @@ import { calculateServerPrice } from '@/services/pricingService';
 import { useActiveZones } from '@/hooks/useZones';
 import { PromoCodeInput } from '@/components/checkout/PromoCodeInput';
 import { recordPromotionUsage } from '@/services/promotionService';
+import { getLocalDateString, parseQuickBookingSearch } from '@/lib/quickBooking';
 
 const ITEM_TYPES = [
   { value: 'carpet', label: 'Carpet' },
@@ -72,11 +73,11 @@ interface ItemForm {
   widthInches: string;
 }
 
-function newItemForm(): ItemForm {
+function newItemForm(itemType = '', name = ''): ItemForm {
   return {
     id: crypto.randomUUID(),
-    name: '',
-    itemType: '',
+    name,
+    itemType,
     quantity: 1,
     lengthInches: '',
     widthInches: '',
@@ -86,6 +87,11 @@ function newItemForm(): ItemForm {
 export const RequestPickup = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const quickBooking = useMemo(
+    () => parseQuickBookingSearch(location.search),
+    [location.search],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderCreated, setOrderCreated] = useState<{
     trackingCode: string;
@@ -97,16 +103,24 @@ export const RequestPickup = () => {
 
   // Form state
   const [serviceType, setServiceType] = useState<'standard' | 'express'>('standard');
-  const [zone, setZone] = useState('');
+  const [zone, setZone] = useState(quickBooking.zone);
   const [pickupAddress, setPickupAddress] = useState('');
   const [pickupLat, setPickupLat] = useState<number | undefined>(undefined);
   const [pickupLng, setPickupLng] = useState<number | undefined>(undefined);
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [pickupDate, setPickupDate] = useState(
-    new Date().toISOString().split('T')[0],
+    quickBooking.pickupDate || getLocalDateString(),
   );
-  const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<ItemForm[]>([newItemForm()]);
+  const [notes, setNotes] = useState(() => {
+    const details = [
+      quickBooking.propertyTypeLabel && `Property type: ${quickBooking.propertyTypeLabel}`,
+      quickBooking.roomsLabel && `Rooms: ${quickBooking.roomsLabel}`,
+    ].filter(Boolean);
+    return details.length > 0 ? `Quick booking details\n${details.join('\n')}` : '';
+  });
+  const [items, setItems] = useState<ItemForm[]>([
+    newItemForm(quickBooking.service, quickBooking.serviceLabel),
+  ]);
   const [eta, setEta] = useState<{ label: string; date: string } | null>(null);
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [promotionId, setPromotionId] = useState<string | null>(null);
@@ -126,13 +140,25 @@ export const RequestPickup = () => {
     if (savedAddresses.length > 0 && !pickupAddress) {
       const defaultAddr = savedAddresses.find((a: Address) => a.isDefault) ?? savedAddresses[0];
       if (defaultAddr) {
+        if (quickBooking.zone && defaultAddr.zone !== quickBooking.zone) return;
         setPickupAddress(defaultAddr.addressLine);
-        setZone(defaultAddr.zone);
+        setZone((current) => current || defaultAddr.zone);
         setPickupLat(defaultAddr.latitude);
         setPickupLng(defaultAddr.longitude);
       }
     }
   }, [savedAddresses]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reject stale or manipulated quick-booking zones once live zones are available.
+  useEffect(() => {
+    if (
+      quickBooking.zone &&
+      activeZones.length > 0 &&
+      !activeZones.some((activeZone) => activeZone.name === quickBooking.zone)
+    ) {
+      setZone('');
+    }
+  }, [activeZones, quickBooking.zone]);
 
   // Fetch ETA when zone changes
   useEffect(() => {

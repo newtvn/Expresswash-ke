@@ -195,9 +195,9 @@ const PricingCalculator = () => {
         {/* Header */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
-            <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">Pricing</span>
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
+            <span className="text-sm font-semibold text-brand-orange uppercase tracking-wider">Pricing</span>
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Transparent Pricing
@@ -216,7 +216,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("calculator")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "calculator"
-                  ? "bg-brand-blue text-white shadow"
+                  ? "bg-brand-orange text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -226,7 +226,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("ratecard")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "ratecard"
-                  ? "bg-brand-blue text-white shadow"
+                  ? "bg-brand-orange text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -407,7 +407,7 @@ const PricingCalculator = () => {
                       </svg>
                     </div>
 
-                    {/* Blue body */}
+                    {/* Quote body */}
                     <div className="bg-brand-blue px-6 pb-6 pt-2">
                       {itemCount > 0 ? (
                         <div className="space-y-6">
