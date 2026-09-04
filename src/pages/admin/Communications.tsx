@@ -104,7 +104,7 @@ export const Communications = () => {
 
         <TabsContent value="templates" className="mt-4">
           <div className="mb-4 flex flex-wrap gap-3">
-            <div className="relative min-w-[240px] flex-1 sm:max-w-sm">
+            <div className="relative min-w-0 flex-1 basis-full sm:min-w-[240px] sm:basis-auto sm:max-w-sm">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={templateSearch}
@@ -114,7 +114,7 @@ export const Communications = () => {
               />
             </div>
             <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-44" aria-label="Filter by channel">
+              <SelectTrigger className="w-full sm:w-44" aria-label="Filter by channel">
                 <SelectValue placeholder="All channels" />
               </SelectTrigger>
               <SelectContent>

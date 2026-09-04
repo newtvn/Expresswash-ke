@@ -284,7 +284,7 @@ const PricingManagement = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {Object.entries(itemPrices).map(([key, value]) => (
                   <div key={key} className="space-y-2">
                     <Label htmlFor={key} className="capitalize">
@@ -328,7 +328,7 @@ const PricingManagement = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {Object.entries(deliveryFees).map(([key, value]) => (
                   <div key={key} className="space-y-2">
                     <Label htmlFor={`delivery-${key}`} className="capitalize">

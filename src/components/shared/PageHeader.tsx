@@ -8,13 +8,13 @@ interface PageHeaderProps {
 }
 
 export const PageHeader = ({ title, description, children, className }: PageHeaderProps) => (
-  <div className={cn('flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6', className)}>
-    <div>
-      <h1 className="text-2xl font-bold text-foreground">{title}</h1>
+  <div className={cn('mb-5 flex min-w-0 flex-col gap-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between', className)}>
+    <div className="min-w-0">
+      <h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">{title}</h1>
       {description && (
-        <p className="text-muted-foreground mt-1">{description}</p>
+        <p className="mt-1 text-sm text-muted-foreground sm:text-base">{description}</p>
       )}
     </div>
-    {children && <div className="flex items-center gap-3">{children}</div>}
+    {children && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">{children}</div>}
   </div>
 );

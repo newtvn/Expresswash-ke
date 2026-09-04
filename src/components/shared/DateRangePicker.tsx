@@ -70,8 +70,8 @@ export const DateRangePicker = (props: DateRangePickerProps) => {
 
   return (
     <div className={props.className}>
-      <div className="flex flex-wrap items-end gap-2" aria-label="Date range">
-        <div className="space-y-1">
+      <div className="grid grid-cols-1 items-end gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap" aria-label="Date range">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor={fromId} className="text-xs text-muted-foreground">From</Label>
           <Input
             id={fromId}
@@ -79,10 +79,10 @@ export const DateRangePicker = (props: DateRangePickerProps) => {
             type="date"
             value={start}
             onChange={(event) => { setStart(event.target.value); setActivePreset(null); }}
-            className="w-40 h-9"
+            className="h-9 w-full sm:w-40"
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor={toId} className="text-xs text-muted-foreground">To</Label>
           <Input
             id={toId}
@@ -90,13 +90,13 @@ export const DateRangePicker = (props: DateRangePickerProps) => {
             type="date"
             value={end}
             onChange={(event) => { setEnd(event.target.value); setActivePreset(null); }}
-            className="w-40 h-9"
+            className="h-9 w-full sm:w-40"
           />
         </div>
-        <Button size="sm" variant="default" onClick={handleApply} disabled={!start && !end}>
+        <Button size="sm" variant="default" className="w-full sm:w-auto" onClick={handleApply} disabled={!start && !end}>
           Apply
         </Button>
-        <div className="flex gap-1" aria-label="Quick date ranges">
+        <div className="grid grid-cols-3 gap-1 sm:flex" aria-label="Quick date ranges">
           {[7, 30, 90].map((days) => (
             <Button
               key={days}

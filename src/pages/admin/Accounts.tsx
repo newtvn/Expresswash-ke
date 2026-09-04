@@ -873,7 +873,7 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <BusinessSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -905,7 +905,7 @@ export const Accounts = () => {
 
       {/* KPI Summary */}
       <p className="-mb-3 text-xs text-muted-foreground">Ledger totals · {reportRangeLabel}</p>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {[
           { label: 'Total Revenue', value: profitAndLoss?.totalIncome ?? 0, icon: DollarSign, color: 'text-green-600', bg: 'bg-green-50' },
           { label: 'Total Expenses', value: profitAndLoss?.totalExpenses ?? 0, icon: TrendingDown, color: 'text-red-600', bg: 'bg-red-50' },
@@ -913,13 +913,13 @@ export const Accounts = () => {
           { label: 'Outstanding', value: arOutstanding, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((kpi) => (
           <Card key={kpi.label}>
-            <CardContent className="py-4 flex items-center gap-4">
+            <CardContent className="flex min-w-0 items-center gap-3 py-4 sm:gap-4">
               <div className={`p-3 rounded-xl ${kpi.bg}`}>
                 <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">{kpi.label}</p>
-                <p className="text-xl font-bold">KES {(kpi.value).toLocaleString()}</p>
+                <p className="break-words text-lg font-bold sm:text-xl">KES {(kpi.value).toLocaleString()}</p>
               </div>
             </CardContent>
           </Card>
@@ -972,7 +972,7 @@ export const Accounts = () => {
         {/* ---- EXPENSES ---- */}
         <TabsContent value="expenses" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
               <CardTitle>Purchases & Expenses</CardTitle>
               <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddExpenseOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add
@@ -984,7 +984,7 @@ export const Accounts = () => {
               ) : (
                 <div className="space-y-2">
                   {expenses.map((e) => (
-                    <div key={e.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={e.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium">{e.description}</p>
                         <p className="text-xs text-muted-foreground">
@@ -1038,7 +1038,7 @@ export const Accounts = () => {
               ) : (
                 <div className="space-y-2">
                   {paymentsReceived.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={p.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">{p.customer_name ?? 'Customer'}</p>
@@ -1101,7 +1101,7 @@ export const Accounts = () => {
           </div>
 
           <p className="text-xs text-muted-foreground">Receivables outstanding by age, as of {reportTo ?? 'today'}.</p>
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-5">
             {[
               { label: 'Current', amount: receivablesAging?.current ?? agingBuckets.current.reduce((s, i) => s + toAmount(i.balance ?? Math.max(toAmount(i.total) - toAmount(i.paid_amount), 0)), 0), color: 'text-green-600' },
               { label: '1–30 days', amount: receivablesAging?.days1To30 ?? agingBuckets['1_30'].reduce((s, i) => s + toAmount(i.balance ?? Math.max(toAmount(i.total) - toAmount(i.paid_amount), 0)), 0), color: 'text-yellow-600' },
@@ -1126,7 +1126,7 @@ export const Accounts = () => {
               ) : (receivablesAging?.items.length ?? 0) > 0 ? (
                 <div className="space-y-2">
                   {receivablesAging!.items.map((inv) => (
-                    <div key={inv.invoiceId ?? inv.invoiceNumber} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={inv.invoiceId ?? inv.invoiceNumber} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium">{inv.invoiceNumber} — {inv.customerName ?? 'Customer'}</p>
                         <p className="text-xs text-muted-foreground">Due: {formatDate(inv.dueDate)} · {Math.max(0, inv.daysOverdue)} days overdue</p>
@@ -1142,7 +1142,7 @@ export const Accounts = () => {
                     const daysOverdue = Math.max(0, getDaysOverdue(inv));
                     const balance = toAmount(inv.balance ?? Math.max(toAmount(inv.total) - toAmount(inv.paid_amount), 0));
                     return (
-                      <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div key={inv.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm font-medium">{inv.invoice_number} — {inv.customer_name}</p>
                           <p className="text-xs text-muted-foreground">Due: {formatDate(dueDate)} · {daysOverdue} days overdue</p>
@@ -1160,7 +1160,7 @@ export const Accounts = () => {
         {/* ---- PAYABLES & BILLS ---- */}
         <TabsContent value="payables" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
               <CardTitle>Bills & Payables</CardTitle>
               <Button size="sm" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => setAddBillOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add Bill
@@ -1206,7 +1206,7 @@ export const Accounts = () => {
                     </div>
                   ))}
                   <Separator />
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 text-sm">
+                  <div className="grid grid-cols-1 gap-2 text-sm min-[420px]:grid-cols-2 lg:grid-cols-5">
                     <div><p className="text-muted-foreground">Current</p><p className="font-semibold">{formatCurrency(payablesAging?.current)}</p></div>
                     <div><p className="text-muted-foreground">1-30</p><p className="font-semibold">{formatCurrency(payablesAging?.days1To30)}</p></div>
                     <div><p className="text-muted-foreground">31-60</p><p className="font-semibold">{formatCurrency(payablesAging?.days31To60)}</p></div>
@@ -1217,7 +1217,7 @@ export const Accounts = () => {
               ) : (payablesAging?.items.length ?? 0) > 0 ? (
                 <div className="space-y-2">
                   {payablesAging!.items.map((bill) => (
-                    <div key={bill.billId ?? bill.billNumber} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div key={bill.billId ?? bill.billNumber} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium">{bill.billNumber} — {bill.supplierName ?? 'Supplier'}</p>
                         <p className="text-xs text-muted-foreground">Due: {formatDate(bill.dueDate)} · {Math.max(0, bill.daysOverdue)} days overdue</p>
@@ -1472,7 +1472,7 @@ export const Accounts = () => {
         {/* ---- CONTACTS ---- */}
         <TabsContent value="contacts" className="mt-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardHeader className="flex flex-col items-start justify-between gap-2 space-y-0 sm:flex-row sm:items-center">
               <CardTitle>Customers & Suppliers</CardTitle>
               <Button size="sm" onClick={() => setAddContactOpen(true)}>
                 <Plus className="h-4 w-4 mr-1" /> Add Contact

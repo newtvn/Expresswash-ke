@@ -90,7 +90,7 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div className={cn('space-y-4', className)}>
       {searchable && (
-        <div className="relative max-w-sm">
+        <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder={searchPlaceholder}
@@ -104,7 +104,7 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
-      <div className="rounded-lg border border-border overflow-hidden">
+      <div className="data-table-desktop rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -165,18 +165,62 @@ export function DataTable<T extends Record<string, unknown>>({
         </Table>
       </div>
 
+      <div className="data-table-mobile space-y-3">
+        {paged.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+            {emptyMessage}
+          </div>
+        ) : (
+          paged.map((item, rowIndex) => (
+            <div
+              key={rowIndex}
+              role={onRowClick ? 'button' : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              className={cn(
+                'min-w-0 space-y-3 rounded-xl border bg-card p-4 text-sm shadow-sm',
+                onRowClick && 'cursor-pointer outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+              )}
+              onClick={() => onRowClick?.(item)}
+              onKeyDown={(event) => {
+                if (onRowClick && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault();
+                  onRowClick(item);
+                }
+              }}
+            >
+              {columns.map((col, columnIndex) => (
+                <div
+                  key={`${col.key}-${col.header}-${columnIndex}`}
+                  className={cn(
+                    col.header
+                      ? 'grid min-w-0 grid-cols-[minmax(5.5rem,0.75fr)_minmax(0,1.25fr)] items-start gap-3'
+                      : 'flex min-w-0 justify-end border-t pt-3',
+                    col.className
+                  )}
+                >
+                  {col.header && <span className="text-xs font-medium text-muted-foreground">{col.header}</span>}
+                  <div className="min-w-0 break-words text-right">
+                    {col.render ? col.render(item) : String(item[col.key] ?? '')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {page * pageSize + 1}-
             {Math.min((page + 1) * pageSize, processed.length)} of{' '}
             {processed.length}
           </p>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center justify-between gap-1 sm:justify-end">
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="hidden h-8 w-8 sm:inline-flex"
               disabled={page === 0}
               onClick={() => setPage(0)}
               aria-label="First page"
@@ -191,7 +235,7 @@ export function DataTable<T extends Record<string, unknown>>({
             >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground px-2">
+            <span className="px-1 text-sm text-muted-foreground sm:px-2">
               {page + 1} / {totalPages}
             </span>
             <Button
@@ -205,7 +249,7 @@ export function DataTable<T extends Record<string, unknown>>({
             <Button
               variant="outline"
               size="icon"
-              className="h-8 w-8"
+              className="hidden h-8 w-8 sm:inline-flex"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(totalPages - 1)}
               aria-label="Last page"

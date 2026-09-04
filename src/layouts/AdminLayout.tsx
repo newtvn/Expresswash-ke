@@ -8,9 +8,9 @@ const AdminLayout = () => {
   return (
     <SidebarProvider>
       <AdminSidebar />
-      <SidebarInset>
+      <SidebarInset className="min-w-0 overflow-x-hidden">
         <AdminTopBar />
-        <div className="flex-1 p-4 md:p-6">
+        <div className="admin-content min-w-0 flex-1 px-4 py-4 sm:px-5 md:px-6 md:py-6">
           <ErrorBoundary fullPage={true} showHomeButton={true} fallbackTitle="Admin Page Error">
             <Outlet />
           </ErrorBoundary>

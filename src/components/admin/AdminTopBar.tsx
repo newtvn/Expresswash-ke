@@ -72,13 +72,13 @@ export function AdminTopBar() {
   });
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-4" />
+    <header className="sticky top-0 z-30 flex h-14 min-w-0 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
+      <SidebarTrigger className="-ml-1 h-10 w-10 shrink-0 md:h-8 md:w-8" />
+      <Separator orientation="vertical" className="mr-1 hidden h-4 sm:block md:mr-2" />
 
       {/* Breadcrumbs */}
-      <Breadcrumb className="flex-1">
-        <BreadcrumbList>
+      <Breadcrumb className="min-w-0 flex-1 overflow-hidden">
+        <BreadcrumbList className="min-w-0 flex-nowrap [&>li]:hidden [&>li:last-child]:inline-flex sm:[&>li]:inline-flex">
           {breadcrumbs.flatMap((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
             const items = [];
@@ -88,7 +88,7 @@ export function AdminTopBar() {
             items.push(
               <BreadcrumbItem key={crumb.href}>
                 {isLast ? (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  <BreadcrumbPage className="max-w-[45vw] truncate sm:max-w-none">{crumb.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
                     <Link to={crumb.href}>{crumb.label}</Link>
@@ -102,8 +102,8 @@ export function AdminTopBar() {
       </Breadcrumb>
 
       {/* Right side actions */}
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="icon" className="relative" onClick={() => navigate(routes.notifications)}>
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <Button variant="ghost" size="icon" className="relative h-10 w-10" onClick={() => navigate(routes.notifications)}>
           <Bell className="h-4 w-4" />
           <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
           <span className="sr-only">Notifications</span>
@@ -111,7 +111,7 @@ export function AdminTopBar() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full p-1">
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.avatarUrl} alt={user?.name} />
                 <AvatarFallback className="text-xs">

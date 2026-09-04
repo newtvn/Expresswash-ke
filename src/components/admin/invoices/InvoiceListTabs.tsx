@@ -81,12 +81,12 @@ export function InvoiceListTabs({
 
       <TabsContent value="all-invoices" className="mt-4 space-y-4">
         <div className="flex flex-wrap gap-3">
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input className="pl-9 w-64" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} />
+            <Input className="w-full pl-9 sm:w-64" placeholder="Search invoices..." value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as 'all' | InvoiceStatus)}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Status</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>

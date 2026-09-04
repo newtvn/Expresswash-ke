@@ -153,7 +153,7 @@ export const Receipts = () => {
       </PageHeader>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-muted-foreground">Total Receipts</p>
@@ -187,12 +187,12 @@ export const Receipts = () => {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9 w-56" placeholder="Search receipts..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="w-full pl-9 sm:w-56" placeholder="Search receipts..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {RECEIPT_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -201,7 +201,7 @@ export const Receipts = () => {
         <DateRangePicker date={dateRange} onDateChange={setDateRange} />
         {allTags.length > 0 && (
           <Select value={tagFilter || 'all'} onValueChange={(v) => setTagFilter(v === 'all' ? '' : v)}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="Tag" /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-36"><SelectValue placeholder="Tag" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tags</SelectItem>
               {allTags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -263,7 +263,7 @@ export const Receipts = () => {
               </CardContent>
             </Card>
           ))}
-          <div className="flex justify-between p-3 font-semibold border-t">
+          <div className="flex flex-col gap-1 border-t p-3 font-semibold min-[420px]:flex-row min-[420px]:justify-between">
             <span>{receipts.length} receipts shown</span>
             <span>KES {totalAmount.toLocaleString()}</span>
           </div>

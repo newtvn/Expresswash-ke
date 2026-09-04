@@ -156,7 +156,7 @@ export const RequestedQuotes = () => {
       />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-4 md:gap-4">
         <Card>
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
@@ -216,10 +216,10 @@ export const RequestedQuotes = () => {
         <SearchInput
           onSearch={useCallback((v: string) => setSearch(v), [])}
           placeholder="Search by customer or tracking code..."
-          className="w-72"
+          className="w-full sm:w-72"
         />
         <Select value={zoneFilter} onValueChange={setZoneFilter}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Zone" />
           </SelectTrigger>
           <SelectContent>

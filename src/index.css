@@ -403,3 +403,18 @@
   }
 
 }
+
+/* Admin data stays dense on larger screens and becomes scan-friendly records on phones. */
+.data-table-mobile {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .admin-content .data-table-desktop {
+    display: none;
+  }
+
+  .admin-content .data-table-mobile {
+    display: block;
+  }
+}

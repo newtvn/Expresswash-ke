@@ -233,7 +233,7 @@ export const UserManagement = () => {
           setPage(1); // Reset to page 1 on new search
         }, [])}
         placeholder="Search by name, email, or phone..."
-        className="max-w-sm"
+        className="w-full sm:max-w-sm"
       />
 
       {isLoading ? (
@@ -263,11 +263,11 @@ export const UserManagement = () => {
 
       {/* Pagination Controls */}
       {!isLoading && allResult && (
-        <div className="flex items-center justify-between border-t pt-4">
+        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {((page - 1) * USERS_PER_PAGE) + 1} to {Math.min(page * USERS_PER_PAGE, allResult.total)} of {allResult.total} users
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"

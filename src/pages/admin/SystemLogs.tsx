@@ -120,7 +120,7 @@ export const SystemLogs = () => {
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-4">
         {/* Level Checkboxes */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {(["info", "warn", "error", "debug"] as const).map((level) => (
             <div key={level} className="flex items-center gap-1.5">
               <Checkbox
@@ -138,7 +138,7 @@ export const SystemLogs = () => {
         </div>
 
         <Select value={serviceFilter} onValueChange={setServiceFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Service" />
           </SelectTrigger>
           <SelectContent>
@@ -151,7 +151,7 @@ export const SystemLogs = () => {
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative min-w-0 flex-1 basis-full sm:min-w-[200px] sm:basis-auto sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search logs..."

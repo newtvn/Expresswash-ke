@@ -172,7 +172,7 @@ export const AuditLogs = () => {
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={actionFilter} onValueChange={setActionFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Action Type" />
           </SelectTrigger>
           <SelectContent>
@@ -187,7 +187,7 @@ export const AuditLogs = () => {
         </Select>
 
         <Select value={entityFilter} onValueChange={setEntityFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Entity Type" />
           </SelectTrigger>
           <SelectContent>
@@ -245,7 +245,7 @@ export const AuditLogs = () => {
 
       {/* Server-side pagination info */}
       {!loading && total > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
             Showing {((page - 1) * limit) + 1}--{Math.min(page * limit, total)} of {total} entries
           </p>

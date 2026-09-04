@@ -251,7 +251,7 @@ export const AdminSettings = () => {
         <TabsContent value="users" className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-3">
             <Input
-              className="w-64"
+              className="w-full sm:w-64"
               placeholder="Search by name, email, or phone..."
               value={userSearch}
               onChange={(e) => setUserSearch(e.target.value)}

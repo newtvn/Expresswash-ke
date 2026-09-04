@@ -647,7 +647,7 @@ export const AdminInvoices = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Invoices" description="Manage all invoices, templates, and payment tracking">
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button onClick={openNewInvoiceDialog}>
             <Plus className="w-4 h-4 mr-2" /> New Invoice
           </Button>
@@ -658,7 +658,7 @@ export const AdminInvoices = () => {
       </PageHeader>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {[
           { label: 'Total Invoices', value: invoices.length, fmt: (v: number) => String(v) },
           { label: 'Paid', value: invoices.filter((i) => i.status === 'paid').length, fmt: (v: number) => String(v) },

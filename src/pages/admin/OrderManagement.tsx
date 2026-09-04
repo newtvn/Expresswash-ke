@@ -386,7 +386,7 @@ export const OrderManagement = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Order Management" description="View, create, and manage all orders">
-        <div className="flex gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <Button onClick={() => { setCreateDialogSource('walkin'); setCreateForm(emptyForm()); }} className="gap-2">
             <Store className="w-4 h-4" />
             Walk-in
@@ -406,10 +406,10 @@ export const OrderManagement = () => {
         <SearchInput
           onSearch={useCallback((v: string) => { setSearch(v); setPage(1); }, [])}
           placeholder="Search orders..."
-          className="w-64"
+          className="w-full sm:w-64"
         />
         <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full sm:w-44">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -420,17 +420,17 @@ export const OrderManagement = () => {
           </SelectContent>
         </Select>
         <ExportButton data={orders} filename="orders-export" />
-        <Button onClick={() => setTrackDialogOpen(true)} variant="outline" className="gap-2 sm:ml-auto">
+        <Button onClick={() => setTrackDialogOpen(true)} variant="outline" className="w-full gap-2 sm:ml-auto sm:w-auto">
           <Package className="w-4 h-4" />
           Find by tracking code
         </Button>
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/50 p-3">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <Select value={bulkStatus} onValueChange={setBulkStatus}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-full min-[420px]:w-44">
               <SelectValue placeholder="Change status to..." />
             </SelectTrigger>
             <SelectContent>
@@ -604,7 +604,7 @@ export const OrderManagement = () => {
             <DialogDescription>Enter a tracking code to view order details</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Input
                 placeholder="Enter tracking code (e.g., EW-2026-12345)"
                 value={trackingCodeInput}

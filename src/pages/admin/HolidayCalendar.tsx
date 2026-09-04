@@ -128,7 +128,7 @@ const HolidayCalendar = () => {
         title="Holiday Calendar"
         description="Manage holidays to exclude from delivery schedules"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-2 min-[420px]:flex-row sm:w-auto">
           <Button
             variant="outline"
             size="sm"

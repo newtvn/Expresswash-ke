@@ -202,15 +202,15 @@ export const Dashboard = () => {
   const revTotal = kpis?.totalRevenue ?? 0;
   if (kpisLoading) {
     return (
-      <div className="space-y-4 p-6">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-5 w-80" />
-        <div className="grid grid-cols-[1.2fr_1fr] gap-4 mt-6">
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full max-w-64" />
+        <Skeleton className="h-5 w-full max-w-80" />
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[1.2fr_1fr]">
           <Skeleton className="h-64 rounded-xl" />
           <Skeleton className="h-64 rounded-xl" />
         </div>
         <Skeleton className="h-56 rounded-xl" />
-        <div className="grid grid-cols-[1.3fr_1fr] gap-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
           <Skeleton className="h-72 rounded-xl" />
           <Skeleton className="h-72 rounded-xl" />
         </div>
@@ -223,7 +223,7 @@ export const Dashboard = () => {
       {/* ── Block 1: Topbar ─────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-xl font-bold leading-tight text-foreground sm:text-2xl">
             {greeting()}, {firstName}.
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -236,7 +236,7 @@ export const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-4">
         {/* Today's Focus */}
         <div
-          className="rounded-[14px] p-7 overflow-hidden"
+          className="min-w-0 overflow-hidden rounded-[14px] p-4 sm:p-6 lg:p-7"
           style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-line)' }}
         >
           <div className="flex items-center gap-2 mb-3">
@@ -259,12 +259,12 @@ export const Dashboard = () => {
               </Tooltip>
             </TooltipProvider>
           </div>
-          <div className="flex items-baseline gap-2 mb-1.5">
-            <span className="text-lg text-muted-foreground">KES</span>
-            <span className="text-5xl font-bold leading-none tracking-tight text-primary">
+          <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-sm text-muted-foreground sm:text-lg">KES</span>
+            <span className="min-w-0 break-all text-3xl font-bold leading-none tracking-tight text-primary sm:text-4xl xl:text-5xl">
               {(kpis?.totalRevenue ?? 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}
             </span>
-            <span className="text-lg text-muted-foreground">
+            <span className="text-sm text-muted-foreground sm:text-lg">
               total revenue
             </span>
           </div>
@@ -275,7 +275,7 @@ export const Dashboard = () => {
           </p>
 
           {/* Mini KPIs */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
             {[
               { caption: 'Orders today', value: String(kpis?.ordersToday ?? 0) },
               { caption: 'Customers', value: String(kpis?.totalCustomers ?? 0) },
@@ -383,17 +383,17 @@ export const Dashboard = () => {
 
       {/* ── Block 3: Pipeline Hero ──────────────────────────────── */}
       <div
-        className="rounded-xl p-6"
+        className="min-w-0 rounded-xl p-4 sm:p-6"
         style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-line)' }}
       >
-        <div className="flex items-start justify-between mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-[15px] font-semibold">Order pipeline</p>
             <p className="text-[11.5px] mt-0.5" style={{ color: 'var(--dash-ink-3)' }}>
               Every active order, grouped by where it is in the journey
             </p>
           </div>
-          <div className="flex items-center gap-4 text-[11.5px]" style={{ color: 'var(--dash-ink-2)' }}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[11.5px]" style={{ color: 'var(--dash-ink-2)' }}>
             <span className="inline-flex items-center gap-1.5">
               <i className="w-2 h-2 rounded-full inline-block" style={{ background: 'var(--dash-accent)' }} />Healthy
             </span>
@@ -438,7 +438,7 @@ export const Dashboard = () => {
           })}
         </div>
 
-        <div className="border-t mt-5 pt-5 grid grid-cols-2 lg:grid-cols-4 gap-5" style={{ borderColor: 'var(--dash-line)' }}>
+        <div className="mt-5 grid grid-cols-1 gap-5 border-t pt-5 min-[420px]:grid-cols-2 lg:grid-cols-4" style={{ borderColor: 'var(--dash-line)' }}>
           <div>
             <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
               Avg time to delivery
@@ -496,7 +496,7 @@ export const Dashboard = () => {
 
         {/* Recent Orders */}
         <div
-          className="rounded-xl p-5"
+          className="min-w-0 rounded-xl p-4 sm:p-5"
           style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-line)' }}
         >
           <div className="flex items-baseline gap-2 mb-4">
@@ -520,7 +520,7 @@ export const Dashboard = () => {
                 return (
                   <div
                     key={order.trackingCode}
-                    className="flex items-center gap-3 py-3 cursor-pointer transition-colors"
+                    className="grid cursor-pointer grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 py-3 transition-colors sm:flex"
                     style={{ borderColor: 'var(--dash-line-2)' }}
                     onClick={() => navigate(`/admin/orders/${order.trackingCode}`)}
                   >
@@ -536,7 +536,7 @@ export const Dashboard = () => {
                         {order.trackingCode} · {getServiceSummary(order.items)}
                       </p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="col-start-2 flex min-w-0 items-center justify-between gap-2 text-right sm:block sm:shrink-0">
                       <p className="text-[13px] font-medium tabular-nums">
                         KES {order.amount.toLocaleString()}
                       </p>

@@ -129,7 +129,7 @@ export const SystemConfig = () => {
                       <span className="font-medium text-sm">{zone.name}</span>
                       <Switch defaultChecked />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
                       <div className="space-y-1">
                         <Label className="text-xs">Price Multiplier</Label>
                         <Input type="number" defaultValue={zone.multiplier} className="h-8 text-sm" step="0.1" />
@@ -160,7 +160,7 @@ export const SystemConfig = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {[
                   { label: 'Carpet (Small)', price: 500 },
                   { label: 'Carpet (Large)', price: 800 },

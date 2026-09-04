@@ -159,7 +159,7 @@ export const NotificationCenter = () => {
       </PageHeader>
 
       {/* KPI Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-4 sm:gap-4">
         {[
           { label: 'Total Sent', value: totalCount, color: 'text-foreground' },
           { label: 'Delivered', value: deliveredCount, color: 'text-emerald-600' },
@@ -178,7 +178,7 @@ export const NotificationCenter = () => {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={channelFilter} onValueChange={setChannelFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Channel" />
           </SelectTrigger>
           <SelectContent>
@@ -191,7 +191,7 @@ export const NotificationCenter = () => {
         </Select>
 
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>

@@ -161,7 +161,7 @@ export const ReportsAnalytics = () => {
       />
 
       <Tabs defaultValue="sales" className="space-y-4">
-        <TabsList className="flex-wrap">
+        <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="orders">Orders</TabsTrigger>
           <TabsTrigger value="zones">Zones</TabsTrigger>
