@@ -102,6 +102,10 @@ export const UserManagement = () => {
   };
 
   const all = allResult?.data ?? [];
+  const formatJoinedDate = (value?: string) => {
+    if (!value) return '—';
+    return new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
   const getByRole = (role?: string) =>
     role ? all.filter((u) => u.role === role) : all;
 
@@ -165,7 +169,7 @@ export const UserManagement = () => {
     {
       key: 'createdAt',
       header: 'Joined',
-      render: (row) => <span className="text-sm">{row.createdAt?.split('T')[0]}</span>,
+      render: (row) => <span className="text-sm whitespace-nowrap">{formatJoinedDate(row.createdAt)}</span>,
     },
     {
       key: 'id',
@@ -182,6 +186,7 @@ export const UserManagement = () => {
               setEditDialogOpen(true);
             }}
             title="Edit Role"
+            aria-label={`Edit ${row.name}'s role`}
           >
             <Edit className="w-4 h-4" />
           </Button>
@@ -191,18 +196,20 @@ export const UserManagement = () => {
             className="h-8 w-8"
             onClick={() => toggleMutation.mutate(row.id)}
             title={row.isActive ? 'Deactivate' : 'Activate'}
+            aria-label={`${row.isActive ? 'Deactivate' : 'Activate'} ${row.name}`}
           >
             {row.isActive ? <ToggleRight className="w-4 h-4 text-green-600" /> : <ToggleLeft className="w-4 h-4" />}
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="h-8 w-8 ml-1 border-l border-border rounded-l-none text-red-600 hover:text-red-700 hover:bg-red-50"
             onClick={() => {
               setDeletingUser(row);
               setDeleteDialogOpen(true);
             }}
             title="Delete User"
+            aria-label={`Delete ${row.name}`}
           >
             <Trash2 className="w-4 h-4" />
           </Button>
@@ -234,19 +241,20 @@ export const UserManagement = () => {
       ) : (
         <Tabs defaultValue="all" className="space-y-4">
           <TabsList>
-            <TabsTrigger value="all">All ({all.length})</TabsTrigger>
-            <TabsTrigger value="customers">Customers ({getByRole('customer').length})</TabsTrigger>
-            <TabsTrigger value="drivers">Drivers ({getByRole('driver').length})</TabsTrigger>
-            <TabsTrigger value="staff">Staff ({getByRole('warehouse_staff').length + getByRole('admin').length})</TabsTrigger>
+            <TabsTrigger value="all">All ({allResult?.total ?? all.length})</TabsTrigger>
+            <TabsTrigger value="customers">Customers</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
+            <TabsTrigger value="staff">Staff</TabsTrigger>
           </TabsList>
-          <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
-          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
-          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
           <TabsContent value="staff">
             <DataTable
               data={[...getByRole('warehouse_staff'), ...getByRole('admin'), ...getByRole('super_admin')]}
               columns={columns}
               searchable={false}
+              pageSize={USERS_PER_PAGE}
               onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
             />
           </TabsContent>
@@ -329,8 +337,8 @@ export const UserManagement = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete User</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deletingUser?.name}</strong>? This action cannot
-              be undone and will permanently remove all user data.
+              Delete <strong>{deletingUser?.name}</strong>? They will lose access and their personal
+              profile data will be anonymized. Historical business records will remain available.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -21,7 +21,7 @@ import {
   Tag,
   BookOpen,
   ScanLine,
-  Wallet,
+  Percent,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -99,8 +99,8 @@ const navGroups = [
     items: [
       { title: 'Pricing', href: '/admin/pricing', icon: DollarSign },
       { title: 'Holiday Calendar', href: '/admin/holidays', icon: Calendar },
-      { title: 'Configuration', href: '/admin/system-config', icon: Settings },
-      { title: 'Settings', href: '/admin/settings', icon: Wallet },
+      { title: 'Service Setup', href: '/admin/system-config', icon: Settings },
+      { title: 'VAT & Access', href: '/admin/settings', icon: Percent },
       { title: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
       { title: 'System Logs', href: '/admin/system-logs', icon: FileText },
     ],

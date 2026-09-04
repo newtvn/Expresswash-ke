@@ -9,16 +9,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AreaChart, Area, XAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { StatusBadge } from '@/components/shared';
 import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
-import { AlertTriangle, Info } from 'lucide-react';
+import { Info } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import type { Order } from '@/types';
 
 const SalesChart = lazy(() =>
   import('@/components/reports').then((m) => ({ default: m.SalesChart }))
@@ -46,10 +44,9 @@ const STAGES: StageConfig[] = [
   { key: 'qApprov',   statusCode: 9,  label: 'Quality approved',  shortLabel: 'Q. approved',   group: 'qc' },
   { key: 'outDel',    statusCode: 11, label: 'Out for delivery',  shortLabel: 'Out for del.',  group: 'del' },
   { key: 'delivered', statusCode: 12, label: 'Delivered',         shortLabel: 'Delivered',     group: 'del' },
-  { key: 'cancelled', statusCode: 13, label: 'Cancelled',         shortLabel: 'Cancelled',     group: 'del' },
 ];
 
-const GROUP_LABELS: Record<string, string> = { intake: 'INTAKE', proc: 'PROC', qc: 'QC', del: 'DEL' };
+const GROUP_LABELS: Record<string, string> = { intake: 'Intake', proc: 'Processing', qc: 'Quality', del: 'Delivery' };
 
 function groupColor(group: string, key: string): string {
   if (key === 'cancelled') return 'var(--dash-neg)';
@@ -81,16 +78,6 @@ const avatarColors = [
   { bg: 'oklch(92% 0.05 75)',  fg: 'oklch(40% 0.1 75)' },
   { bg: 'oklch(92% 0.05 285)', fg: 'oklch(40% 0.1 285)' },
 ];
-
-function statusPillClass(status: number): string {
-  if (status >= 1 && status <= 4) return 'dash-pill-vio';
-  if (status >= 5 && status <= 7) return 'dash-pill-acc';
-  if (status >= 8 && status <= 9) return 'dash-pill-warn';
-  if (status === 11) return 'dash-pill-vio';
-  if (status === 12) return 'dash-pill-pos';
-  if (status === 13) return 'dash-pill-neg';
-  return '';
-}
 
 function getServiceSummary(items: { name: string; quantity: number }[]): string {
   if (!items || items.length === 0) return '';
@@ -170,9 +157,10 @@ export const Dashboard = () => {
 
   const maxCount = Math.max(...stageCounts.map(s => s.count), 1);
   const totalActive = stageCounts.reduce((s, c) => s + c.count, 0);
-  const cancelledCount = stageCounts.find(s => s.key === 'cancelled')?.count ?? 0;
-  const deliveredCount = stageCounts.find(s => s.key === 'delivered')?.count ?? 0;
-  const cancellationRate = totalActive > 0 ? Math.round((cancelledCount / totalActive) * 100) : 0;
+  const cancelledLabel = getOrderStatusLabel(13);
+  const cancelledCount = statusCounts.find((status) => status.status === cancelledLabel)?.count ?? 0;
+  const totalTracked = totalActive + cancelledCount;
+  const cancellationRate = totalTracked > 0 ? Math.round((cancelledCount / totalTracked) * 100) : 0;
 
   // Compute attention items from real data
   const attentionItems = useMemo(() => {
@@ -212,8 +200,6 @@ export const Dashboard = () => {
 
   // Revenue summary for chart header
   const revTotal = kpis?.totalRevenue ?? 0;
-  const revAvgDay = salesData.length > 0 ? Math.round(revTotal / Math.max(salesData.length, 1)) : 0;
-
   if (kpisLoading) {
     return (
       <div className="space-y-4 p-6">
@@ -254,7 +240,7 @@ export const Dashboard = () => {
           style={{ background: 'var(--dash-surface)', border: '1px solid var(--dash-line)' }}
         >
           <div className="flex items-center gap-2 mb-3">
-            <p className="text-[11px] uppercase tracking-[0.1em]" style={{ color: 'var(--dash-ink-3)' }}>
+            <p className="text-xs font-medium" style={{ color: 'var(--dash-ink-3)' }}>
               Business snapshot
             </p>
             <TooltipProvider delayDuration={200}>
@@ -276,7 +262,7 @@ export const Dashboard = () => {
           <div className="flex items-baseline gap-2 mb-1.5">
             <span className="text-lg text-muted-foreground">KES</span>
             <span className="text-5xl font-bold leading-none tracking-tight text-primary">
-              {(kpis?.totalRevenue ?? 0).toLocaleString()}
+              {(kpis?.totalRevenue ?? 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}
             </span>
             <span className="text-lg text-muted-foreground">
               total revenue
@@ -293,25 +279,25 @@ export const Dashboard = () => {
             {[
               { caption: 'Orders today', value: String(kpis?.ordersToday ?? 0) },
               { caption: 'Customers', value: String(kpis?.totalCustomers ?? 0) },
-              { caption: 'Unpaid', value: String(kpis?.unpaidInvoices ?? 0), sub: `· ${(kpis?.outstandingAmount ?? 0).toLocaleString()}` },
+              { caption: 'Unpaid', value: String(kpis?.unpaidInvoices ?? 0), sub: `KES ${(kpis?.outstandingAmount ?? 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}` },
               { caption: 'Rating', value: (kpis?.avgRating ?? 0).toFixed(1), sub: '★' },
             ].map((m) => (
               <div key={m.caption}>
-                <p className="text-[11px] uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--dash-ink-4)' }}>
+                <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
                   {m.caption}
                 </p>
                 <p className="text-[22px] font-semibold tabular-nums leading-none">
                   {m.value}
-                  {m.sub && <span className="text-[12px] font-normal ml-1.5" style={{ color: 'var(--dash-ink-3)' }}>{m.sub}</span>}
+                  {m.sub && <span className="block text-[12px] font-normal mt-1" style={{ color: 'var(--dash-ink-3)' }}>{m.sub}</span>}
                 </p>
               </div>
             ))}
           </div>
 
           {/* 7-day revenue sparkline */}
-          {salesData.length > 0 && (
+          {salesData.length > 1 ? (
             <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--dash-line)' }}>
-              <p className="text-[11px] uppercase tracking-[0.08em] mb-3" style={{ color: 'var(--dash-ink-4)' }}>
+              <p className="text-xs mb-3" style={{ color: 'var(--dash-ink-4)' }}>
                 Recent revenue
               </p>
               <ResponsiveContainer width="100%" height={56}>
@@ -343,6 +329,13 @@ export const Dashboard = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+          ) : (
+            <div className="mt-6 pt-4" style={{ borderTop: '1px solid var(--dash-line)' }}>
+              <p className="text-xs font-medium">Recent revenue</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--dash-ink-3)' }}>
+                Not enough recent revenue data to chart yet.
+              </p>
+            </div>
           )}
         </div>
 
@@ -357,9 +350,10 @@ export const Dashboard = () => {
           </div>
           <div className="flex flex-col gap-2">
             {attentionItems.map((item, i) => (
-              <div
+              <button
+                type="button"
                 key={i}
-                className="flex items-center gap-3 p-3 rounded-[10px] cursor-pointer transition-colors hover:bg-[var(--dash-surface-2)]"
+                className="flex w-full items-center gap-3 p-3 rounded-[10px] text-left transition-colors hover:bg-[var(--dash-surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 style={{ border: '1px solid var(--dash-line)', background: 'var(--dash-surface)' }}
                 onClick={() => navigate(item.link)}
               >
@@ -381,7 +375,7 @@ export const Dashboard = () => {
                 >
                   {item.badge}
                 </span>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -412,26 +406,25 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* 12-col stage grid */}
-        <div className="grid grid-cols-12 gap-1.5 overflow-x-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-11 gap-2">
           {stageCounts.map((stage) => {
             const color = groupColor(stage.group, stage.key);
             return (
               <div
                 key={stage.key}
-                className="flex flex-col justify-between rounded-lg p-2.5 min-h-[120px] cursor-pointer hover:shadow-sm transition-shadow"
+                className="flex flex-col justify-between rounded-lg p-3 min-h-[112px] cursor-pointer hover:shadow-sm transition-shadow"
                 style={{ border: '1px solid var(--dash-line)', background: 'var(--dash-surface)' }}
                 onClick={() => navigate(`/admin/orders?status=${stage.statusCode}`)}
               >
                 <div>
-                  <p className="text-[9.5px] uppercase tracking-[0.08em] mb-1" style={{ color }}>
+                  <p className="text-[10px] font-medium mb-1" style={{ color }}>
                     {GROUP_LABELS[stage.group]}
                   </p>
                   <p className="text-[22px] font-semibold tabular-nums leading-none tracking-[-0.02em]">
                     {stage.count}
                   </p>
                   <p className="text-[10.5px] leading-tight mt-1" style={{ color: 'var(--dash-ink-2)' }}>
-                    {stage.shortLabel}
+                    {stage.label}
                   </p>
                 </div>
                 <div className="h-[3px] rounded-full mt-2.5 overflow-hidden" style={{ background: 'var(--dash-line)' }}>
@@ -445,10 +438,9 @@ export const Dashboard = () => {
           })}
         </div>
 
-        {/* Metric strip — uses same 12-col grid as pipeline, 3 cols each */}
-        <div className="border-t mt-5 pt-5 grid grid-cols-12 gap-1.5" style={{ borderColor: 'var(--dash-line)' }}>
-          <div className="col-span-3">
-            <p className="text-[11px] uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--dash-ink-4)' }}>
+        <div className="border-t mt-5 pt-5 grid grid-cols-2 lg:grid-cols-4 gap-5" style={{ borderColor: 'var(--dash-line)' }}>
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
               Avg time to delivery
             </p>
             <p className="text-[28px] font-semibold tracking-[-0.02em] leading-none">
@@ -456,8 +448,8 @@ export const Dashboard = () => {
               <span className="text-[14px] font-normal ml-1" style={{ color: 'var(--dash-ink-3)' }}>days</span>
             </p>
           </div>
-          <div className="col-span-3">
-            <p className="text-[11px] uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--dash-ink-4)' }}>
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
               Biggest bottleneck
             </p>
             <p className="text-[18px] font-semibold tracking-[-0.01em] leading-tight">
@@ -467,8 +459,8 @@ export const Dashboard = () => {
               {bottleneck ? `${bottleneck.count} order${bottleneck.count !== 1 ? 's' : ''} in stage` : 'No bottleneck'}
             </p>
           </div>
-          <div className="col-span-3">
-            <p className="text-[11px] uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--dash-ink-4)' }}>
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
               Cancellation rate
             </p>
             <p className="text-[28px] font-semibold tracking-[-0.02em] leading-none">
@@ -478,11 +470,11 @@ export const Dashboard = () => {
               </span>
             </p>
             <p className="text-[11.5px] mt-1" style={{ color: 'var(--dash-ink-3)' }}>
-              {cancelledCount} of {totalActive} this month
+              {cancelledCount} of {totalTracked} orders
             </p>
           </div>
-          <div className="col-span-3">
-            <p className="text-[11px] uppercase tracking-[0.08em] mb-2" style={{ color: 'var(--dash-ink-4)' }}>
+          <div>
+            <p className="text-xs mb-2" style={{ color: 'var(--dash-ink-4)' }}>
               On-time delivery
             </p>
             <p className="text-[28px] font-semibold tracking-[-0.02em] leading-none">

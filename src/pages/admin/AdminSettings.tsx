@@ -135,7 +135,7 @@ export const AdminSettings = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Configure VAT, manage users, and system preferences" />
+      <PageHeader title="VAT & Access" description="Manage tax settings, company billing details, and administrator access" />
 
       <Tabs defaultValue="vat">
         <TabsList>

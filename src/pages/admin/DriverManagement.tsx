@@ -14,7 +14,6 @@ import { toast } from "sonner";
 import { getDrivers } from "@/services/driverService";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/config/queryKeys";
-import { useAuthStore } from "@/stores/authStore";
 
 type DriverTableRow = {
   id: string;
@@ -59,6 +58,19 @@ const driverColumns: Column<DriverTableRow>[] = [
 const VEHICLE_TYPES = ['car', 'van', 'truck', 'motorcycle'] as const;
 const ZONES = ['Kitengela', 'Athi River', 'Syokimau', 'Mlolongo', 'Greater Nairobi'] as const;
 
+const formatZone = (value?: string) => value
+  ? value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+  : 'Not assigned';
+
+const formatPhone = (value?: string) => {
+  if (!value) return '—';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('254')) {
+    return `+254 ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`;
+  }
+  return value;
+};
+
 const initialDriverForm = {
   name: '',
   email: '',
@@ -73,7 +85,6 @@ const initialDriverForm = {
 export const DriverManagement = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user: adminUser } = useAuthStore();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newDriver, setNewDriver] = useState(initialDriverForm);
   const [creating, setCreating] = useState(false);
@@ -149,19 +160,21 @@ export const DriverManagement = () => {
   const uniqueZones = new Set(drivers.map((d) => d.zone).filter(Boolean)).size;
 
   const performanceKPIs = [
-    { label: "Total Drivers", value: totalDrivers, change: 0, changeDirection: "flat" as const, icon: Truck, format: "number" as const },
-    { label: "Active Today", value: activeToday, change: 0, changeDirection: "flat" as const, icon: CheckCircle2, format: "number" as const },
-    { label: "Avg Rating", value: avgRating, change: 0, changeDirection: "flat" as const, icon: Star, format: "decimal" as const },
-    { label: "Zones Covered", value: uniqueZones, change: 0, changeDirection: "flat" as const, icon: MapPin, format: "number" as const },
+    { label: "Total Drivers", value: totalDrivers, icon: Truck, format: "number" as const },
+    { label: "Active Today", value: activeToday, icon: CheckCircle2, format: "number" as const },
+    { label: "Avg Rating", value: avgRating, icon: Star, format: "decimal" as const },
+    { label: "Zones Covered", value: uniqueZones, icon: MapPin, format: "number" as const },
   ];
 
   // Transform drivers to table rows
   const tableData: DriverTableRow[] = drivers.map((driver) => ({
     id: driver.id,
     name: driver.name,
-    phone: driver.phone,
-    vehicle: `${driver.vehicleType} - ${driver.vehiclePlate}`,
-    zone: driver.zone || 'N/A',
+    phone: formatPhone(driver.phone),
+    vehicle: driver.vehicleType && driver.vehiclePlate
+      ? `${formatZone(driver.vehicleType)} · ${driver.vehiclePlate.toUpperCase()}`
+      : '—',
+    zone: formatZone(driver.zone),
     deliveries: driver.totalDeliveries,
     rating: driver.rating,
     status: driver.status,
@@ -226,7 +239,7 @@ export const DriverManagement = () => {
                   type="button"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

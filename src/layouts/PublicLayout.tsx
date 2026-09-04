@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import WhatsAppFloat from '@/components/shared/WhatsAppFloat';
 
 /** Scrolls to the hash target after navigation */
 function ScrollToHash() {
@@ -31,6 +32,7 @@ const PublicLayout = () => (
       </ErrorBoundary>
     </main>
     <Footer />
+    <WhatsAppFloat />
   </div>
 );
 

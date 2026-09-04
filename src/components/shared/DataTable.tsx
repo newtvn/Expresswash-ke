@@ -108,9 +108,9 @@ export function DataTable<T extends Record<string, unknown>>({
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              {columns.map((col) => (
+              {columns.map((col, columnIndex) => (
                 <TableHead
-                  key={col.key}
+                  key={`${col.key}-${col.header}-${columnIndex}`}
                   className={cn(
                     col.sortable && 'cursor-pointer select-none hover:bg-muted/80',
                     col.className
@@ -151,8 +151,8 @@ export function DataTable<T extends Record<string, unknown>>({
                   )}
                   onClick={() => onRowClick?.(item)}
                 >
-                  {columns.map((col) => (
-                    <TableCell key={col.key} className={col.className}>
+                  {columns.map((col, columnIndex) => (
+                    <TableCell key={`${col.key}-${col.header}-${columnIndex}`} className={col.className}>
                       {col.render
                         ? col.render(item)
                         : String(item[col.key] ?? '')}
@@ -179,6 +179,7 @@ export function DataTable<T extends Record<string, unknown>>({
               className="h-8 w-8"
               disabled={page === 0}
               onClick={() => setPage(0)}
+              aria-label="First page"
             >
               <ChevronsLeft className="w-4 h-4" />
             </Button>
@@ -207,6 +208,7 @@ export function DataTable<T extends Record<string, unknown>>({
               className="h-8 w-8"
               disabled={page >= totalPages - 1}
               onClick={() => setPage(totalPages - 1)}
+              aria-label="Last page"
             >
               <ChevronsRight className="w-4 h-4" />
             </Button>

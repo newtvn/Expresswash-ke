@@ -7,7 +7,7 @@ interface KPICardProps {
   value: string | number;
   change?: number;
   changeDirection?: 'up' | 'down' | 'flat';
-  format?: 'number' | 'currency' | 'percentage';
+  format?: 'number' | 'currency' | 'percentage' | 'decimal';
   icon?: LucideIcon;
   className?: string;
   onClick?: () => void;
@@ -26,15 +26,17 @@ export const KPICard = ({
   const formatValue = () => {
     switch (format) {
       case 'currency':
-        return `KES ${Number(value).toLocaleString()}`;
+        return `KES ${Number(value).toLocaleString('en-KE', { maximumFractionDigits: 2 })}`;
       case 'percentage':
         return `${value}%`;
+      case 'decimal':
+        return Number(value).toLocaleString('en-KE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
       default:
         return typeof value === 'number' ? value.toLocaleString() : String(value);
     }
   };
 
-  const showChange = change != null && !isNaN(change) && changeDirection != null;
+  const showChange = change != null && !isNaN(change) && change !== 0 && changeDirection != null && changeDirection !== 'flat';
 
   const TrendIcon =
     changeDirection === 'up'
@@ -69,7 +71,6 @@ export const KPICard = ({
             className={cn('flex items-center gap-1 mt-3 text-sm', {
               'text-green-600': changeDirection === 'up',
               'text-red-500': changeDirection === 'down',
-              'text-muted-foreground': changeDirection === 'flat',
             })}
           >
             <TrendIcon className="w-4 h-4" />

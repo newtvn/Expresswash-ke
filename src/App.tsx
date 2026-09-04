@@ -3,7 +3,6 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import WhatsAppFloat from '@/components/shared/WhatsAppFloat';
 
 function SignUpRedirect() {
   const { search } = useLocation();
@@ -129,7 +128,6 @@ const App = () => {
       <Sonner />
       <ErrorBoundary>
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-          <WhatsAppFloat />
           <SessionTimeoutWarning />
           <LazyLoader>
             <Routes>

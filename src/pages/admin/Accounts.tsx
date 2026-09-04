@@ -878,22 +878,22 @@ export const Accounts = () => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>
-                <Plus className="w-4 h-4 mr-2" /> New <ChevronDown className="w-4 h-4 ml-1 opacity-70" />
+                <Plus className="w-4 h-4 mr-2" /> Create <ChevronDown className="w-4 h-4 ml-1 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem onSelect={() => setAddContactOpen(true)}>
-                <Users className="w-4 h-4 mr-2" /> Contact
+                <Users className="w-4 h-4 mr-2" /> New contact
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddBillOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Bill
+                <Plus className="w-4 h-4 mr-2" /> New bill
               </DropdownMenuItem>
               <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddExpenseOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" /> Expense
+                <Plus className="w-4 h-4 mr-2" /> New expense
               </DropdownMenuItem>
               <DropdownMenuItem disabled={isConsolidated} onSelect={() => setAddJournalOpen(true)}>
-                <FileText className="w-4 h-4 mr-2" /> Journal Entry
+                <FileText className="w-4 h-4 mr-2" /> New journal entry
               </DropdownMenuItem>
               {isConsolidated && (
                 <p className="px-2 py-1.5 text-xs text-muted-foreground">{consolidatedWriteHint}</p>
@@ -927,15 +927,15 @@ export const Accounts = () => {
       </div>
 
       <Tabs defaultValue="reports">
-        <TabsList className="flex-wrap h-auto gap-1">
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto" aria-label="Accounting sections">
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="expenses">Purchases & Expenses</TabsTrigger>
+          <TabsTrigger value="expenses" className="ml-2 border-l pl-4">Purchases & Expenses</TabsTrigger>
           <TabsTrigger value="payments">Payments Received</TabsTrigger>
           <TabsTrigger value="aging">Aging Summary</TabsTrigger>
-          <TabsTrigger value="payables">Payables & Bills</TabsTrigger>
+          <TabsTrigger value="payables" className="ml-2 border-l pl-4">Payables & Bills</TabsTrigger>
           <TabsTrigger value="refunds">Credits & Refunds</TabsTrigger>
-          <TabsTrigger value="posting">Posting Gaps</TabsTrigger>
+          <TabsTrigger value="posting" className="ml-2 border-l pl-4">Posting Gaps</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="outbox">Outbox</TabsTrigger>
         </TabsList>

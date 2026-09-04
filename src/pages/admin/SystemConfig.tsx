@@ -21,7 +21,7 @@ const handleSave = (section: string) => {
 export const SystemConfig = () => {
   return (
     <div className="space-y-6">
-      <PageHeader title="System Configuration" description="Manage application settings and business rules" />
+      <PageHeader title="Service Setup" description="Manage service zones, pricing rules, delivery policies, and business hours" />
 
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
-import { Receipt, Plus, Search, Filter, Tag, Calendar } from 'lucide-react';
+import { Receipt, Plus, Search, Tag, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
@@ -218,7 +218,10 @@ export const Receipts = () => {
           <CardContent className="py-12 text-center text-muted-foreground">
             <Receipt className="h-10 w-10 mx-auto mb-3 opacity-30" />
             <p className="font-medium">No receipts found</p>
-            <p className="text-sm mt-1">Add your first receipt using the button above</p>
+            <p className="text-sm mt-1">Record supplier receipts and other expense documents here.</p>
+            <Button className="mt-4" onClick={() => setAddOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add receipt
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -240,7 +243,7 @@ export const Receipts = () => {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {r.description}
                     {r.reference_number && ` · Ref: ${r.reference_number}`}
-                    {' · '}<Calendar className="h-3 w-3 inline-block" /> {new Date(r.date).toLocaleDateString()}
+                    {' · '}<Calendar className="h-3 w-3 inline-block" /> {new Date(r.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                   {r.notes && <p className="text-xs text-muted-foreground mt-0.5 italic">{r.notes}</p>}
                 </div>
