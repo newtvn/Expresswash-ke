@@ -389,11 +389,36 @@ const PricingCalculator = () => {
 
                 {/* Right: Quote Receipt */}
                 <div className="lg:col-span-1">
-                  <div className="rounded-2xl sticky top-24 shadow-md overflow-hidden border border-slate-200/60">
-                    {/* White header with foam bubbles */}
-                    <div className="relative bg-white px-6 pt-6 pb-14">
+                  <div className="relative flex h-full min-h-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-md">
+                    {/* Heading + empty state — white area that shrinks as the quote fills up */}
+                    <div className="relative z-10 flex flex-1 flex-col px-6 pt-6">
                       <h3 className="text-lg font-semibold text-brand-blue">Your Quote</h3>
-                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[50px] text-brand-blue">
+                      {itemCount === 0 && (
+                        <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+                          <div
+                            className="relative mb-5 flex h-20 w-20 items-center justify-center"
+                            style={{ animation: "pricing-float 3s ease-in-out infinite" }}
+                          >
+                            <div
+                              className="absolute inset-0 bg-brand-blue/10"
+                              style={{ animation: "pricing-blob 6s ease-in-out infinite", borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%" }}
+                            />
+                            <ShoppingCart className="relative z-10 h-8 w-8 text-brand-blue/50" />
+                          </div>
+                          <p className="text-sm text-slate-500">Add seats or mattresses to see your quote</p>
+                          <button
+                            onClick={() => setTab("ratecard")}
+                            className="mt-3 text-xs text-brand-blue/70 underline underline-offset-2 transition-colors hover:text-brand-blue"
+                          >
+                            View carpet &amp; full rate card
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Blue liquid fill — grows from the bottom as items are added; bubbly wave surface */}
+                    <div className="relative z-[1] bg-brand-blue px-6 pb-6 pt-2 text-white">
+                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute -top-6 left-0 h-8 w-full text-brand-blue" aria-hidden="true">
                         <circle cx="0"   cy="30" r="30" fill="currentColor" />
                         <circle cx="50"  cy="22" r="35" fill="currentColor" />
                         <circle cx="110" cy="15" r="40" fill="currentColor" />
@@ -405,12 +430,12 @@ const PricingCalculator = () => {
                         <circle cx="400" cy="22" r="25" fill="currentColor" />
                         <rect y="35" width="400" height="20" fill="currentColor" />
                       </svg>
-                    </div>
+                      <span className="absolute -top-8 left-8 h-2.5 w-2.5 rounded-full bg-brand-blue/60" aria-hidden="true" />
+                      <span className="absolute -top-12 left-16 h-1.5 w-1.5 rounded-full bg-brand-blue/40" aria-hidden="true" />
+                      <span className="absolute -top-9 right-10 h-2 w-2 rounded-full bg-brand-blue/50" aria-hidden="true" />
 
-                    {/* Quote body */}
-                    <div className="bg-brand-blue px-6 pb-6 pt-2">
                       {itemCount > 0 ? (
-                        <div className="space-y-6">
+                        <div className="relative space-y-6">
                           <div className="space-y-3">
                             {allItems
                               .filter((item) => quantities[item.id] > 0)
@@ -465,27 +490,7 @@ const PricingCalculator = () => {
                           </AnimatedButton>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center py-10">
-                          <div
-                            className="relative w-20 h-20 flex items-center justify-center mb-5"
-                            style={{ animation: "pricing-float 3s ease-in-out infinite" }}
-                          >
-                            <div
-                              className="absolute inset-0 bg-white/15"
-                              style={{ animation: "pricing-blob 6s ease-in-out infinite", borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%" }}
-                            />
-                            <ShoppingCart className="relative z-10 w-8 h-8 text-white/80" />
-                          </div>
-                          <p className="text-white/80 text-sm text-center">
-                            Add seats or mattresses to see your quote
-                          </p>
-                          <button
-                            onClick={() => setTab("ratecard")}
-                            className="mt-3 text-xs text-white/60 underline underline-offset-2 hover:text-white/90 transition-colors"
-                          >
-                            View carpet &amp; full rate card
-                          </button>
-                        </div>
+                        <div className="h-2" />
                       )}
                     </div>
                   </div>

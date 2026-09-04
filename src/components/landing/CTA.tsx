@@ -183,12 +183,12 @@ const CTA = () => {
           <svg
             viewBox="0 -60 1440 220"
             preserveAspectRatio="none"
-            className="block w-full"
+            className="block w-full text-brand-blue"
             style={{ height: 160 }}
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Blue base connecting to card */}
-            <rect y="-60" width="1440" height="150" fill="#007AF4" />
+            {/* Blue base connecting to card — same token as the card so there's no seam */}
+            <rect y="-60" width="1440" height="150" fill="currentColor" />
 
             {/* Main cloud humps in background color */}
             <circle cx="0"    cy="100" r="40"  fill="#f8fafc" />
