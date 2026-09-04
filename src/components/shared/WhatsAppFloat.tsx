@@ -20,7 +20,7 @@ const WhatsAppFloat = () => (
     target="_blank"
     rel="noopener noreferrer"
     aria-label="Chat with us on WhatsApp"
-    className="fixed bottom-6 right-6 z-50 hidden items-center gap-2 rounded-full bg-green-500 px-4 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:bg-green-600 hover:shadow-xl active:bg-green-700 xl:flex"
+    className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-green-500 px-3 py-3 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:bg-green-600 hover:shadow-xl active:bg-green-700 sm:bottom-6 sm:right-6 sm:px-4"
   >
     <WhatsAppIcon />
     <span className="pr-1">Get a Quote</span>

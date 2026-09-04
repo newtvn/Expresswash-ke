@@ -18,8 +18,6 @@ import {
 const initialSelection = (): QuickBookingSelection => ({
   service: 'carpet',
   zone: '',
-  propertyType: '',
-  rooms: '',
   pickupDate: '',
 });
 
@@ -110,8 +108,6 @@ export const HeroQuickBooking = () => {
     const submittedSelection: QuickBookingSelection = {
       service: String(formData.get('service') ?? ''),
       zone: String(formData.get('zone') ?? ''),
-      propertyType: '',
-      rooms: '',
       pickupDate: String(formData.get('pickupDate') ?? ''),
     };
 

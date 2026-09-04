@@ -111,13 +111,7 @@ export const RequestPickup = () => {
   const [pickupDate, setPickupDate] = useState(
     quickBooking.pickupDate || getLocalDateString(),
   );
-  const [notes, setNotes] = useState(() => {
-    const details = [
-      quickBooking.propertyTypeLabel && `Property type: ${quickBooking.propertyTypeLabel}`,
-      quickBooking.roomsLabel && `Rooms: ${quickBooking.roomsLabel}`,
-    ].filter(Boolean);
-    return details.length > 0 ? `Quick booking details\n${details.join('\n')}` : '';
-  });
+  const [notes, setNotes] = useState('');
   const [items, setItems] = useState<ItemForm[]>([
     newItemForm(quickBooking.service, quickBooking.serviceLabel),
   ]);

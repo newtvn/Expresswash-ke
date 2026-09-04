@@ -11,8 +11,6 @@ describe('quick booking URL handoff', () => {
     const search = buildQuickBookingSearch({
       service: 'carpet',
       zone: 'Kitengela',
-      propertyType: 'home',
-      rooms: '3',
       pickupDate,
     });
 
@@ -20,23 +18,16 @@ describe('quick booking URL handoff', () => {
       service: 'carpet',
       serviceLabel: 'Carpet Cleaning',
       zone: 'Kitengela',
-      propertyType: 'home',
-      propertyTypeLabel: 'House',
-      rooms: '3',
-      roomsLabel: '3 rooms',
       pickupDate,
     });
   });
 
   it('drops unsupported values and past dates', () => {
     const parsed = parseQuickBookingSearch(
-      'service=unknown&propertyType=castle&rooms=99&pickupDate=2020-01-01',
+      'service=unknown&pickupDate=2020-01-01',
     );
 
     expect(parsed.service).toBe('');
-    expect(parsed.propertyType).toBe('');
-    expect(parsed.rooms).toBe('');
     expect(parsed.pickupDate).toBe('');
   });
 });
-

@@ -1,16 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import {
-  Armchair,
-  BedDouble,
   Minus,
   Plus,
   ArrowRight,
   ShoppingCart,
   MapPin,
-  Layers,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PricingArtworkStyles, PricingRibbonBackdrop } from "./PricingArtwork";
+import {
+  allItems,
+  carpetRates,
+  homeCleaningRates,
+  mattressItems,
+  mattressRows,
+  officeCleaningRates,
+  seatItems,
+  seatRows,
+  zones,
+} from "./pricingData";
 
 function useRevealOnScroll() {
   const ref = useRef<HTMLDivElement>(null);
@@ -36,137 +45,6 @@ function useRevealOnScroll() {
 
   return { ref, visible };
 }
-
-/* Blob animation for empty state */
-const BlobStyles = () => (
-  <style>{`
-    @keyframes pricing-blob {
-      0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-      50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-    }
-    @keyframes pricing-float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-    .pricing-ribbon-path {
-      transition: stroke-dashoffset 100ms linear, opacity 80ms linear;
-      will-change: stroke-dashoffset, opacity;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .pricing-ribbon-path {
-        opacity: 1 !important;
-        stroke-dasharray: none !important;
-        stroke-dashoffset: 0 !important;
-        transition: none;
-      }
-    }
-  `}</style>
-);
-
-const PricingRibbonBackdrop = ({ progress }: { progress: number }) => {
-  const leftProgress = Math.min(1, Math.max(0, progress / 0.92));
-  const rightProgress = Math.min(1, Math.max(0, (progress - 0.045) / 0.88));
-
-  return (
-  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
-    <svg
-      viewBox="0 0 1440 1600"
-      preserveAspectRatio="none"
-      className="h-full w-full"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <defs>
-        <linearGradient id="pricing-ribbon-left" x1="0" y1="0" x2="650" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="hsl(var(--brand-blue))" stopOpacity="0.095" />
-          <stop offset="0.46" stopColor="hsl(var(--brand-blue))" stopOpacity="0.055" />
-          <stop offset="1" stopColor="hsl(var(--brand-blue))" stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id="pricing-ribbon-right" x1="1440" y1="0" x2="790" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="hsl(var(--brand-orange))" stopOpacity="0.085" />
-          <stop offset="0.46" stopColor="hsl(var(--brand-orange))" stopOpacity="0.045" />
-          <stop offset="1" stopColor="hsl(var(--brand-orange))" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      <path
-        d="M-210 132 C126 -52 520 52 500 310 C482 528 78 480 78 766 C78 992 468 910 500 1192 C526 1424 164 1540 -176 1394"
-        stroke="url(#pricing-ribbon-left)"
-        strokeWidth="72"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength="1"
-        className="pricing-ribbon-path"
-        style={{
-          opacity: leftProgress <= 0.002 ? 0 : 1,
-          strokeDasharray: "1 1",
-          strokeDashoffset: 1 - leftProgress,
-        }}
-        vectorEffect="non-scaling-stroke"
-      />
-      <path
-        d="M1652 250 C1322 72 936 164 958 422 C978 642 1362 574 1362 858 C1362 1084 980 1020 940 1292 C910 1490 1210 1580 1614 1466"
-        stroke="url(#pricing-ribbon-right)"
-        strokeWidth="64"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pathLength="1"
-        className="pricing-ribbon-path"
-        style={{
-          opacity: rightProgress <= 0.002 ? 0 : 1,
-          strokeDasharray: "1 1",
-          strokeDashoffset: 1 - rightProgress,
-        }}
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  </div>
-  );
-};
-
-// ── Rate Card Data ────────────────────────────────────────────────────
-
-const carpetRates = [
-  { type: "Non-Fluffy (Normal/Express)", pricePerSqFt: 35, pricePerSqMtr: 377 },
-  { type: "Loose Fluffy",               pricePerSqFt: 40, pricePerSqMtr: 431 },
-  { type: "Jute & Woolen",              pricePerSqFt: 45, pricePerSqMtr: 484 },
-];
-
-const homeCleaningRates = [
-  { type: "Occupied Home",       pricePerSqFt: 12, pricePerSqMtr: 130 },
-  { type: "Vacant Home",         pricePerSqFt: 8,  pricePerSqMtr: 87  },
-  { type: "After Construction",  pricePerSqFt: 10, pricePerSqMtr: 108 },
-];
-
-const officeCleaningRates = [
-  { type: "Non-Carpeted", pricePerSqFt: 4,  pricePerSqMtr: 38  },
-  { type: "Carpeted",     pricePerSqFt: 15, pricePerSqMtr: 158 },
-];
-
-// ── Unit-Priced Items (seats + mattresses for calculator) ─────────────
-
-const seatItems = [
-  { id: "sofa-seat",    icon: Armchair,  name: "Sofa Seat",    price: 800 },
-  { id: "dining-seat",  icon: Armchair,  name: "Dining Seat",  price: 300 },
-  { id: "puff-seat",    icon: Armchair,  name: "Puff Seat",    price: 400 },
-  { id: "arm-chair",    icon: Armchair,  name: "Arm Chair",    price: 800 },
-  { id: "office-chair", icon: Armchair,  name: "Office Chair", price: 700 },
-  { id: "pillow",       icon: Layers,    name: "Pillow",       price: 200 },
-];
-
-const mattressItems = [
-  { id: "mattress-3x6",   icon: BedDouble, name: "Mattress 3×6 ft", price: 2000 },
-  { id: "mattress-4x6",   icon: BedDouble, name: "Mattress 4×6 ft", price: 2500 },
-  { id: "mattress-queen", icon: BedDouble, name: "Mattress Queen",  price: 3500 },
-  { id: "mattress-king",  icon: BedDouble, name: "Mattress King",   price: 4000 },
-];
-
-const allItems = [...seatItems, ...mattressItems];
-
-const zones = [
-  { id: "kitengela", name: "Kitengela",  delivery: "24 Hours" },
-  { id: "athiriver", name: "Athi River", delivery: "24 Hours" },
-];
 
 // ── Sub-components ────────────────────────────────────────────────────
 
@@ -220,25 +98,6 @@ const RateTable = ({
     </div>
   </div>
 );
-
-// ── Seat rows for the rate table ──────────────────────────────────────
-const seatRows = [
-  { type: "Sofa Seat",    price: 800 },
-  { type: "Dining Seat",  price: 300 },
-  { type: "Puff Seat",    price: 400 },
-  { type: "Arm Chair",    price: 800 },
-  { type: "Office Chair", price: 700 },
-  { type: "Pillows",      price: 200 },
-];
-
-const mattressRows = [
-  { type: "Three by Six (3×6)",  price: 2000 },
-  { type: "Four by Six (4×6)",   price: 2500 },
-  { type: "Queen Size",          price: 3500 },
-  { type: "King Size",           price: 4000 },
-  { type: "Custom",              price: undefined },
-  { type: "Bed",                 price: undefined },
-];
 
 // ── Main Component ────────────────────────────────────────────────────
 
@@ -299,7 +158,7 @@ const PricingCalculator = () => {
 
   return (
     <section ref={pricingRef} id="pricing" className="relative py-24 bg-white overflow-hidden">
-      <BlobStyles />
+      <PricingArtworkStyles />
       <PricingRibbonBackdrop progress={ribbonProgress} />
 
       <div className="container mx-auto max-w-7xl px-6 relative z-10">

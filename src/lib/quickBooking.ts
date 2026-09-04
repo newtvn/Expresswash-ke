@@ -6,26 +6,9 @@ export const QUICK_BOOKING_SERVICES = [
   { value: 'mattress', label: 'Mattress Cleaning' },
 ] as const;
 
-export const QUICK_BOOKING_PROPERTY_TYPES = [
-  { value: 'home', label: 'House' },
-  { value: 'apartment', label: 'Apartment' },
-  { value: 'office', label: 'Office' },
-  { value: 'commercial', label: 'Commercial Space' },
-] as const;
-
-export const QUICK_BOOKING_ROOM_OPTIONS = [
-  { value: '1', label: '1 room' },
-  { value: '2', label: '2 rooms' },
-  { value: '3', label: '3 rooms' },
-  { value: '4', label: '4 rooms' },
-  { value: '5+', label: '5+ rooms' },
-] as const;
-
 export interface QuickBookingSelection {
   service: string;
   zone: string;
-  propertyType: string;
-  rooms: string;
   pickupDate: string;
 }
 
@@ -47,8 +30,6 @@ export const buildQuickBookingSearch = (selection: QuickBookingSelection) => {
   const params = new URLSearchParams({
     service: selection.service,
     zone: selection.zone,
-    propertyType: selection.propertyType,
-    rooms: selection.rooms,
     pickupDate: selection.pickupDate,
   });
 
@@ -58,25 +39,15 @@ export const buildQuickBookingSearch = (selection: QuickBookingSelection) => {
 export const parseQuickBookingSearch = (search: string) => {
   const params = new URLSearchParams(search);
   const service = params.get('service') ?? '';
-  const propertyType = params.get('propertyType') ?? '';
-  const rooms = params.get('rooms') ?? '';
   const pickupDate = params.get('pickupDate') ?? '';
 
   return {
     service: findLabel(QUICK_BOOKING_SERVICES, service) ? service : '',
     serviceLabel: findLabel(QUICK_BOOKING_SERVICES, service) ?? '',
     zone: (params.get('zone') ?? '').slice(0, 100),
-    propertyType: findLabel(QUICK_BOOKING_PROPERTY_TYPES, propertyType)
-      ? propertyType
-      : '',
-    propertyTypeLabel:
-      findLabel(QUICK_BOOKING_PROPERTY_TYPES, propertyType) ?? '',
-    rooms: findLabel(QUICK_BOOKING_ROOM_OPTIONS, rooms) ? rooms : '',
-    roomsLabel: findLabel(QUICK_BOOKING_ROOM_OPTIONS, rooms) ?? '',
     pickupDate:
       isIsoDate(pickupDate) && pickupDate >= getLocalDateString()
         ? pickupDate
         : '',
   };
 };
-
