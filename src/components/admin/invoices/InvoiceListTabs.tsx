@@ -130,12 +130,12 @@ export function InvoiceListTabs({
                           </p>
                         )}
                       </div>
-                      <div className="flex flex-col gap-3 border-t pt-3 min-[360px]:flex-row min-[360px]:items-end min-[360px]:justify-between sm:shrink-0 sm:border-0 sm:pt-0">
-                        <div className="shrink-0 min-[360px]:text-left sm:text-right">
+                      <div className="flex flex-col gap-3 border-t pt-3 sm:shrink-0 sm:flex-row sm:items-end sm:border-0 sm:pt-0">
+                        <div className="shrink-0 sm:text-right">
                           <p className="text-lg font-bold leading-tight">KES {invoice.total.toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">Due {formatDate(invoice.due_date)}</p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1.5 min-[360px]:justify-end" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:justify-end" onClick={(event) => event.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
