@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Phone, CalendarCheck, X, MessageCircle, LogIn } from "lucide-react";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,19 @@ import { useAuthStore } from "@/stores/authStore";
 const PHONE = "254746747481";
 const WA_MESSAGE = "Hi,\nI'm interested in your services, may I get your rate card?";
 const WA_URL = `https://wa.me/${PHONE}?text=${encodeURIComponent(WA_MESSAGE)}`;
+
+const mainFoamBubbles = [
+  [0, 100, 40], [90, 95, 50], [210, 80, 75], [340, 90, 55],
+  [500, 55, 100], [660, 85, 60], [780, 95, 45], [920, 65, 85],
+  [1080, 90, 55], [1250, 50, 105], [1400, 85, 60], [1440, 100, 40],
+];
+
+const fillerFoamBubbles = [
+  [45, 100, 35], [140, 95, 40], [280, 95, 40], [420, 95, 40],
+  [580, 95, 40], [620, 100, 35], [720, 95, 40], [850, 95, 40],
+  [1000, 95, 40], [1160, 95, 40], [1200, 100, 35], [1340, 95, 40],
+  [1440, 100, 35],
+];
 
 const WaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" className={className} fill="currentColor" aria-hidden="true">
@@ -100,13 +113,52 @@ const BubbleStyles = () => (
     .bubble-1 { animation: bubble-drift-1 8s ease-in-out infinite; }
     .bubble-2 { animation: bubble-drift-2 10s ease-in-out infinite; }
     .bubble-3 { animation: bubble-drift-3 12s ease-in-out infinite; }
+    @keyframes cta-foam-pop {
+      0% { opacity: 0; transform: translateY(34px) scale(.56); }
+      62% { opacity: 1; transform: translateY(-6px) scale(1.055); }
+      82% { transform: translateY(3px) scale(.985); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .cta-foam-bubble {
+      opacity: 0;
+      transform-box: fill-box;
+      transform-origin: center bottom;
+    }
+    .cta-foam-visible .cta-foam-bubble {
+      animation: cta-foam-pop 620ms cubic-bezier(.2,.8,.2,1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bubble-1, .bubble-2, .bubble-3 { animation: none; }
+      .cta-foam-bubble { opacity: 1; transform: none; }
+      .cta-foam-visible .cta-foam-bubble { animation: none; }
+    }
   `}</style>
 );
 
 const CTA = () => {
   const [pickupModalOpen, setPickupModalOpen] = useState(false);
+  const [foamVisible, setFoamVisible] = useState(false);
+  const foamRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const foam = foamRef.current;
+    if (!foam) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setFoamVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -6% 0px" },
+    );
+
+    observer.observe(foam);
+    return () => observer.disconnect();
+  }, []);
 
   const handleSchedulePickup = () => {
     if (isAuthenticated) {
@@ -179,45 +231,46 @@ const CTA = () => {
         </div>
 
         {/* Foam transition — sits outside the card, on the slate-50 background */}
-        <div className="relative w-full overflow-hidden" style={{ marginTop: -1 }}>
+        <div
+          ref={foamRef}
+          className={`relative w-full overflow-hidden ${foamVisible ? "cta-foam-visible" : ""}`}
+          style={{ marginTop: -1 }}
+        >
           <svg
             viewBox="0 -60 1440 220"
             preserveAspectRatio="none"
-            className="block w-full"
+            className="block w-full text-brand-blue"
             style={{ height: 160 }}
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Blue base connecting to card */}
-            <rect y="-60" width="1440" height="150" fill="#007AF4" />
+            {/* Blue base connecting to card — same token as the card so there's no seam */}
+            <rect y="-60" width="1440" height="150" fill="currentColor" />
 
             {/* Main cloud humps in background color */}
-            <circle cx="0"    cy="100" r="40"  fill="#f8fafc" />
-            <circle cx="90"   cy="95"  r="50"  fill="#f8fafc" />
-            <circle cx="210"  cy="80"  r="75"  fill="#f8fafc" />
-            <circle cx="340"  cy="90"  r="55"  fill="#f8fafc" />
-            <circle cx="500"  cy="55"  r="100" fill="#f8fafc" />
-            <circle cx="660"  cy="85"  r="60"  fill="#f8fafc" />
-            <circle cx="780"  cy="95"  r="45"  fill="#f8fafc" />
-            <circle cx="920"  cy="65"  r="85"  fill="#f8fafc" />
-            <circle cx="1080" cy="90"  r="55"  fill="#f8fafc" />
-            <circle cx="1250" cy="50"  r="105" fill="#f8fafc" />
-            <circle cx="1400" cy="85"  r="60"  fill="#f8fafc" />
-            <circle cx="1440" cy="100" r="40"  fill="#f8fafc" />
+            {mainFoamBubbles.map(([cx, cy, radius], index) => (
+              <circle
+                key={`main-${cx}-${radius}`}
+                className="cta-foam-bubble"
+                cx={cx}
+                cy={cy}
+                r={radius}
+                fill="#f8fafc"
+                style={{ animationDelay: `${index * 48}ms` }}
+              />
+            ))}
 
             {/* Gap fillers along the base */}
-            <circle cx="45"   cy="100" r="35" fill="#f8fafc" />
-            <circle cx="140"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="280"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="420"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="580"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="620"  cy="100" r="35" fill="#f8fafc" />
-            <circle cx="720"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="850"  cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="1000" cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="1160" cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="1200" cy="100" r="35" fill="#f8fafc" />
-            <circle cx="1340" cy="95"  r="40" fill="#f8fafc" />
-            <circle cx="1440" cy="100" r="35" fill="#f8fafc" />
+            {fillerFoamBubbles.map(([cx, cy, radius], index) => (
+              <circle
+                key={`filler-${cx}-${radius}`}
+                className="cta-foam-bubble"
+                cx={cx}
+                cy={cy}
+                r={radius}
+                fill="#f8fafc"
+                style={{ animationDelay: `${90 + index * 42}ms` }}
+              />
+            ))}
 
             {/* Solid fill below humps */}
             <rect y="90" width="1440" height="130" fill="#f8fafc" />

@@ -51,6 +51,7 @@ const AnimatedButton = React.forwardRef<HTMLButtonElement, AnimatedButtonProps>(
 
     const mergedClassName = cn(
       "animated-btn inline-flex items-center justify-center gap-2 px-8 py-4 text-base rounded-xl font-bold tracking-wider select-none",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary",
       bordered && "animated-btn--bordered",
       className,
     );

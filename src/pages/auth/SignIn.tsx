@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,6 +9,7 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthLayout, SocialAuthButtons } from '@/components/auth';
 import { ROUTES } from '@/config/routes';
+import { getAuthRedirectPath } from '@/lib/authRedirect';
 import {
   Form,
   FormControl,
@@ -32,6 +33,8 @@ type SignInFormValues = z.infer<typeof signInSchema>;
  */
 export const SignIn = () => {
   const { login } = useAuth();
+  const location = useLocation();
+  const redirectTo = getAuthRedirectPath(location.state);
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -48,7 +51,7 @@ export const SignIn = () => {
     setServerError('');
     setIsSubmitting(true);
     try {
-      const result = await login(values);
+      const result = await login(values, redirectTo);
       if (!result.success) {
         setServerError(result.error || 'Failed to sign in');
       }
@@ -147,6 +150,7 @@ export const SignIn = () => {
         Don't have an account?{' '}
         <Link
           to={ROUTES.SIGN_UP}
+          state={location.state}
           className="font-medium text-primary hover:text-primary/80 transition-colors"
         >
           Create Account

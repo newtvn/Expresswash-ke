@@ -4,20 +4,21 @@ import { useAuthStore } from '@/stores/authStore';
 import { signIn as signInService, signUp as signUpService, signOut as signOutService } from '@/services/authService';
 import { SignInFormData, SignUpFormData, User } from '@/types';
 import { getDefaultRouteForRole } from '@/config/permissions';
+import { isSafeInternalPath } from '@/lib/authRedirect';
 
 export const useAuth = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, setAuth, clearAuth, setLoading, isLoading, updateUser: storeUpdateUser } = useAuthStore();
 
-  const login = useCallback(async (formData: SignInFormData) => {
+  const login = useCallback(async (formData: SignInFormData, redirectTo?: string) => {
     setLoading(true);
     try {
       const response = await signInService(formData);
       if (response.success && response.user && response.tokens) {
         setAuth(response.user, response.tokens);
         const defaultRoute = getDefaultRouteForRole(response.user.role);
-        navigate(defaultRoute);
-        return { success: true };
+        navigate(redirectTo && isSafeInternalPath(redirectTo) ? redirectTo : defaultRoute);
+        return { success: true, user: response.user };
       }
       return { success: false, error: response.error || 'Login failed' };
     } catch {
@@ -27,15 +28,15 @@ export const useAuth = () => {
     }
   }, [navigate, setAuth, setLoading]);
 
-  const register = useCallback(async (formData: SignUpFormData) => {
+  const register = useCallback(async (formData: SignUpFormData, redirectTo?: string) => {
     setLoading(true);
     try {
       const response = await signUpService(formData);
       if (response.success && response.user && response.tokens) {
         setAuth(response.user, response.tokens);
         const defaultRoute = getDefaultRouteForRole(response.user.role);
-        navigate(defaultRoute);
-        return { success: true };
+        navigate(redirectTo && isSafeInternalPath(redirectTo) ? redirectTo : defaultRoute);
+        return { success: true, user: response.user };
       }
       return { success: false, error: response.error || 'Registration failed' };
     } catch {

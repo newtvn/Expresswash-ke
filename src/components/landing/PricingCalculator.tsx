@@ -1,16 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { AnimatedButton } from "@/components/ui/animated-button";
 import {
-  Armchair,
-  BedDouble,
   Minus,
   Plus,
   ArrowRight,
   ShoppingCart,
   MapPin,
-  Layers,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PricingArtworkStyles, PricingRibbonBackdrop } from "./PricingArtwork";
+import {
+  allItems,
+  carpetRates,
+  homeCleaningRates,
+  mattressItems,
+  mattressRows,
+  officeCleaningRates,
+  seatItems,
+  seatRows,
+  zones,
+} from "./pricingData";
 
 function useRevealOnScroll() {
   const ref = useRef<HTMLDivElement>(null);
@@ -37,64 +46,6 @@ function useRevealOnScroll() {
   return { ref, visible };
 }
 
-/* Blob animation for empty state */
-const BlobStyles = () => (
-  <style>{`
-    @keyframes pricing-blob {
-      0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-      50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-    }
-    @keyframes pricing-float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-  `}</style>
-);
-
-// ── Rate Card Data ────────────────────────────────────────────────────
-
-const carpetRates = [
-  { type: "Non-Fluffy (Normal/Express)", pricePerSqFt: 35, pricePerSqMtr: 377 },
-  { type: "Loose Fluffy",               pricePerSqFt: 40, pricePerSqMtr: 431 },
-  { type: "Jute & Woolen",              pricePerSqFt: 45, pricePerSqMtr: 484 },
-];
-
-const homeCleaningRates = [
-  { type: "Occupied Home",       pricePerSqFt: 12, pricePerSqMtr: 130 },
-  { type: "Vacant Home",         pricePerSqFt: 8,  pricePerSqMtr: 87  },
-  { type: "After Construction",  pricePerSqFt: 10, pricePerSqMtr: 108 },
-];
-
-const officeCleaningRates = [
-  { type: "Non-Carpeted", pricePerSqFt: 4,  pricePerSqMtr: 38  },
-  { type: "Carpeted",     pricePerSqFt: 15, pricePerSqMtr: 158 },
-];
-
-// ── Unit-Priced Items (seats + mattresses for calculator) ─────────────
-
-const seatItems = [
-  { id: "sofa-seat",    icon: Armchair,  name: "Sofa Seat",    price: 800 },
-  { id: "dining-seat",  icon: Armchair,  name: "Dining Seat",  price: 300 },
-  { id: "puff-seat",    icon: Armchair,  name: "Puff Seat",    price: 400 },
-  { id: "arm-chair",    icon: Armchair,  name: "Arm Chair",    price: 800 },
-  { id: "office-chair", icon: Armchair,  name: "Office Chair", price: 700 },
-  { id: "pillow",       icon: Layers,    name: "Pillow",       price: 200 },
-];
-
-const mattressItems = [
-  { id: "mattress-3x6",   icon: BedDouble, name: "Mattress 3×6 ft", price: 2000 },
-  { id: "mattress-4x6",   icon: BedDouble, name: "Mattress 4×6 ft", price: 2500 },
-  { id: "mattress-queen", icon: BedDouble, name: "Mattress Queen",  price: 3500 },
-  { id: "mattress-king",  icon: BedDouble, name: "Mattress King",   price: 4000 },
-];
-
-const allItems = [...seatItems, ...mattressItems];
-
-const zones = [
-  { id: "kitengela", name: "Kitengela",  delivery: "24 Hours" },
-  { id: "athiriver", name: "Athi River", delivery: "24 Hours" },
-];
-
 // ── Sub-components ────────────────────────────────────────────────────
 
 const RateTable = ({
@@ -107,11 +58,14 @@ const RateTable = ({
   hasSqPricing: boolean;
 }) => (
   <div>
-    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">{title}</h4>
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-blue">
+      <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" aria-hidden="true" />
+      {title}
+    </h4>
+    <div className="overflow-x-auto rounded-lg border border-brand-blue/20 shadow-[0_5px_16px_rgba(0,122,244,0.06)]">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-brand-navy text-white">
+          <tr className="bg-brand-blue text-white">
             <th className="text-left px-3 py-2 font-semibold">Type</th>
             {hasSqPricing ? (
               <>
@@ -125,7 +79,7 @@ const RateTable = ({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={row.type} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+            <tr key={row.type} className={i % 2 === 0 ? "bg-white" : "bg-brand-blue/[0.045]"}>
               <td className="px-3 py-2 text-slate-700">{row.type}</td>
               {hasSqPricing ? (
                 <>
@@ -145,31 +99,47 @@ const RateTable = ({
   </div>
 );
 
-// ── Seat rows for the rate table ──────────────────────────────────────
-const seatRows = [
-  { type: "Sofa Seat",    price: 800 },
-  { type: "Dining Seat",  price: 300 },
-  { type: "Puff Seat",    price: 400 },
-  { type: "Arm Chair",    price: 800 },
-  { type: "Office Chair", price: 700 },
-  { type: "Pillows",      price: 200 },
-];
-
-const mattressRows = [
-  { type: "Three by Six (3×6)",  price: 2000 },
-  { type: "Four by Six (4×6)",   price: 2500 },
-  { type: "Queen Size",          price: 3500 },
-  { type: "King Size",           price: 4000 },
-  { type: "Custom",              price: undefined },
-  { type: "Bed",                 price: undefined },
-];
-
 // ── Main Component ────────────────────────────────────────────────────
 
 const PricingCalculator = () => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [selectedZone, setSelectedZone] = useState(zones[0]);
   const [tab, setTab] = useState<"calculator" | "ratecard">("calculator");
+  const [ribbonProgress, setRibbonProgress] = useState(0);
+  const pricingRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const updateProgress = () => {
+      frame = 0;
+      const section = pricingRef.current;
+      if (!section) return;
+
+      const bounds = section.getBoundingClientRect();
+      const startLine = window.innerHeight * 0.88;
+      const travel = bounds.height + window.innerHeight * 0.72;
+      const nextProgress = Math.min(1, Math.max(0, (startLine - bounds.top) / travel));
+
+      setRibbonProgress((current) =>
+        Math.abs(current - nextProgress) < 0.001 ? current : nextProgress,
+      );
+    };
+
+    const requestUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateProgress);
+    };
+
+    updateProgress();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+    };
+  }, [tab]);
 
   const updateQuantity = (itemId: string, delta: number) => {
     setQuantities((prev) => {
@@ -187,17 +157,18 @@ const PricingCalculator = () => {
   const { ref: contentRef, visible } = useRevealOnScroll();
 
   return (
-    <section id="pricing" className="relative py-24 bg-white overflow-hidden">
-      <BlobStyles />
+    <section ref={pricingRef} id="pricing" className="relative py-24 bg-white overflow-hidden">
+      <PricingArtworkStyles />
+      <PricingRibbonBackdrop progress={ribbonProgress} />
 
       <div className="container mx-auto max-w-7xl px-6 relative z-10">
 
         {/* Header */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
-            <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">Pricing</span>
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
+            <span className="text-sm font-semibold text-brand-orange uppercase tracking-wider">Pricing</span>
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Transparent Pricing
@@ -216,7 +187,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("calculator")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "calculator"
-                  ? "bg-brand-blue text-white shadow"
+                  ? "bg-brand-orange text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -226,7 +197,7 @@ const PricingCalculator = () => {
               onClick={() => setTab("ratecard")}
               className={`px-5 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${
                 tab === "ratecard"
-                  ? "bg-brand-blue text-white shadow"
+                  ? "bg-brand-orange text-white shadow"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
@@ -251,8 +222,8 @@ const PricingCalculator = () => {
                 <RateTable title="Home Cleaning" rows={homeCleaningRates} hasSqPricing />
                 <RateTable title="Office Cleaning" rows={officeCleaningRates} hasSqPricing />
               </div>
-              <div className="md:col-span-2 bg-brand-navy/5 border border-brand-navy/20 rounded-xl p-4 text-sm text-slate-600 space-y-1">
-                <p><span className="font-semibold text-brand-navy">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
+              <div className="md:col-span-2 bg-brand-orange/5 border border-brand-orange/30 rounded-xl p-4 text-sm text-slate-600 space-y-1">
+                <p><span className="font-semibold text-brand-blue">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
                 <p><span className="font-semibold text-brand-blue">EXPRESS:</span> Service turn around is within 24 hrs without fail. <span className="text-brand-orange font-semibold">+KES 1,000 surcharge.</span></p>
                 <p className="pt-1 text-xs text-slate-400">All prices in KES. VAT (16%) applicable. Custom &amp; Bed sizes — request a quote.</p>
               </div>
@@ -389,11 +360,36 @@ const PricingCalculator = () => {
 
                 {/* Right: Quote Receipt */}
                 <div className="lg:col-span-1">
-                  <div className="rounded-2xl sticky top-24 shadow-md overflow-hidden border border-slate-200/60">
-                    {/* White header with foam bubbles */}
-                    <div className="relative bg-white px-6 pt-6 pb-14">
+                  <div className="relative flex h-full min-h-[560px] flex-col overflow-hidden rounded-2xl border border-slate-200/60 bg-white shadow-md">
+                    {/* Heading + empty state — white area that shrinks as the quote fills up */}
+                    <div className="relative z-10 flex flex-1 flex-col px-6 pt-6">
                       <h3 className="text-lg font-semibold text-brand-blue">Your Quote</h3>
-                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute bottom-0 left-0 w-full h-[50px] text-brand-blue">
+                      {itemCount === 0 && (
+                        <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
+                          <div
+                            className="relative mb-5 flex h-20 w-20 items-center justify-center"
+                            style={{ animation: "pricing-float 3s ease-in-out infinite" }}
+                          >
+                            <div
+                              className="absolute inset-0 bg-brand-blue/10"
+                              style={{ animation: "pricing-blob 6s ease-in-out infinite", borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%" }}
+                            />
+                            <ShoppingCart className="relative z-10 h-8 w-8 text-brand-blue/50" />
+                          </div>
+                          <p className="text-sm text-slate-500">Add seats or mattresses to see your quote</p>
+                          <button
+                            onClick={() => setTab("ratecard")}
+                            className="mt-3 text-xs text-brand-blue/70 underline underline-offset-2 transition-colors hover:text-brand-blue"
+                          >
+                            View carpet &amp; full rate card
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Blue liquid fill — grows from the bottom as items are added; bubbly wave surface */}
+                    <div className="relative z-[1] bg-brand-blue px-6 pb-6 pt-2 text-white">
+                      <svg viewBox="0 -30 400 80" preserveAspectRatio="none" className="absolute -top-6 left-0 h-8 w-full text-brand-blue" aria-hidden="true">
                         <circle cx="0"   cy="30" r="30" fill="currentColor" />
                         <circle cx="50"  cy="22" r="35" fill="currentColor" />
                         <circle cx="110" cy="15" r="40" fill="currentColor" />
@@ -405,12 +401,12 @@ const PricingCalculator = () => {
                         <circle cx="400" cy="22" r="25" fill="currentColor" />
                         <rect y="35" width="400" height="20" fill="currentColor" />
                       </svg>
-                    </div>
+                      <span className="absolute -top-8 left-8 h-2.5 w-2.5 rounded-full bg-brand-blue/60" aria-hidden="true" />
+                      <span className="absolute -top-12 left-16 h-1.5 w-1.5 rounded-full bg-brand-blue/40" aria-hidden="true" />
+                      <span className="absolute -top-9 right-10 h-2 w-2 rounded-full bg-brand-blue/50" aria-hidden="true" />
 
-                    {/* Blue body */}
-                    <div className="bg-brand-blue px-6 pb-6 pt-2">
                       {itemCount > 0 ? (
-                        <div className="space-y-6">
+                        <div className="relative space-y-6">
                           <div className="space-y-3">
                             {allItems
                               .filter((item) => quantities[item.id] > 0)
@@ -465,27 +461,7 @@ const PricingCalculator = () => {
                           </AnimatedButton>
                         </div>
                       ) : (
-                        <div className="flex flex-col items-center py-10">
-                          <div
-                            className="relative w-20 h-20 flex items-center justify-center mb-5"
-                            style={{ animation: "pricing-float 3s ease-in-out infinite" }}
-                          >
-                            <div
-                              className="absolute inset-0 bg-white/15"
-                              style={{ animation: "pricing-blob 6s ease-in-out infinite", borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%" }}
-                            />
-                            <ShoppingCart className="relative z-10 w-8 h-8 text-white/80" />
-                          </div>
-                          <p className="text-white/80 text-sm text-center">
-                            Add seats or mattresses to see your quote
-                          </p>
-                          <button
-                            onClick={() => setTab("ratecard")}
-                            className="mt-3 text-xs text-white/60 underline underline-offset-2 hover:text-white/90 transition-colors"
-                          >
-                            View carpet &amp; full rate card
-                          </button>
-                        </div>
+                        <div className="h-2" />
                       )}
                     </div>
                   </div>

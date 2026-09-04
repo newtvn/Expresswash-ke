@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import { Mail, Lock, User, Eye, EyeOff, Phone, AlertCircle, Gift } from 'lucide-
 import { AuthLayout, SocialAuthButtons } from '@/components/auth';
 import { useAuth } from '@/hooks/useAuth';
 import { ROUTES } from '@/config/routes';
+import { getAuthRedirectPath } from '@/lib/authRedirect';
 import {
   Form,
   FormControl,
@@ -65,6 +66,8 @@ type SignUpFormValues = z.infer<typeof signUpSchema>;
  */
 export const SignUp = () => {
   const { register: registerUser, isLoading } = useAuth();
+  const location = useLocation();
+  const redirectTo = getAuthRedirectPath(location.state);
   const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
@@ -106,7 +109,7 @@ export const SignUp = () => {
       password: values.password,
       confirmPassword: values.confirmPassword,
       zone: values.zone,
-    });
+    }, redirectTo);
     if (!result.success) {
       setServerError(result.error || 'Failed to create account');
     } else if (refCode && result.user?.id) {
@@ -315,6 +318,7 @@ export const SignUp = () => {
         Already have an account?{' '}
         <Link
           to={ROUTES.SIGN_IN}
+          state={location.state}
           className="font-medium text-primary hover:text-primary/80 transition-colors"
         >
           Sign in

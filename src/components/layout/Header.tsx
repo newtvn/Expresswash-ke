@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard } from "lucide-react";
+import { AnimatedButton } from "@/components/ui/animated-button";
+import { Clock, LayoutDashboard, Phone, Smartphone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { getDefaultRouteForRole } from "@/config/permissions";
 import { ROUTES } from "@/config/routes";
 import Logo from "@/components/shared/Logo";
+
+const BUSINESS_PHONE_HREF = "tel:+254746747481";
+const BUSINESS_PHONE_LABEL = "0746 747 481";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -71,10 +75,32 @@ const Header = () => {
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled || mobileMenuOpen
-            ? "bg-background/80 backdrop-blur-xl shadow-apple-sm border-b border-border/50"
+            ? "bg-white/55 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] border-b border-white/50"
             : "bg-transparent"
         }`}
       >
+        {/* Top utility bar — working hours + phone (hides on scroll) */}
+        <div
+          className={`w-full overflow-hidden rounded-b-3xl bg-primary text-white transition-all duration-300 ${
+            scrolled ? "max-h-0 opacity-0" : "max-h-16 opacity-100"
+          }`}
+        >
+          <div className="container mx-auto flex h-9 items-center justify-between px-4 text-[11px] sm:text-sm">
+            <span className="inline-flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+              <span>Working Hours: Mon–Sat, 7AM–7PM</span>
+            </span>
+            <a
+              href={BUSINESS_PHONE_HREF}
+              className="inline-flex items-center gap-2 font-medium transition-opacity hover:opacity-80"
+              aria-label={`Call Express Carpets on ${BUSINESS_PHONE_LABEL}`}
+            >
+              <Smartphone className="h-[18px] w-[18px] sm:h-5 sm:w-5" aria-hidden="true" />
+              <span>{BUSINESS_PHONE_LABEL}</span>
+            </a>
+          </div>
+        </div>
+
         <div className="container mx-auto">
           <nav className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
@@ -83,12 +109,12 @@ const Header = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden lg:flex items-center gap-8">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
+                  className="text-base font-semibold text-muted-foreground hover:text-foreground transition-colors relative after:absolute after:bottom-[-4px] after:left-0 after:w-0 after:h-[2px] after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
                 >
                   {link.name}
                 </Link>
@@ -96,7 +122,7 @@ const Header = () => {
             </div>
 
             {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-3">
               {isAuthenticated && user ? (
                 <>
                   <Button variant="ghost" size="sm" asChild>
@@ -119,19 +145,39 @@ const Header = () => {
                 </>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link to={ROUTES.SIGN_IN}>Sign In</Link>
-                  </Button>
-                  <Button variant="default" size="sm" asChild>
-                    <Link to={ROUTES.SIGN_UP}>Get Started</Link>
-                  </Button>
+                  <AnimatedButton
+                    asChild
+                    color="#1e293b"
+                    hoverColor="#fff"
+                    fillColor="#0f172a"
+                    bg="#f1f5f9"
+                    bordered={false}
+                    className="min-h-11 rounded-lg px-5 py-2 text-xs"
+                  >
+                    <Link to={ROUTES.SIGN_IN} aria-label="Sign in to your account">
+                      Sign In
+                    </Link>
+                  </AnimatedButton>
+                  <AnimatedButton
+                    asChild
+                    color="#fff"
+                    hoverColor="#fff"
+                    fillColor="#000000"
+                    bg="#F4743B"
+                    bordered={false}
+                    className="min-h-11 rounded-lg px-5 py-2 text-xs"
+                  >
+                    <Link to={ROUTES.SIGN_UP} aria-label="Create an account to get started">
+                      Get Started
+                    </Link>
+                  </AnimatedButton>
                 </>
               )}
             </div>
 
             {/* Mobile Menu Toggle - Animated Hamburger */}
             <button
-              className="md:hidden relative z-50 w-11 h-11 flex items-center justify-center rounded-xl transition-colors duration-200 active:bg-primary/10 touch-manipulation"
+              className="relative z-50 flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200 active:bg-primary/10 touch-manipulation lg:hidden"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -160,7 +206,7 @@ const Header = () => {
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${
+        className={`fixed inset-0 z-40 transition-all duration-300 lg:hidden ${
           mobileMenuOpen ? "visible" : "invisible pointer-events-none"
         }`}
       >
@@ -203,6 +249,16 @@ const Header = () => {
             }`}
             style={{ animationDelay: `${navLinks.length * 50 + 150}ms` }}
           >
+            <Button variant="outline" size="lg" className="w-full border-primary/25 text-primary" asChild>
+              <a
+                href={BUSINESS_PHONE_HREF}
+                onClick={closeMobileMenu}
+                className="flex items-center justify-center gap-2"
+              >
+                <Phone className="h-5 w-5" aria-hidden="true" />
+                Call {BUSINESS_PHONE_LABEL}
+              </a>
+            </Button>
             {isAuthenticated && user ? (
               <>
                 <div className="flex items-center gap-3 py-3 px-4">
@@ -235,12 +291,12 @@ const Header = () => {
             ) : (
               <>
                 <Button variant="outline" size="lg" className="w-full" asChild>
-                  <Link to="/signin" onClick={closeMobileMenu}>
+                  <Link to={ROUTES.SIGN_IN} onClick={closeMobileMenu}>
                     Sign In
                   </Link>
                 </Button>
                 <Button variant="default" size="lg" className="w-full" asChild>
-                  <Link to="/signup" onClick={closeMobileMenu}>
+                  <Link to={ROUTES.SIGN_UP} onClick={closeMobileMenu}>
                     Get Started
                   </Link>
                 </Button>

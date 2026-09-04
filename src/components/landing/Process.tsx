@@ -81,11 +81,11 @@ const Process = () => {
         {/* Header — centered, Services-inspired */}
         <div className="mb-16 text-center">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
-            <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
+            <span className="text-sm font-semibold text-brand-orange uppercase tracking-wider">
               How It Works
             </span>
-            <span className="block w-16 h-[2px] bg-brand-blue/40" />
+            <span className="block w-16 h-[2px] bg-brand-orange/40" />
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Simple 4-Step Process

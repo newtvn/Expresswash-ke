@@ -1,92 +1,117 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Armchair,
-  Layers,
-  BedDouble,
-  Blinds,
-  Sofa,
-  RectangleHorizontal,
   Phone,
   Mail,
   LogIn,
   X,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-
-/* ───────────────────────────────────────────────────────────────────
-   1. CUSTOM ANIMATIONS
-   ─────────────────────────────────────────────────────────────────── */
-const CustomStyles = () => (
-  <style>{`
-    @keyframes blob-shape {
-      0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
-      50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
-    }
-    @keyframes subtle-float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(-2px) rotate(2deg); }
-    }
-    @keyframes subtle-float-reverse {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(2px) rotate(-2deg); }
-    }
-    .animate-blob-shape {
-      animation: blob-shape 6s ease-in-out infinite;
-    }
-    .animate-subtle-float {
-      animation: subtle-float 4s ease-in-out infinite;
-    }
-    .animate-subtle-float-reverse {
-      animation: subtle-float-reverse 5s ease-in-out infinite;
-    }
-  `}</style>
-);
+import { ServiceEdgeRings, ServiceMotionStyles } from "./ServiceEdgeRings";
+import { services, type ServiceDefinition } from "./servicesData";
 
 /* ───────────────────────────────────────────────────────────────────
    2. FOAM / BUBBLE TRANSITION SVG
    ─────────────────────────────────────────────────────────────────── */
 const FoamTransition = () => (
-  <div className="relative w-full z-30 overflow-hidden" style={{ marginTop: -110, marginBottom: -1 }}>
+  <div className="foam-transition-reveal relative w-full z-30 overflow-hidden" style={{ marginTop: -155, marginBottom: -1 }}>
+    <style>{`
+      @keyframes foam-reveal { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: translateY(0) } }
+      @keyframes foam-drift-a { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-7px) } }
+      @keyframes foam-drift-b { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(6px) } }
+      .foam-transition-reveal { opacity: 0; animation: foam-reveal 0.8s ease-out 2.4s forwards; }
+      .foam-drift-a { animation: foam-drift-a 6s ease-in-out infinite; }
+      .foam-drift-b { animation: foam-drift-b 8s ease-in-out infinite; }
+      @media (min-width: 1024px) { .foam-transition-reveal { animation-delay: 5.75s; } }
+      @media (prefers-reduced-motion: reduce){
+        .foam-transition-reveal { animation: none; opacity: 1; transform: none; }
+        .foam-drift-a,.foam-drift-b{ animation: none }
+      }
+    `}</style>
     <svg
-      viewBox="0 -60 1440 220"
+      viewBox="0 0 1440 240"
       preserveAspectRatio="none"
-      className="block w-full text-[#f2f8fc]"
-      style={{ height: 120 }}
+      className="block w-full"
+      style={{ height: 185 }}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <rect y="90" width="1440" height="70" fill="currentColor" />
-      <circle cx="0"    cy="100" r="40"  fill="currentColor" />
-      <circle cx="90"   cy="95"  r="50"  fill="currentColor" />
-      <circle cx="210"  cy="80"  r="75"  fill="currentColor" />
-      <circle cx="340"  cy="90"  r="55"  fill="currentColor" />
-      <circle cx="500"  cy="55"  r="100" fill="currentColor" />
-      <circle cx="660"  cy="85"  r="60"  fill="currentColor" />
-      <circle cx="780"  cy="95"  r="45"  fill="currentColor" />
-      <circle cx="920"  cy="65"  r="85"  fill="currentColor" />
-      <circle cx="1080" cy="90"  r="55"  fill="currentColor" />
-      <circle cx="1250" cy="50"  r="105" fill="currentColor" />
-      <circle cx="1400" cy="85"  r="60"  fill="currentColor" />
-      <circle cx="1440" cy="100" r="40"  fill="currentColor" />
-      <circle cx="140"  cy="100" r="30" fill="currentColor" />
-      <circle cx="280"  cy="100" r="30" fill="currentColor" />
-      <circle cx="420"  cy="100" r="30" fill="currentColor" />
-      <circle cx="590"  cy="100" r="30" fill="currentColor" />
-      <circle cx="720"  cy="100" r="30" fill="currentColor" />
-      <circle cx="850"  cy="100" r="30" fill="currentColor" />
-      <circle cx="1010" cy="100" r="30" fill="currentColor" />
-      <circle cx="1160" cy="100" r="30" fill="currentColor" />
-      <circle cx="1340" cy="100" r="30" fill="currentColor" />
+      {/* Back suds layer — deepest shade, sits highest for depth. */}
+      <path fill="#e6f0fb" d="M0,34 C 380,134 560,180 720,184 C 880,180 1100,134 1440,34 L1440,240 L0,240 Z" />
+      <g fill="#e6f0fb">
+        <circle cx="60"   cy="56"  r="58" />
+        <circle cx="210"  cy="107" r="58" />
+        <circle cx="360"  cy="144" r="58" />
+        <circle cx="520"  cy="170" r="58" />
+        <circle cx="700"  cy="182" r="58" />
+        <circle cx="880"  cy="174" r="58" />
+        <circle cx="1050" cy="150" r="58" />
+        <circle cx="1210" cy="112" r="58" />
+        <circle cx="1380" cy="56"  r="58" />
+      </g>
+
+      {/* Middle suds layer — mid shade, staggered for organic overlap. */}
+      <path fill="#ecf4fc" d="M0,42 C 380,142 560,188 720,192 C 880,188 1100,142 1440,42 L1440,240 L0,240 Z" />
+      <g fill="#ecf4fc">
+        <circle cx="50"   cy="60"  r="52" />
+        <circle cx="170"  cy="102" r="52" />
+        <circle cx="290"  cy="136" r="52" />
+        <circle cx="410"  cy="162" r="52" />
+        <circle cx="530"  cy="179" r="52" />
+        <circle cx="650"  cy="188" r="52" />
+        <circle cx="770"  cy="189" r="52" />
+        <circle cx="890"  cy="181" r="52" />
+        <circle cx="1010" cy="165" r="52" />
+        <circle cx="1130" cy="141" r="52" />
+        <circle cx="1250" cy="108" r="52" />
+        <circle cx="1370" cy="68"  r="52" />
+        <circle cx="1440" cy="40"  r="52" />
+      </g>
+
+      {/* Front suds layer — dense, varied bumps so the whole valley crest reads as foam (no flat gaps). */}
+      <path fill="#f2f8fc" d="M0,50 C 380,150 560,196 720,200 C 880,196 1100,150 1440,50 L1440,240 L0,240 Z" />
+      <g fill="#f2f8fc">
+        <circle cx="20"   cy="56"  r="52" />
+        <circle cx="80"   cy="80"  r="44" />
+        <circle cx="140"  cy="101" r="56" />
+        <circle cx="200"  cy="120" r="46" />
+        <circle cx="260"  cy="137" r="50" />
+        <circle cx="320"  cy="152" r="42" />
+        <circle cx="380"  cy="165" r="54" />
+        <circle cx="440"  cy="175" r="46" />
+        <circle cx="500"  cy="184" r="52" />
+        <circle cx="560"  cy="191" r="44" />
+        <circle cx="620"  cy="195" r="56" />
+        <circle cx="680"  cy="198" r="46" />
+        <circle cx="740"  cy="198" r="50" />
+        <circle cx="800"  cy="196" r="44" />
+        <circle cx="860"  cy="192" r="56" />
+        <circle cx="920"  cy="187" r="46" />
+        <circle cx="980"  cy="178" r="52" />
+        <circle cx="1040" cy="168" r="42" />
+        <circle cx="1100" cy="156" r="54" />
+        <circle cx="1160" cy="142" r="46" />
+        <circle cx="1220" cy="126" r="50" />
+        <circle cx="1280" cy="107" r="56" />
+        <circle cx="1340" cy="87"  r="44" />
+        <circle cx="1400" cy="64"  r="52" />
+        <circle cx="1440" cy="48"  r="46" />
+      </g>
+
     </svg>
-    <div className="absolute w-3 h-3 rounded-full bg-[#f2f8fc]" style={{ left: '8%', top: '10%' }} />
-    <div className="absolute w-5 h-5 rounded-full bg-[#f2f8fc]" style={{ left: '11%', top: '2%' }} />
-    <div className="absolute w-2 h-2 rounded-full bg-[#f2f8fc]" style={{ left: '14%', top: '18%' }} />
-    <div className="absolute w-4 h-4 rounded-full bg-[#f2f8fc]" style={{ left: '35%', top: '8%' }} />
-    <div className="absolute w-2.5 h-2.5 rounded-full bg-[#f2f8fc]" style={{ left: '38%', top: '20%' }} />
-    <div className="absolute w-3 h-3 rounded-full bg-[#f2f8fc]" style={{ left: '62%', top: '5%' }} />
-    <div className="absolute w-6 h-6 rounded-full bg-[#f2f8fc]" style={{ left: '86%', top: '3%' }} />
-    <div className="absolute w-3 h-3 rounded-full bg-[#f2f8fc]" style={{ left: '90%', top: '15%' }} />
-    <div className="absolute w-2 h-2 rounded-full bg-[#f2f8fc]" style={{ left: '93%', top: '8%' }} />
+
+    {/* Free-floating bubbles — perfect circles (fixed px), drifting above the raised sides */}
+    <div className="foam-drift-a absolute rounded-full bg-[#f2f8fc]" style={{ width: 22, height: 22, left: '4%',  top: '6%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#ecf4fc]" style={{ width: 12, height: 12, left: '8%',  top: '22%' }} />
+    <div className="foam-drift-a absolute rounded-full bg-[#f2f8fc]" style={{ width: 9,  height: 9,  left: '12%', top: '12%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#ecf4fc]" style={{ width: 7,  height: 7,  left: '6%',  top: '34%' }} />
+    <div className="foam-drift-a absolute rounded-full bg-[#f2f8fc]" style={{ width: 15, height: 15, left: '15%', top: '26%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#ecf4fc]" style={{ width: 6,  height: 6,  left: '10%', top: '4%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#f2f8fc]" style={{ width: 22, height: 22, left: '95%', top: '6%' }} />
+    <div className="foam-drift-a absolute rounded-full bg-[#ecf4fc]" style={{ width: 12, height: 12, left: '91%', top: '22%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#f2f8fc]" style={{ width: 9,  height: 9,  left: '87%', top: '12%' }} />
+    <div className="foam-drift-a absolute rounded-full bg-[#ecf4fc]" style={{ width: 7,  height: 7,  left: '93%', top: '34%' }} />
+    <div className="foam-drift-b absolute rounded-full bg-[#f2f8fc]" style={{ width: 15, height: 15, left: '84%', top: '26%' }} />
+    <div className="foam-drift-a absolute rounded-full bg-[#ecf4fc]" style={{ width: 6,  height: 6,  left: '89%', top: '4%' }} />
   </div>
 );
 
@@ -198,50 +223,71 @@ const ServiceModal = ({
 };
 
 /* ───────────────────────────────────────────────────────────────────
-   5. SERVICES DATA
-   ─────────────────────────────────────────────────────────────────── */
-const services = [
-  {
-    icon: Layers,
-    title: "Carpet Cleaning",
-    description: "Deep carpet cleaning for all types and sizes — carpets wash, stain removal & deodorizing",
-  },
-  {
-    icon: Armchair,
-    title: "Chair Washing",
-    description: "Fabric and leather chair washing — dining chairs, office chairs & accent seats",
-  },
-  {
-    icon: Blinds,
-    title: "Curtain Washing",
-    description: "Gentle curtain washing for all fabric types — silk, linen & blackout curtains",
-  },
-  {
-    icon: RectangleHorizontal,
-    title: "Rug & Rags Cleaning",
-    description: "Specialized rug washing and rags cleaning — area rugs, oriental rugs & decorative pieces",
-  },
-  {
-    icon: Sofa,
-    title: "Sofa Cleaning",
-    description: "Complete sofa washing & upholstery cleaning — sofas, loveseats & sectionals",
-  },
-  {
-    icon: BedDouble,
-    title: "Mattress Cleaning",
-    description: "Deep mattress sanitization, dust mite removal & stain extraction",
-  },
-];
-
-/* ───────────────────────────────────────────────────────────────────
    6. MAIN SERVICES COMPONENT
    ─────────────────────────────────────────────────────────────────── */
 const Services = () => {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const [activeService, setActiveService] = useState<typeof services[0] | null>(null);
+  const [activeService, setActiveService] = useState<ServiceDefinition | null>(null);
+  const [ringProgress, setRingProgress] = useState(0);
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
 
-  const handleServiceClick = (service: typeof services[0]) => {
+  useEffect(() => {
+    let frame = 0;
+
+    const updateRings = () => {
+      frame = 0;
+      const section = sectionRef.current;
+      if (!section) return;
+
+      const bounds = section.getBoundingClientRect();
+      const scrollFrontier = window.innerHeight * 0.75;
+      const nextProgress = Math.max(0, Math.min(1, (scrollFrontier - bounds.top) / bounds.height));
+
+      setRingProgress((current) =>
+        Math.abs(current - nextProgress) < 0.001 ? current : nextProgress
+      );
+    };
+
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(updateRings);
+    };
+
+    updateRings();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const cards = cardsRef.current;
+    const firstCard = cards?.firstElementChild;
+    if (!firstCard) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCardsVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0.2,
+        rootMargin: "0px 0px -10% 0px",
+      }
+    );
+
+    observer.observe(firstCard);
+    return () => observer.disconnect();
+  }, []);
+
+  const handleServiceClick = (service: ServiceDefinition) => {
     if (isAuthenticated) {
       navigate("/portal/request-pickup");
     } else {
@@ -253,18 +299,20 @@ const Services = () => {
     <>
       <FoamTransition />
 
-      <section id="services" className="pt-12 pb-24 bg-[#f2f8fc]">
-        <CustomStyles />
+      <section ref={sectionRef} id="services" className="relative overflow-hidden bg-[#f2f8fc] pt-12 pb-24">
+        <ServiceMotionStyles />
+        <ServiceEdgeRings progress={ringProgress} />
 
         <div className="container mx-auto max-w-7xl px-6 relative z-10">
 
-          {/* Header */}
-          <div className="mb-16">
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-sm font-semibold text-brand-blue uppercase tracking-wider">
+          {/* Header — centered, matching other sections */}
+          <div className="mb-16 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <span className="block w-16 h-[2px] bg-brand-orange/40" />
+              <span className="text-sm font-semibold text-brand-orange uppercase tracking-wider">
                 Our Services
               </span>
-              <span className="block w-16 h-[2px] bg-brand-blue/40" />
+              <span className="block w-16 h-[2px] bg-brand-orange/40" />
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
               What We Clean
@@ -272,9 +320,12 @@ const Services = () => {
           </div>
 
           {/* 3x2 Services Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {services.map((service, index) => {
               const Icon = service.icon;
+              const isTopRow = index < 3;
+              const sequenceIndex = isTopRow ? 2 - index : index - 3;
+              const delay = isTopRow ? sequenceIndex * 180 : 720 + sequenceIndex * 180;
 
               return (
                 <div
@@ -283,8 +334,10 @@ const Services = () => {
                   tabIndex={0}
                   onClick={() => handleServiceClick(service)}
                   onKeyDown={(e) => e.key === "Enter" && handleServiceClick(service)}
-                  className="animated-card group bg-white p-8 rounded-[5px] shadow-[0_4px_20px_rgb(0,0,0,0.04)] flex flex-col items-center text-center cursor-pointer"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className={`service-card-reveal animated-card group bg-white p-8 rounded-[5px] shadow-[0_4px_20px_rgb(0,0,0,0.04)] flex flex-col items-center text-center cursor-pointer ${
+                    cardsVisible ? "is-visible" : ""
+                  }`}
+                  style={{ animationDelay: `${delay}ms` }}
                 >
                   <span className="animated-card__span" aria-hidden />
                   <span className="animated-card__span" aria-hidden />
