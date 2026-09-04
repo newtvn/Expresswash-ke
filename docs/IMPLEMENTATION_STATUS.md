@@ -16,10 +16,11 @@ Parts A–E all green — trial balance zero, every entry balances, per-business
 (EW + GH + others = consolidated), idempotency (native + ingest), RLS isolation, ingest
 provenance (posted vs failed), and the complete consolidated write-lock (all create/pay/
 allocate/refund/repost/reverse controls disabled). Evidence in `docs/QA_E2E_LEDGER_RESULTS_2026-08-31.md`.
-**The ledger + multi-business hub are production-ready.** Two PRs ready to merge:
-**#60** (backend B1–B3, base `main`) then **#61** (UI C, currently based on `#60`'s branch →
-retarget to `main` after #60 merges). Only remaining work: **A2 Goalhub → Render cutover**
-(blocked on Render GitHub App auth + Goalhub Supabase source URL/secrets).
+**The ledger + multi-business hub are production-ready and MERGED to `main`:**
+**#60** (backend B1–B3), **#61** (UI C), and **#62** (082 hardening: validate the ledger
+business FK + re-raise `insufficient_privilege` in `update_draft` instead of soft-failing).
+All CI green; 082 verified on the Docker local stack. Only remaining work: **A2 Goalhub →
+Render cutover** (blocked on Render GitHub App auth + Goalhub Supabase source URL/secrets).
 
 ## Session 2 progress (2026-08-31)
 - **Workstream A1 done** — Goalhub `render.yaml` converted to Docker runtime + preDeploy `alembic upgrade head` + starter plan; accounting connector env added (disabled). Render Postgres **`goalhub-db`** provisioned via MCP (Frankfurt, basic_256mb, PG16, id `dpg-daaba86k1f9s73ftrb70-a`). Branch `infra/goalhub-render-docker` → **PR newtvn/Goalhub#36**. Decision: DB pre-provisioned via MCP (not blueprint-managed), so it's removed from the blueprint.
