@@ -873,12 +873,14 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto">
           <BusinessSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" /> Create <ChevronDown className="w-4 h-4 ml-1 opacity-70" />
+              <Button aria-label="Create accounting record" className="shrink-0 px-3 min-[360px]:px-4">
+                <Plus className="h-4 w-4 min-[360px]:mr-2" />
+                <span className="hidden min-[360px]:inline">Create</span>
+                <ChevronDown className="ml-1 h-4 w-4 opacity-70" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
@@ -1009,28 +1011,32 @@ export const Accounts = () => {
 
         {/* ---- PAYMENTS RECEIVED ---- */}
         <TabsContent value="payments" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <DateRangePicker date={dateRange} onDateChange={setDateRange} />
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={paymentsReceived.length === 0}
-              onClick={() => downloadCsv(
-                `payments-${selectedBusiness}-${new Date().toISOString().split('T')[0]}.csv`,
-                ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
-                paymentsReceived.map((p) => [
-                  formatDate(p.created_at),
-                  p.customer_name ?? '',
-                  toAmount(p.amount),
-                  p.method ?? '',
-                  p.mpesa_receipt_number ?? p.checkout_request_id ?? '',
-                  p.status ?? '',
-                ]),
-              )}
-            >
-              <Download className="h-4 w-4 mr-1" /> Export
-            </Button>
-          </div>
+          <DateRangePicker
+            date={dateRange}
+            onDateChange={setDateRange}
+            className="w-full"
+            actions={(
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={paymentsReceived.length === 0}
+                onClick={() => downloadCsv(
+                  `payments-${selectedBusiness}-${new Date().toISOString().split('T')[0]}.csv`,
+                  ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
+                  paymentsReceived.map((p) => [
+                    formatDate(p.created_at),
+                    p.customer_name ?? '',
+                    toAmount(p.amount),
+                    p.method ?? '',
+                    p.mpesa_receipt_number ?? p.checkout_request_id ?? '',
+                    p.status ?? '',
+                  ]),
+                )}
+              >
+                <Download className="mr-1 h-4 w-4" /> Export
+              </Button>
+            )}
+          />
           <Card>
             <CardContent className="pt-4">
               {paymentsReceived.length === 0 ? (

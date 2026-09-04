@@ -67,9 +67,9 @@ export function BusinessSwitcher() {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
       <Select value={selectedBusiness} onValueChange={handleChange}>
-        <SelectTrigger className="w-[220px]">
+        <SelectTrigger className="min-w-0 flex-1 sm:w-[220px] sm:flex-none">
           <Building2 className="w-4 h-4 mr-2 shrink-0" />
           <SelectValue placeholder="Select business" />
         </SelectTrigger>
@@ -83,9 +83,9 @@ export function BusinessSwitcher() {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="gap-2" title="Add business">
+          <Button variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Add business">
             <Plus className="w-4 h-4" />
-            <span className="hidden xl:inline">Add business</span>
+            <span className="sr-only">Add business</span>
           </Button>
         </DialogTrigger>
         <DialogContent>

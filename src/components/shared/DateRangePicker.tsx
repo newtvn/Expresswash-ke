@@ -1,22 +1,25 @@
-import { useEffect, useId, useState } from 'react';
+import { type ReactNode, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 type DateValue = { from: Date | undefined; to: Date | undefined };
 
-type DateRangePickerProps =
+type DateRangePickerProps = (
   | {
       startDate: string;
       endDate: string;
       onRangeChange: (start: string, end: string) => void;
-      className?: string;
     }
   | {
       date: DateValue;
       onDateChange: (date: DateValue) => void;
-      className?: string;
-    };
+    }
+) & {
+  className?: string;
+  actions?: ReactNode;
+};
 
 const toInputDate = (date?: Date) => date ? date.toISOString().split('T')[0] : '';
 const detectPreset = (start: string, end: string): number | null => {
@@ -69,8 +72,8 @@ export const DateRangePicker = (props: DateRangePickerProps) => {
   };
 
   return (
-    <div className={props.className}>
-      <div className="grid grid-cols-1 items-end gap-2 min-[420px]:grid-cols-2 sm:flex sm:flex-wrap" aria-label="Date range">
+    <div className={cn('w-full sm:w-auto', props.className)}>
+      <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap" aria-label="Date range">
         <div className="min-w-0 space-y-1">
           <Label htmlFor={fromId} className="text-xs text-muted-foreground">From</Label>
           <Input
@@ -93,21 +96,25 @@ export const DateRangePicker = (props: DateRangePickerProps) => {
             className="h-9 w-full sm:w-40"
           />
         </div>
-        <Button size="sm" variant="default" className="w-full sm:w-auto" onClick={handleApply} disabled={!start && !end}>
-          Apply
-        </Button>
-        <div className="grid grid-cols-3 gap-1 sm:flex" aria-label="Quick date ranges">
-          {[7, 30, 90].map((days) => (
-            <Button
-              key={days}
-              size="sm"
-              variant={activePreset === days ? 'secondary' : 'ghost'}
-              aria-pressed={activePreset === days}
-              onClick={() => setPreset(days)}
-            >
-              {days}D
-            </Button>
-          ))}
+        <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-1.5 sm:col-span-1 sm:flex-nowrap">
+          <div className="flex min-w-0 flex-1 sm:flex-none" aria-label="Quick date ranges">
+            {[7, 30, 90].map((days) => (
+              <Button
+                key={days}
+                size="sm"
+                variant={activePreset === days ? 'secondary' : 'ghost'}
+                className="min-w-0 flex-1 px-2 sm:flex-none"
+                aria-pressed={activePreset === days}
+                onClick={() => setPreset(days)}
+              >
+                {days}D
+              </Button>
+            ))}
+          </div>
+          <Button size="sm" variant="default" className="shrink-0" onClick={handleApply} disabled={!start && !end}>
+            Apply
+          </Button>
+          {props.actions && <div className="shrink-0">{props.actions}</div>}
         </div>
       </div>
     </div>

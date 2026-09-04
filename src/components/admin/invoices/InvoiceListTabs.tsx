@@ -107,33 +107,35 @@ export function InvoiceListTabs({
               const status = STATUS_CONFIG[invoice.status];
               return (
                 <Card key={invoice.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => onSelectInvoice(invoice)}>
-                  <CardContent className="py-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">{invoice.invoice_number}</span>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${status.className}`}>
-                            <status.icon className="h-3 w-3" />
-                            {status.label}
-                          </span>
-                          {invoice.posted_journal_entry_id && <Badge variant="outline" className="text-xs">Posted</Badge>}
-                          {invoice.order_tracking_code && (
-                            <Badge variant="outline" className="text-xs">#{invoice.order_tracking_code}</Badge>
-                          )}
+                  <CardContent className="p-4 sm:px-6 sm:py-3">
+                    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center sm:gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                          <span className="break-words text-base font-semibold leading-snug">{invoice.invoice_number}</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                              <status.icon className="h-3 w-3" />
+                              {status.label}
+                            </span>
+                            {invoice.posted_journal_entry_id && <Badge variant="outline" className="text-xs">Posted</Badge>}
+                            {invoice.order_tracking_code && (
+                              <Badge variant="outline" className="max-w-full truncate text-xs">#{invoice.order_tracking_code}</Badge>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-0.5">{invoice.customer_name}</p>
+                        <p className="mt-1.5 break-words text-sm text-muted-foreground">{invoice.customer_name}</p>
                         {isPartialStatus(invoice.status) && (
-                          <p className="text-xs text-blue-600 mt-0.5">
+                          <p className="mt-2 inline-flex rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
                             Paid: KES {invoice.paid_amount.toLocaleString()} · Balance: KES {invoice.balance.toLocaleString()}
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-bold">KES {invoice.total.toLocaleString()}</p>
+                      <div className="flex flex-col gap-3 border-t pt-3 min-[360px]:flex-row min-[360px]:items-end min-[360px]:justify-between sm:shrink-0 sm:border-0 sm:pt-0">
+                        <div className="shrink-0 min-[360px]:text-left sm:text-right">
+                          <p className="text-lg font-bold leading-tight">KES {invoice.total.toLocaleString()}</p>
                           <p className="text-xs text-muted-foreground">Due {formatDate(invoice.due_date)}</p>
                         </div>
-                        <div className="flex gap-1" onClick={(event) => event.stopPropagation()}>
+                        <div className="flex flex-wrap items-center gap-1.5 min-[360px]:justify-end" onClick={(event) => event.stopPropagation()}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -173,6 +175,7 @@ export function InvoiceListTabs({
                             size="sm"
                             variant="outline"
                             title="Download PDF"
+                            aria-label={`Download ${invoice.invoice_number} PDF`}
                             disabled={pdfPending}
                             onClick={() => onDownloadPdf(invoice.id)}
                           >
@@ -193,16 +196,16 @@ export function InvoiceListTabs({
         <div className="space-y-2">
           {overdueInvoices.map((invoice) => (
             <Card key={invoice.id} className="border-red-200">
-              <CardContent className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm">{invoice.invoice_number}</span>
+              <CardContent className="flex flex-col justify-between gap-4 p-4 sm:flex-row sm:items-center sm:px-6 sm:py-3">
+                <div className="min-w-0">
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                    <span className="break-words text-base font-semibold leading-snug">{invoice.invoice_number}</span>
                     <Badge variant="destructive" className="text-xs">Overdue</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">{invoice.customer_name}</p>
-                  <p className="text-xs text-red-600 mt-0.5">Due: {formatDate(invoice.due_date)} · Balance: KES {invoice.balance.toLocaleString()}</p>
+                  <p className="mt-1.5 break-words text-sm text-muted-foreground">{invoice.customer_name}</p>
+                  <p className="mt-2 inline-flex rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700">Due {formatDate(invoice.due_date)} · Balance KES {invoice.balance.toLocaleString()}</p>
                 </div>
-                <div className="flex gap-2" onClick={(event) => event.stopPropagation()}>
+                <div className="flex flex-wrap gap-2 border-t pt-3 sm:shrink-0 sm:border-0 sm:pt-0" onClick={(event) => event.stopPropagation()}>
                   {invoice.customer_phone && (
                     <Button size="sm" variant="outline" onClick={() => onOpenWhatsAppReminder(invoice.customer_phone!, invoice.invoice_number)}>
                       <MessageSquare className="h-3 w-3 mr-1" /> Remind
