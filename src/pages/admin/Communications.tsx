@@ -9,17 +9,33 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Send, Bell, History, CheckCircle, XCircle } from 'lucide-react';
+import { Send, Bell, History, CheckCircle, XCircle, Eye, Search } from 'lucide-react';
 import {
   getTemplates,
   sendNotification,
   getNotificationHistory,
+  NotificationTemplate,
   NotificationHistoryEntry,
 } from '@/services/communicationService';
+import { sanitizeHTML } from '@/utils/validation';
+
+const humanizeTemplateName = (name: string) => name
+  .replace(/[_-]+/g, ' ')
+  .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const templateExcerpt = (body: string) => body
+  .replace(/<[^>]+>/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
 
 export const Communications = () => {
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState('templates');
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [channelFilter, setChannelFilter] = useState('all');
+  const [previewTemplate, setPreviewTemplate] = useState<NotificationTemplate | null>(null);
   const [sendForm, setSendForm] = useState({
     templateId: '',
     recipientId: '',
@@ -39,6 +55,14 @@ export const Communications = () => {
   });
 
   const selectedTemplate = templates.find((t) => t.id === sendForm.templateId);
+  const filteredTemplates = templates.filter((template) => {
+    const matchesChannel = channelFilter === 'all' || template.channel === channelFilter;
+    const query = templateSearch.trim().toLowerCase();
+    const matchesSearch = !query
+      || template.name.toLowerCase().includes(query)
+      || templateExcerpt(template.body).toLowerCase().includes(query);
+    return matchesChannel && matchesSearch;
+  });
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -71,7 +95,7 @@ export const Communications = () => {
     <div className="space-y-6">
       <PageHeader title="Communications" description="Manage notification templates and send messages" />
 
-      <Tabs defaultValue="templates">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="templates"><Bell className="w-4 h-4 mr-2" />Templates</TabsTrigger>
           <TabsTrigger value="send"><Send className="w-4 h-4 mr-2" />Send Notification</TabsTrigger>
@@ -79,20 +103,44 @@ export const Communications = () => {
         </TabsList>
 
         <TabsContent value="templates" className="mt-4">
+          <div className="mb-4 flex flex-wrap gap-3">
+            <div className="relative min-w-[240px] flex-1 sm:max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={templateSearch}
+                onChange={(event) => setTemplateSearch(event.target.value)}
+                placeholder="Search templates..."
+                className="pl-9"
+              />
+            </div>
+            <Select value={channelFilter} onValueChange={setChannelFilter}>
+              <SelectTrigger className="w-44" aria-label="Filter by channel">
+                <SelectValue placeholder="All channels" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All channels</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="sms">SMS</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="push">Push</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {templatesLoading ? (
             <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20" />)}</div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {templates.map((t) => (
+              {filteredTemplates.map((t) => (
                 <Card key={t.id}>
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-semibold">{t.name}</CardTitle>
+                      <CardTitle className="text-sm font-semibold">{humanizeTemplateName(t.name)}</CardTitle>
                       <Badge variant="outline" className="text-xs capitalize">{t.channel}</Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{t.body}</p>
+                    {t.subject && <p className="mb-1 text-xs font-medium">{t.subject}</p>}
+                    <p className="text-xs text-muted-foreground line-clamp-2">{templateExcerpt(t.body)}</p>
                     {t.variables.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
                         {t.variables.map((v) => (
@@ -100,9 +148,32 @@ export const Communications = () => {
                         ))}
                       </div>
                     )}
+                    <div className="mt-3 flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setPreviewTemplate(t)}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" /> Preview
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSendForm((current) => ({ ...current, templateId: t.id, variables: {} }));
+                          setActiveTab('send');
+                        }}
+                      >
+                        Use template
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
+              {filteredTemplates.length === 0 && (
+                <Card className="md:col-span-2">
+                  <CardContent className="py-12 text-center">
+                    <p className="text-sm font-medium">No templates match these filters</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Try another search term or channel.</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </TabsContent>
@@ -184,6 +255,30 @@ export const Communications = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!previewTemplate} onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{previewTemplate ? humanizeTemplateName(previewTemplate.name) : 'Template preview'}</DialogTitle>
+            <DialogDescription>
+              {previewTemplate?.channel ? `${previewTemplate.channel.toUpperCase()} preview` : 'Message preview'}
+            </DialogDescription>
+          </DialogHeader>
+          {previewTemplate?.subject && (
+            <div className="rounded-lg border bg-muted/30 px-4 py-3">
+              <p className="text-xs text-muted-foreground">Subject</p>
+              <p className="mt-1 text-sm font-medium">{previewTemplate.subject}</p>
+            </div>
+          )}
+          <div className="max-h-[55vh] overflow-y-auto rounded-lg border bg-white p-5 text-sm text-slate-900">
+            {previewTemplate?.channel === 'email' ? (
+              <div dangerouslySetInnerHTML={{ __html: sanitizeHTML(previewTemplate.body) }} />
+            ) : (
+              <p className="whitespace-pre-wrap leading-6">{previewTemplate?.body}</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

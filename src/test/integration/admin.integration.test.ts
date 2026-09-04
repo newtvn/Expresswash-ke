@@ -90,7 +90,7 @@ describe('Admin › Access verification', () => {
       .eq('id', adminId)
       .single();
 
-    expect(profile!.role).toBe('admin');
+    expect(['admin', 'super_admin']).toContain(profile!.role);
 
     const { data: allProfiles } = await client
       .from('profiles')

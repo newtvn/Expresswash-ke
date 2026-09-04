@@ -1,71 +1,113 @@
-import { useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Calendar } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
-interface DateRangePickerProps {
-  startDate: string;
-  endDate: string;
-  onRangeChange: (start: string, end: string) => void;
-  className?: string;
-}
+type DateValue = { from: Date | undefined; to: Date | undefined };
 
-export const DateRangePicker = ({
-  startDate,
-  endDate,
-  onRangeChange,
-  className,
-}: DateRangePickerProps) => {
-  const [start, setStart] = useState(startDate);
-  const [end, setEnd] = useState(endDate);
+type DateRangePickerProps =
+  | {
+      startDate: string;
+      endDate: string;
+      onRangeChange: (start: string, end: string) => void;
+      className?: string;
+    }
+  | {
+      date: DateValue;
+      onDateChange: (date: DateValue) => void;
+      className?: string;
+    };
+
+const toInputDate = (date?: Date) => date ? date.toISOString().split('T')[0] : '';
+const detectPreset = (start: string, end: string): number | null => {
+  if (!start || !end) return null;
+  const days = Math.round((new Date(`${end}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()) / 86_400_000);
+  return [7, 30, 90].includes(days) ? days : null;
+};
+
+export const DateRangePicker = (props: DateRangePickerProps) => {
+  const fromId = useId();
+  const toId = useId();
+  const controlledStart = 'startDate' in props ? props.startDate : toInputDate(props.date.from);
+  const controlledEnd = 'endDate' in props ? props.endDate : toInputDate(props.date.to);
+  const [start, setStart] = useState(controlledStart);
+  const [end, setEnd] = useState(controlledEnd);
+  const [activePreset, setActivePreset] = useState<number | null>(() => detectPreset(controlledStart, controlledEnd));
+
+  useEffect(() => {
+    setStart(controlledStart);
+    setEnd(controlledEnd);
+    setActivePreset(detectPreset(controlledStart, controlledEnd));
+  }, [controlledStart, controlledEnd]);
+
+  const publish = (nextStart: string, nextEnd: string) => {
+    if ('onRangeChange' in props) {
+      props.onRangeChange(nextStart, nextEnd);
+      return;
+    }
+    props.onDateChange({
+      from: nextStart ? new Date(`${nextStart}T00:00:00`) : undefined,
+      to: nextEnd ? new Date(`${nextEnd}T23:59:59`) : undefined,
+    });
+  };
 
   const handleApply = () => {
-    onRangeChange(start, end);
+    setActivePreset(null);
+    publish(start, end);
   };
 
   const setPreset = (days: number) => {
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    const s = startDate.toISOString().split('T')[0];
-    const e = endDate.toISOString().split('T')[0];
-    setStart(s);
-    setEnd(e);
-    onRangeChange(s, e);
+    const presetEnd = new Date();
+    const presetStart = new Date();
+    presetStart.setDate(presetStart.getDate() - days);
+    const nextStart = toInputDate(presetStart);
+    const nextEnd = toInputDate(presetEnd);
+    setStart(nextStart);
+    setEnd(nextEnd);
+    setActivePreset(days);
+    publish(nextStart, nextEnd);
   };
 
   return (
-    <div className={className}>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-muted-foreground" />
+    <div className={props.className}>
+      <div className="flex flex-wrap items-end gap-2" aria-label="Date range">
+        <div className="space-y-1">
+          <Label htmlFor={fromId} className="text-xs text-muted-foreground">From</Label>
           <Input
+            id={fromId}
+            aria-label="Start date"
             type="date"
             value={start}
-            onChange={(e) => setStart(e.target.value)}
+            onChange={(event) => { setStart(event.target.value); setActivePreset(null); }}
             className="w-40 h-9"
           />
-          <span className="text-muted-foreground text-sm">to</span>
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={toId} className="text-xs text-muted-foreground">To</Label>
           <Input
+            id={toId}
+            aria-label="End date"
             type="date"
             value={end}
-            onChange={(e) => setEnd(e.target.value)}
+            onChange={(event) => { setEnd(event.target.value); setActivePreset(null); }}
             className="w-40 h-9"
           />
-          <Button size="sm" variant="default" onClick={handleApply}>
-            Apply
-          </Button>
         </div>
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setPreset(7)}>
-            7D
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setPreset(30)}>
-            30D
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setPreset(90)}>
-            90D
-          </Button>
+        <Button size="sm" variant="default" onClick={handleApply} disabled={!start && !end}>
+          Apply
+        </Button>
+        <div className="flex gap-1" aria-label="Quick date ranges">
+          {[7, 30, 90].map((days) => (
+            <Button
+              key={days}
+              size="sm"
+              variant={activePreset === days ? 'secondary' : 'ghost'}
+              aria-pressed={activePreset === days}
+              onClick={() => setPreset(days)}
+            >
+              {days}D
+            </Button>
+          ))}
         </div>
       </div>
     </div>

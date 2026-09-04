@@ -29,37 +29,39 @@ import type {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const today = new Date();
-const oneYearAgo = new Date(today);
-oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+const defaultStart = new Date(today);
+defaultStart.setDate(defaultStart.getDate() - 30);
 
 const fmt = (d: Date) => d.toISOString().split('T')[0];
+const formatCurrency = (value: unknown) => `KES ${Number(value).toLocaleString('en-KE', { maximumFractionDigits: 2 })}`;
 
 // ── Column Definitions ───────────────────────────────────────────────
 
 type PeriodRow = { period: string; payments: number; revenue: number };
 const periodColumns: Column<PeriodRow>[] = [
-  { key: 'period', header: 'Period', sortable: true },
-  { key: 'payments', header: 'Payments', sortable: true },
+  { key: 'period', header: 'Period', sortable: true, className: 'w-1/3 whitespace-nowrap' },
+  { key: 'payments', header: 'Payments', sortable: true, className: 'w-1/3 text-right tabular-nums [&>span]:justify-end' },
   {
     key: 'revenue',
     header: 'Revenue',
     sortable: true,
-    render: (row) => `KES ${Number(row.revenue).toLocaleString()}`,
+    className: 'w-1/3 text-right tabular-nums [&>span]:justify-end',
+    render: (row) => formatCurrency(row.revenue),
   },
 ];
 
 type PaymentMethodRow = { method: string; count: number; revenue: number };
 const paymentMethodColumns: Column<PaymentMethodRow>[] = [
   { key: 'method', header: 'Payment Method', sortable: true, render: (row) => <span className="capitalize">{row.method.replace('_', ' ')}</span> },
-  { key: 'count', header: 'Count', sortable: true },
-  { key: 'revenue', header: 'Revenue', sortable: true, render: (row) => `KES ${Number(row.revenue).toLocaleString()}` },
+  { key: 'count', header: 'Count', sortable: true, className: 'text-right tabular-nums [&>span]:justify-end' },
+  { key: 'revenue', header: 'Revenue', sortable: true, className: 'text-right tabular-nums [&>span]:justify-end', render: (row) => formatCurrency(row.revenue) },
 ];
 
 type ZoneRevenueRow = { zone: string; orders: number; revenue: number };
 const zoneRevenueColumns: Column<ZoneRevenueRow>[] = [
   { key: 'zone', header: 'Zone', sortable: true },
   { key: 'orders', header: 'Orders', sortable: true },
-  { key: 'revenue', header: 'Revenue', sortable: true, render: (row) => `KES ${Number(row.revenue).toLocaleString()}` },
+  { key: 'revenue', header: 'Revenue', sortable: true, className: 'text-right tabular-nums [&>span]:justify-end', render: (row) => formatCurrency(row.revenue) },
 ];
 
 const driverColumns: Column<DriverPerformanceRow>[] = [
@@ -71,7 +73,7 @@ const driverColumns: Column<DriverPerformanceRow>[] = [
     key: 'cash_collected',
     header: 'Cash Collected',
     sortable: true,
-    render: (row) => `KES ${Number(row.cash_collected).toLocaleString()}`,
+    render: (row) => formatCurrency(row.cash_collected),
   },
   {
     key: 'cancellation_rate',
@@ -89,7 +91,7 @@ const topCustomerColumns: Column<TopCustomerRow>[] = [
     key: 'total_spent',
     header: 'Total Spent',
     sortable: true,
-    render: (row) => `KES ${Number(row.total_spent).toLocaleString()}`,
+    render: (row) => formatCurrency(row.total_spent),
   },
 ];
 
@@ -97,7 +99,7 @@ type ExpenseCategoryRow = { category: string; total: number; count: number };
 const expenseCategoryColumns: Column<ExpenseCategoryRow>[] = [
   { key: 'category', header: 'Category', sortable: true, render: (row) => <span className="capitalize">{row.category.replace('_', ' ')}</span> },
   { key: 'count', header: 'Count', sortable: true },
-  { key: 'total', header: 'Total', sortable: true, render: (row) => `KES ${Number(row.total).toLocaleString()}` },
+  { key: 'total', header: 'Total', sortable: true, render: (row) => formatCurrency(row.total) },
 ];
 
 // ── Loading Skeletons ────────────────────────────────────────────────
@@ -119,7 +121,7 @@ const TableSkeleton = () => (
 
 export const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState({
-    start: fmt(oneYearAgo),
+    start: fmt(defaultStart),
     end: fmt(today),
   });
 
@@ -150,7 +152,7 @@ export const ReportsAnalytics = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports & Analytics" description="Comprehensive business intelligence and insights" />
+      <PageHeader title="Reports & Analytics" description="Track sales, operations, customers, and financial performance" />
 
       <DateRangePicker
         startDate={dateRange.start}

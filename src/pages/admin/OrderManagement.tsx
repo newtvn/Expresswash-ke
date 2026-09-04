@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Package, History, Plus, Phone, MessageSquare, Store, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getOrders, bulkUpdateOrderStatus, trackOrder, createOrder } from '@/services/orderService';
@@ -23,7 +22,7 @@ import {
 import { OrderTimeline } from '@/components/admin/OrderTimeline';
 import { getOrderStatusBadgeKey } from '@/constants/orderStatus';
 import { useActiveZones } from '@/hooks/useZones';
-import { PRICING, calculateItemPrice, calculateETA } from '@/services/orderService';
+import { PRICING, calculateItemPrice } from '@/services/orderService';
 
 const STATUS_OPTIONS = [
   { value: '1', label: 'Pending' },
@@ -79,6 +78,14 @@ const SOURCE_LABELS: Record<string, { label: string; icon: React.ElementType; co
   call: { label: 'Call', icon: Phone, color: 'bg-orange-100 text-orange-700' },
   whatsapp: { label: 'WhatsApp', icon: MessageSquare, color: 'bg-emerald-100 text-emerald-700' },
 };
+
+const formatZone = (value?: string) => value
+  ? value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+  : '—';
+
+const formatOrderDate = (value?: string) => value
+  ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })
+  : '—';
 
 export const OrderManagement = () => {
   const navigate = useNavigate();
@@ -299,16 +306,33 @@ export const OrderManagement = () => {
     {
       key: 'items',
       header: 'Items',
-      render: (row) => (
-        <span className="text-sm">{row.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}</span>
-      ),
+      className: 'max-w-[280px]',
+      render: (row) => {
+        const fullSummary = row.items.map((item) => `${item.quantity}× ${item.name}`).join(', ');
+        const summary = row.items.length > 1
+          ? `${row.items[0].quantity}× ${row.items[0].name} + ${row.items.length - 1} more`
+          : fullSummary;
+        return <span className="block truncate text-sm" title={fullSummary}>{summary}</span>;
+      },
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      className: 'whitespace-nowrap text-right tabular-nums [&>span]:justify-end',
+      render: (row) => `KES ${(row.total ?? 0).toLocaleString('en-KE', { maximumFractionDigits: 2 })}`,
+    },
+    {
+      key: 'createdAt',
+      header: 'Placed',
+      className: 'whitespace-nowrap',
+      render: (row) => formatOrderDate(row.createdAt),
     },
     {
       key: 'status',
       header: 'Status',
       render: (row) => <StatusBadge status={getOrderStatusBadgeKey(row.status)} />,
     },
-    { key: 'zone', header: 'Zone', sortable: true },
+    { key: 'zone', header: 'Zone', sortable: true, render: (row) => formatZone(row.zone) },
     {
       key: 'orderSource',
       header: 'Source',
@@ -339,6 +363,7 @@ export const OrderManagement = () => {
             size="icon"
             className="h-8 w-8"
             title="View Timeline"
+            aria-label={`View timeline for ${row.trackingCode}`}
             onClick={() => setTimelineOrder(row)}
           >
             <History className="w-4 h-4" />
@@ -362,7 +387,7 @@ export const OrderManagement = () => {
     <div className="space-y-6">
       <PageHeader title="Order Management" description="View, create, and manage all orders">
         <div className="flex gap-2">
-          <Button onClick={() => { setCreateDialogSource('walkin'); setCreateForm(emptyForm()); }} variant="outline" className="gap-2">
+          <Button onClick={() => { setCreateDialogSource('walkin'); setCreateForm(emptyForm()); }} className="gap-2">
             <Store className="w-4 h-4" />
             Walk-in
           </Button>
@@ -378,10 +403,6 @@ export const OrderManagement = () => {
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button onClick={() => setTrackDialogOpen(true)} variant="outline" className="gap-2">
-          <Package className="w-4 h-4" />
-          Track Order
-        </Button>
         <SearchInput
           onSearch={useCallback((v: string) => { setSearch(v); setPage(1); }, [])}
           placeholder="Search orders..."
@@ -399,6 +420,10 @@ export const OrderManagement = () => {
           </SelectContent>
         </Select>
         <ExportButton data={orders} filename="orders-export" />
+        <Button onClick={() => setTrackDialogOpen(true)} variant="outline" className="gap-2 sm:ml-auto">
+          <Package className="w-4 h-4" />
+          Find by tracking code
+        </Button>
       </div>
 
       {selectedIds.size > 0 && (

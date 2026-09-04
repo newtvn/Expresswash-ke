@@ -83,8 +83,9 @@ export function BusinessSwitcher() {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" size="icon" title="Add business">
+          <Button variant="outline" className="gap-2" title="Add business">
             <Plus className="w-4 h-4" />
+            <span className="hidden xl:inline">Add business</span>
           </Button>
         </DialogTrigger>
         <DialogContent>

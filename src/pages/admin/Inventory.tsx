@@ -3,29 +3,32 @@ import { PageHeader, DataTable, StatusBadge, KPICard } from '@/components/shared
 import type { Column } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Droplets, Wind, Sparkles, PackageCheck, AlertTriangle, RefreshCw, Plus } from 'lucide-react';
+import { Package, Droplets, Wind, Sparkles, PackageCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getWarehouseStats, getProcessingItems } from '@/services/warehouseService';
 import type { WarehouseStats, ProcessingItem } from '@/types';
 
+const humanizeValue = (value?: string) => value
+  ? value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+  : '—';
+
 const itemColumns: Column<ProcessingItem>[] = [
-  { key: 'id', header: 'Item ID', sortable: true },
+  { key: 'id', header: 'Item ID', sortable: true, render: (row) => <span className="font-mono text-xs" title={row.id}>{row.id.slice(0, 8).toUpperCase()}</span> },
   { key: 'orderNumber', header: 'Order', sortable: true },
   { key: 'customerName', header: 'Customer', sortable: true },
-  { key: 'itemName', header: 'Item Name', sortable: true },
-  { key: 'itemType', header: 'Item Type', sortable: true },
+  { key: 'itemName', header: 'Item Name', sortable: true, render: (row) => humanizeValue(row.itemName) },
+  { key: 'itemType', header: 'Item Type', sortable: true, render: (row) => humanizeValue(row.itemType) },
   { key: 'stage', header: 'Stage', render: (row) => <StatusBadge status={row.stage} /> },
-  { key: 'warehouseLocation', header: 'Location' },
+  { key: 'warehouseLocation', header: 'Location', render: (row) => humanizeValue(row.warehouseLocation) },
   {
     key: 'daysInWarehouse',
     header: 'Days In',
     sortable: true,
     render: (row) => (
       <span className={cn('font-medium', row.daysInWarehouse >= 5 && 'text-red-500')}>
-        {row.daysInWarehouse}d
+        {row.daysInWarehouse} {row.daysInWarehouse === 1 ? 'day' : 'days'}
       </span>
     ),
   },
@@ -69,9 +72,8 @@ function TableSkeleton({ rows = 5 }: { rows?: number }) {
 
 /**
  * Admin Inventory Page
- * Stock management with low stock alerts + warehouse item pipeline tracking.
+ * Warehouse item pipeline tracking.
  * KPIs and warehouse pipeline items are fetched from Supabase.
- * Stock levels remain mock data until a stock table is added to the DB.
  */
 export const Inventory = () => {
   const [stats, setStats] = useState<WarehouseStats | null>(null);
@@ -111,23 +113,18 @@ export const Inventory = () => {
   // Build KPI cards from live stats
   const warehouseKPIs = stats
     ? [
-        { label: 'Total Items', value: stats.totalItems, change: 0, changeDirection: 'flat' as const, icon: Package, format: 'number' as const },
-        { label: 'In Washing', value: stats.inWashing, change: 0, changeDirection: 'flat' as const, icon: Droplets, format: 'number' as const },
-        { label: 'Drying', value: stats.inDrying, change: 0, changeDirection: 'flat' as const, icon: Wind, format: 'number' as const },
-        { label: 'Quality Check', value: stats.inQualityCheck, change: 0, changeDirection: 'flat' as const, icon: Sparkles, format: 'number' as const },
-        { label: 'Ready to Dispatch', value: stats.readyForDispatch, change: 0, changeDirection: 'flat' as const, icon: PackageCheck, format: 'number' as const },
-        { label: 'Overdue Items', value: stats.overdueItems, change: 0, changeDirection: 'flat' as const, icon: AlertTriangle, format: 'number' as const },
+        { label: 'Total Items', value: stats.totalItems, icon: Package, format: 'number' as const },
+        { label: 'In Washing', value: stats.inWashing, icon: Droplets, format: 'number' as const },
+        { label: 'Drying', value: stats.inDrying, icon: Wind, format: 'number' as const },
+        { label: 'Quality Check', value: stats.inQualityCheck, icon: Sparkles, format: 'number' as const },
+        { label: 'Ready to Dispatch', value: stats.readyForDispatch, icon: PackageCheck, format: 'number' as const },
+        { label: 'Overdue Items', value: stats.overdueItems, icon: AlertTriangle, format: 'number' as const },
       ]
     : [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Inventory Management" description="Track stock levels and warehouse pipeline">
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
-      </PageHeader>
+      <PageHeader title="Inventory Management" description="Track every customer item through the warehouse pipeline" />
 
       {/* Pipeline Stats */}
       {statsLoading ? (
@@ -166,23 +163,6 @@ export const Inventory = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Stock Table (placeholder — no stock table in DB yet) */}
-      <Card className="bg-card border-border/50">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Stock Levels</h3>
-            <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
-              Coming Soon
-            </Badge>
-          </div>
-          <div className="text-center py-10 text-muted-foreground">
-            <Package className="h-10 w-10 mx-auto mb-3 opacity-50" />
-            <p className="text-sm font-medium">Stock management is coming soon</p>
-            <p className="text-xs mt-1">Inventory tracking will be available in a future update</p>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Warehouse Items Table (real data) */}
       <Card className="bg-card border-border/50">
