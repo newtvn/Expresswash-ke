@@ -48,8 +48,81 @@ const BlobStyles = () => (
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-6px); }
     }
+    .pricing-ribbon-path {
+      transition: stroke-dashoffset 100ms linear, opacity 80ms linear;
+      will-change: stroke-dashoffset, opacity;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .pricing-ribbon-path {
+        opacity: 1 !important;
+        stroke-dasharray: none !important;
+        stroke-dashoffset: 0 !important;
+        transition: none;
+      }
+    }
   `}</style>
 );
+
+const PricingRibbonBackdrop = ({ progress }: { progress: number }) => {
+  const leftProgress = Math.min(1, Math.max(0, progress / 0.92));
+  const rightProgress = Math.min(1, Math.max(0, (progress - 0.045) / 0.88));
+
+  return (
+  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+    <svg
+      viewBox="0 0 1440 1600"
+      preserveAspectRatio="none"
+      className="h-full w-full"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <defs>
+        <linearGradient id="pricing-ribbon-left" x1="0" y1="0" x2="650" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="hsl(var(--brand-blue))" stopOpacity="0.095" />
+          <stop offset="0.46" stopColor="hsl(var(--brand-blue))" stopOpacity="0.055" />
+          <stop offset="1" stopColor="hsl(var(--brand-blue))" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="pricing-ribbon-right" x1="1440" y1="0" x2="790" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="hsl(var(--brand-orange))" stopOpacity="0.085" />
+          <stop offset="0.46" stopColor="hsl(var(--brand-orange))" stopOpacity="0.045" />
+          <stop offset="1" stopColor="hsl(var(--brand-orange))" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+
+      <path
+        d="M-210 132 C126 -52 520 52 500 310 C482 528 78 480 78 766 C78 992 468 910 500 1192 C526 1424 164 1540 -176 1394"
+        stroke="url(#pricing-ribbon-left)"
+        strokeWidth="72"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength="1"
+        className="pricing-ribbon-path"
+        style={{
+          opacity: leftProgress <= 0.002 ? 0 : 1,
+          strokeDasharray: "1 1",
+          strokeDashoffset: 1 - leftProgress,
+        }}
+        vectorEffect="non-scaling-stroke"
+      />
+      <path
+        d="M1652 250 C1322 72 936 164 958 422 C978 642 1362 574 1362 858 C1362 1084 980 1020 940 1292 C910 1490 1210 1580 1614 1466"
+        stroke="url(#pricing-ribbon-right)"
+        strokeWidth="64"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pathLength="1"
+        className="pricing-ribbon-path"
+        style={{
+          opacity: rightProgress <= 0.002 ? 0 : 1,
+          strokeDasharray: "1 1",
+          strokeDashoffset: 1 - rightProgress,
+        }}
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  </div>
+  );
+};
 
 // ── Rate Card Data ────────────────────────────────────────────────────
 
@@ -107,11 +180,14 @@ const RateTable = ({
   hasSqPricing: boolean;
 }) => (
   <div>
-    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">{title}</h4>
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-blue">
+      <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" aria-hidden="true" />
+      {title}
+    </h4>
+    <div className="overflow-x-auto rounded-lg border border-brand-blue/20 shadow-[0_5px_16px_rgba(0,122,244,0.06)]">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-brand-navy text-white">
+          <tr className="bg-brand-blue text-white">
             <th className="text-left px-3 py-2 font-semibold">Type</th>
             {hasSqPricing ? (
               <>
@@ -125,7 +201,7 @@ const RateTable = ({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={row.type} className={i % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+            <tr key={row.type} className={i % 2 === 0 ? "bg-white" : "bg-brand-blue/[0.045]"}>
               <td className="px-3 py-2 text-slate-700">{row.type}</td>
               {hasSqPricing ? (
                 <>
@@ -170,6 +246,41 @@ const PricingCalculator = () => {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [selectedZone, setSelectedZone] = useState(zones[0]);
   const [tab, setTab] = useState<"calculator" | "ratecard">("calculator");
+  const [ribbonProgress, setRibbonProgress] = useState(0);
+  const pricingRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const updateProgress = () => {
+      frame = 0;
+      const section = pricingRef.current;
+      if (!section) return;
+
+      const bounds = section.getBoundingClientRect();
+      const startLine = window.innerHeight * 0.88;
+      const travel = bounds.height + window.innerHeight * 0.72;
+      const nextProgress = Math.min(1, Math.max(0, (startLine - bounds.top) / travel));
+
+      setRibbonProgress((current) =>
+        Math.abs(current - nextProgress) < 0.001 ? current : nextProgress,
+      );
+    };
+
+    const requestUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(updateProgress);
+    };
+
+    updateProgress();
+    window.addEventListener("scroll", requestUpdate, { passive: true });
+    window.addEventListener("resize", requestUpdate);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", requestUpdate);
+      window.removeEventListener("resize", requestUpdate);
+    };
+  }, [tab]);
 
   const updateQuantity = (itemId: string, delta: number) => {
     setQuantities((prev) => {
@@ -187,8 +298,9 @@ const PricingCalculator = () => {
   const { ref: contentRef, visible } = useRevealOnScroll();
 
   return (
-    <section id="pricing" className="relative py-24 bg-white overflow-hidden">
+    <section ref={pricingRef} id="pricing" className="relative py-24 bg-white overflow-hidden">
       <BlobStyles />
+      <PricingRibbonBackdrop progress={ribbonProgress} />
 
       <div className="container mx-auto max-w-7xl px-6 relative z-10">
 
@@ -251,8 +363,8 @@ const PricingCalculator = () => {
                 <RateTable title="Home Cleaning" rows={homeCleaningRates} hasSqPricing />
                 <RateTable title="Office Cleaning" rows={officeCleaningRates} hasSqPricing />
               </div>
-              <div className="md:col-span-2 bg-brand-navy/5 border border-brand-navy/20 rounded-xl p-4 text-sm text-slate-600 space-y-1">
-                <p><span className="font-semibold text-brand-navy">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
+              <div className="md:col-span-2 bg-brand-orange/5 border border-brand-orange/30 rounded-xl p-4 text-sm text-slate-600 space-y-1">
+                <p><span className="font-semibold text-brand-blue">NORMAL:</span> Best effort is put to meet 24 hrs service turn around.</p>
                 <p><span className="font-semibold text-brand-blue">EXPRESS:</span> Service turn around is within 24 hrs without fail. <span className="text-brand-orange font-semibold">+KES 1,000 surcharge.</span></p>
                 <p className="pt-1 text-xs text-slate-400">All prices in KES. VAT (16%) applicable. Custom &amp; Bed sizes — request a quote.</p>
               </div>

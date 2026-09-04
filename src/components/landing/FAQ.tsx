@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import askImg from "@/assets/ask.webp";
 import {
   Accordion,
@@ -33,6 +34,16 @@ const faqs = [
     answer:
       "You or a trusted representative (like your house manager or a family member) just needs to be there to hand over the items. We\u2019ll give you a call beforehand to confirm we are on the way to your location.",
   },
+  {
+    question: "How long does the cleaning process take?",
+    answer:
+      "Most orders are cleaned, dried, quality-checked, and returned within 48 to 72 hours. We confirm the expected delivery window when we collect your items and keep you updated if a specialist treatment needs more time.",
+  },
+  {
+    question: "Are your cleaning products safe for children and pets?",
+    answer:
+      "Yes. We use fabric-appropriate cleaning products and rinse thoroughly so no sticky residue is left behind. Tell us about any allergies or sensitivities during booking and our team will choose the gentlest suitable treatment.",
+  },
 ];
 
 const BubbleStyles = () => (
@@ -60,10 +71,35 @@ const BubbleStyles = () => (
     .faq-bubble-1 { animation: faq-bubble-1 8s ease-in-out infinite; }
     .faq-bubble-2 { animation: faq-bubble-2 10s ease-in-out infinite; }
     .faq-bubble-3 { animation: faq-bubble-3 12s ease-in-out infinite; }
+    @keyframes faq-deal-into-stack {
+      0% {
+        opacity: 0;
+        transform: translate3d(115%, calc(-1 * var(--faq-stack-distance)), 0) rotate(2.5deg) scale(.965);
+      }
+      58% {
+        opacity: 1;
+        transform: translate3d(-16px, 7px, 0) rotate(-.35deg) scale(1.008);
+      }
+      78% { transform: translate3d(7px, -3px, 0) rotate(.12deg) scale(.997); }
+      92% { transform: translate3d(-2px, 1px, 0) rotate(0deg) scale(1.001); }
+      100% { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+    }
+    .faq-stack-card {
+      opacity: 0;
+      will-change: transform, opacity;
+    }
+    .faq-stack-card.is-visible {
+      animation: faq-deal-into-stack 780ms cubic-bezier(.18,.82,.2,1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .faq-bubble-1, .faq-bubble-2, .faq-bubble-3 { animation: none; }
+      .faq-stack-card,
+      .faq-stack-card.is-visible { animation: none; opacity: 1; transform: none; }
+    }
   `}</style>
 );
 
-function useRevealOnScroll(threshold = 0.15) {
+function useRevealOnScroll(threshold = 0.15, rootMargin = "0px") {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
 
@@ -78,18 +114,22 @@ function useRevealOnScroll(threshold = 0.15) {
           observer.disconnect();
         }
       },
-      { threshold }
+      { threshold, rootMargin }
     );
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [threshold]);
+  }, [rootMargin, threshold]);
 
   return { ref, visible };
 }
 
 const FAQ = () => {
   const { ref: sectionRef, visible: sectionVisible } = useRevealOnScroll(0.1);
+  const { ref: stackRef, visible: stackVisible } = useRevealOnScroll(
+    0.08,
+    "0px 0px -28% 0px",
+  );
   const accordionWrapRef = useRef<HTMLDivElement>(null);
   const [lockedHeight, setLockedHeight] = useState<number | undefined>(undefined);
 
@@ -178,17 +218,20 @@ const FAQ = () => {
             className="lg:col-span-3 overflow-hidden"
             style={lockedHeight ? { height: lockedHeight } : undefined}
           >
+            <div ref={stackRef}>
             <Accordion type="single" collapsible defaultValue="faq-0" className="space-y-3">
               {faqs.map((faq, index) => (
                 <AccordionItem
                   key={index}
                   value={`faq-${index}`}
-                  className="bg-white border border-slate-200/80 rounded-xl px-6 data-[state=open]:shadow-md transition-all duration-700 ease-out"
+                  className={`faq-stack-card bg-white border border-slate-200/80 rounded-xl px-6 ${
+                    stackVisible ? "is-visible" : ""
+                  }`}
                   style={{
-                    opacity: sectionVisible ? 1 : 0,
-                    transform: sectionVisible ? "translateY(0)" : "translateY(20px)",
-                    transitionDelay: `${index * 150}ms`,
-                  }}
+                    "--faq-stack-distance": `${index * 76}px`,
+                    animationDelay: `${(faqs.length - 1 - index) * 170}ms`,
+                    zIndex: index + 1,
+                  } as CSSProperties}
                 >
                   <AccordionTrigger className="text-left text-slate-900 font-medium hover:no-underline py-5">
                     {faq.question}
@@ -199,6 +242,7 @@ const FAQ = () => {
                 </AccordionItem>
               ))}
             </Accordion>
+            </div>
           </div>
         </div>
       </div>

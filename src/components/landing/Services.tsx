@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Armchair,
@@ -31,6 +31,13 @@ const CustomStyles = () => (
       0%, 100% { transform: translateY(0) rotate(0deg); }
       50% { transform: translateY(2px) rotate(-2deg); }
     }
+    @keyframes service-bounce-in {
+      0% { opacity: 0; transform: translateY(34px) scale(.94); }
+      58% { opacity: 1; transform: translateY(-10px) scale(1.012); }
+      76% { transform: translateY(5px) scale(.996); }
+      90% { transform: translateY(-2px) scale(1.002); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
     .animate-blob-shape {
       animation: blob-shape 6s ease-in-out infinite;
     }
@@ -40,7 +47,109 @@ const CustomStyles = () => (
     .animate-subtle-float-reverse {
       animation: subtle-float-reverse 5s ease-in-out infinite;
     }
+    .service-card-reveal {
+      opacity: 0;
+    }
+    .service-card-reveal.is-visible {
+      animation: service-bounce-in 680ms cubic-bezier(.2,.82,.22,1) both;
+    }
+    .service-semi-ring path {
+      transition: stroke-dashoffset 90ms linear, opacity 70ms linear;
+      will-change: stroke-dashoffset, opacity;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .service-semi-ring path {
+        opacity: 1 !important;
+        stroke-dasharray: none !important;
+        stroke-dashoffset: 0 !important;
+        transition: none;
+      }
+      .service-card-reveal,
+      .service-card-reveal.is-visible { animation: none; opacity: 1; transform: none; }
+    }
   `}</style>
+);
+
+const semiRingPattern = [
+  { top: 10, radius: "clamp(72px, 6.5vw, 112px)" },
+  { top: 10, radius: "clamp(46px, 4vw, 70px)" },
+  { top: 16, radius: "clamp(58px, 5vw, 88px)" },
+  { top: 22, radius: "clamp(72px, 6.5vw, 108px)" },
+  { top: 28, radius: "clamp(76px, 6.5vw, 112px)" },
+  { top: 28, radius: "clamp(48px, 4vw, 72px)" },
+  { top: 35, radius: "clamp(60px, 5vw, 90px)" },
+  { top: 42, radius: "clamp(74px, 6.5vw, 110px)" },
+  { top: 49, radius: "clamp(72px, 6vw, 106px)" },
+  { top: 49, radius: "clamp(46px, 4vw, 68px)" },
+  { top: 57, radius: "clamp(58px, 5vw, 86px)" },
+  { top: 65, radius: "clamp(72px, 6.5vw, 108px)" },
+  { top: 73, radius: "clamp(74px, 6.5vw, 110px)" },
+  { top: 73, radius: "clamp(46px, 4vw, 70px)" },
+  { top: 79, radius: "clamp(58px, 5vw, 86px)" },
+  { top: 84, radius: "clamp(44px, 4vw, 60px)" },
+  { top: 88, radius: "clamp(36px, 3vw, 50px)" },
+];
+
+const ringColors = [
+  "text-primary/50",
+  "text-[#F4743B]/60",
+  "text-slate-400/55",
+  "text-slate-950/40",
+];
+
+const ringDrawSpans = [5, 3.5, 5, 5, 6, 3.5, 5.5, 5.5, 6, 3.5, 6, 6, 4.5, 3.5, 4.5, 3.5, 3];
+const ringLeads = [0, 1.4, 0.4, 0, 0.8, 1.8, 0.2, 0, 1, 1.6, 0.4, 0, 0.8, 1.8, 0.2, 1, 1.5];
+
+const RingTrack = ({ side, progress }: { side: "left" | "right"; progress: number }) => (
+  <div
+    className={`absolute inset-y-0 w-28 sm:w-40 ${side === "left" ? "left-0" : "right-0"}`}
+  >
+    {semiRingPattern.map((ring, index) => {
+      const top = Math.min(ring.top + (side === "right" && index % 3 === 0 ? 2 : 0), 90);
+      const sideLead = side === "right" ? (index % 4) * 0.35 : 0;
+      const localProgress = Math.max(
+        0,
+        Math.min(1, (progress * 100 - top + ringLeads[index] + sideLead) / ringDrawSpans[index])
+      );
+
+      return (
+        <svg
+          key={`${side}-${ring.top}-${index}`}
+          viewBox="0 0 102 202"
+          fill="none"
+          className={`service-semi-ring absolute ${ringColors[(index + (side === "right" ? 2 : 0)) % ringColors.length]}`}
+          style={{
+            top: `${top}%`,
+            width: ring.radius,
+            aspectRatio: "1 / 2",
+            [side]: 0,
+            transform: side === "right" ? "scaleX(-1)" : undefined,
+          }}
+        >
+          <path
+            pathLength="1"
+            d="M1 1 A100 100 0 0 1 1 201"
+            stroke="currentColor"
+            strokeWidth="1.35"
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            style={{
+              opacity: localProgress <= 0.002 ? 0 : 1,
+              strokeDasharray: "1 1",
+              strokeDashoffset: 1 - localProgress,
+            }}
+          />
+        </svg>
+      );
+    })}
+  </div>
+);
+
+const EdgeRings = ({ progress }: { progress: number }) => (
+  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+    <RingTrack side="left" progress={progress} />
+    <RingTrack side="right" progress={progress} />
+  </div>
 );
 
 /* ───────────────────────────────────────────────────────────────────
@@ -298,6 +407,63 @@ const Services = () => {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [activeService, setActiveService] = useState<typeof services[0] | null>(null);
+  const [ringProgress, setRingProgress] = useState(0);
+  const [cardsVisible, setCardsVisible] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const updateRings = () => {
+      frame = 0;
+      const section = sectionRef.current;
+      if (!section) return;
+
+      const bounds = section.getBoundingClientRect();
+      const scrollFrontier = window.innerHeight * 0.75;
+      const nextProgress = Math.max(0, Math.min(1, (scrollFrontier - bounds.top) / bounds.height));
+
+      setRingProgress((current) =>
+        Math.abs(current - nextProgress) < 0.001 ? current : nextProgress
+      );
+    };
+
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(updateRings);
+    };
+
+    updateRings();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  useEffect(() => {
+    const cards = cardsRef.current;
+    const firstCard = cards?.firstElementChild;
+    if (!firstCard) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCardsVisible(true);
+          observer.disconnect();
+        }
+      },
+      {
+        threshold: 0.2,
+        rootMargin: "0px 0px -10% 0px",
+      }
+    );
+
+    observer.observe(firstCard);
+    return () => observer.disconnect();
+  }, []);
 
   const handleServiceClick = (service: typeof services[0]) => {
     if (isAuthenticated) {
@@ -311,8 +477,9 @@ const Services = () => {
     <>
       <FoamTransition />
 
-      <section id="services" className="pt-12 pb-24 bg-[#f2f8fc]">
+      <section ref={sectionRef} id="services" className="relative overflow-hidden bg-[#f2f8fc] pt-12 pb-24">
         <CustomStyles />
+        <EdgeRings progress={ringProgress} />
 
         <div className="container mx-auto max-w-7xl px-6 relative z-10">
 
@@ -331,9 +498,12 @@ const Services = () => {
           </div>
 
           {/* 3x2 Services Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {services.map((service, index) => {
               const Icon = service.icon;
+              const isTopRow = index < 3;
+              const sequenceIndex = isTopRow ? 2 - index : index - 3;
+              const delay = isTopRow ? sequenceIndex * 180 : 720 + sequenceIndex * 180;
 
               return (
                 <div
@@ -342,8 +512,10 @@ const Services = () => {
                   tabIndex={0}
                   onClick={() => handleServiceClick(service)}
                   onKeyDown={(e) => e.key === "Enter" && handleServiceClick(service)}
-                  className="animated-card group bg-white p-8 rounded-[5px] shadow-[0_4px_20px_rgb(0,0,0,0.04)] flex flex-col items-center text-center cursor-pointer"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className={`service-card-reveal animated-card group bg-white p-8 rounded-[5px] shadow-[0_4px_20px_rgb(0,0,0,0.04)] flex flex-col items-center text-center cursor-pointer ${
+                    cardsVisible ? "is-visible" : ""
+                  }`}
+                  style={{ animationDelay: `${delay}ms` }}
                 >
                   <span className="animated-card__span" aria-hidden />
                   <span className="animated-card__span" aria-hidden />
