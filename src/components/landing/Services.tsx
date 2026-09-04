@@ -47,13 +47,19 @@ const CustomStyles = () => (
    2. FOAM / BUBBLE TRANSITION SVG
    ─────────────────────────────────────────────────────────────────── */
 const FoamTransition = () => (
-  <div className="relative w-full z-30 overflow-hidden" style={{ marginTop: -155, marginBottom: -1 }}>
+  <div className="foam-transition-reveal relative w-full z-30 overflow-hidden" style={{ marginTop: -155, marginBottom: -1 }}>
     <style>{`
+      @keyframes foam-reveal { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: translateY(0) } }
       @keyframes foam-drift-a { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(-7px) } }
       @keyframes foam-drift-b { 0%,100%{ transform: translateY(0) } 50%{ transform: translateY(6px) } }
+      .foam-transition-reveal { opacity: 0; animation: foam-reveal 0.8s ease-out 2.4s forwards; }
       .foam-drift-a { animation: foam-drift-a 6s ease-in-out infinite; }
       .foam-drift-b { animation: foam-drift-b 8s ease-in-out infinite; }
-      @media (prefers-reduced-motion: reduce){ .foam-drift-a,.foam-drift-b{ animation: none } }
+      @media (min-width: 1024px) { .foam-transition-reveal { animation-delay: 5.75s; } }
+      @media (prefers-reduced-motion: reduce){
+        .foam-transition-reveal { animation: none; opacity: 1; transform: none; }
+        .foam-drift-a,.foam-drift-b{ animation: none }
+      }
     `}</style>
     <svg
       viewBox="0 0 1440 240"

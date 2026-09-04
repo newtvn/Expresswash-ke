@@ -128,13 +128,13 @@ export const HeroQuickBooking = () => {
 
   return (
     <div
-      className={`container relative z-40 mx-auto max-w-[1380px] px-4 transition-all duration-1000 ease-out motion-reduce:transform-none motion-reduce:transition-none sm:px-6 ${
+      className={`container relative z-40 mx-auto max-w-[1380px] px-4 transition-all delay-0 duration-700 ease-out motion-reduce:transform-none motion-reduce:transition-none lg:[transition-delay:2500ms] sm:px-6 ${
         isVisible ? 'translate-y-0 opacity-100' : 'translate-y-5 opacity-0'
       }`}
     >
       <form
         onSubmit={handleSubmit}
-        className="overflow-hidden rounded-3xl border border-white bg-white shadow-[0_24px_60px_-24px_rgba(30,64,175,0.35)]"
+        className="overflow-hidden rounded-3xl bg-white shadow-[0_24px_60px_-24px_rgba(30,64,175,0.35)]"
         aria-label="Quick booking"
       >
         <div

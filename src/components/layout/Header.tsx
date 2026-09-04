@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AnimatedButton } from "@/components/ui/animated-button";
-import { LayoutDashboard, Phone } from "lucide-react";
+import { Clock, LayoutDashboard, Phone, Smartphone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/authStore";
 import { getDefaultRouteForRole } from "@/config/permissions";
@@ -75,10 +75,32 @@ const Header = () => {
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
           scrolled || mobileMenuOpen
-            ? "bg-background/80 backdrop-blur-xl shadow-apple-sm border-b border-border/50"
+            ? "bg-white/55 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_10px_30px_-12px_rgba(15,23,42,0.18)] border-b border-white/50"
             : "bg-transparent"
         }`}
       >
+        {/* Top utility bar — working hours + phone (hides on scroll) */}
+        <div
+          className={`w-full overflow-hidden rounded-b-3xl bg-primary text-white transition-all duration-300 ${
+            scrolled ? "max-h-0 opacity-0" : "max-h-16 opacity-100"
+          }`}
+        >
+          <div className="container mx-auto flex h-9 items-center justify-between px-4 text-[11px] sm:text-sm">
+            <span className="inline-flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
+              <span>Working Hours: Mon–Sat, 7AM–7PM</span>
+            </span>
+            <a
+              href={BUSINESS_PHONE_HREF}
+              className="inline-flex items-center gap-2 font-medium transition-opacity hover:opacity-80"
+              aria-label={`Call Express Carpets on ${BUSINESS_PHONE_LABEL}`}
+            >
+              <Smartphone className="h-[18px] w-[18px] sm:h-5 sm:w-5" aria-hidden="true" />
+              <span>{BUSINESS_PHONE_LABEL}</span>
+            </a>
+          </div>
+        </div>
+
         <div className="container mx-auto">
           <nav className="flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
@@ -87,7 +109,7 @@ const Header = () => {
             </Link>
 
             {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-8">
+            <div className="hidden lg:flex items-center gap-8">
               {navLinks.map((link) => (
                 <Link
                   key={link.name}
@@ -100,7 +122,7 @@ const Header = () => {
             </div>
 
             {/* Desktop CTA */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-3">
               {isAuthenticated && user ? (
                 <>
                   <Button variant="ghost" size="sm" asChild>
@@ -155,7 +177,7 @@ const Header = () => {
 
             {/* Mobile Menu Toggle - Animated Hamburger */}
             <button
-              className="md:hidden relative z-50 w-11 h-11 flex items-center justify-center rounded-xl transition-colors duration-200 active:bg-primary/10 touch-manipulation"
+              className="relative z-50 flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200 active:bg-primary/10 touch-manipulation lg:hidden"
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               aria-expanded={mobileMenuOpen}
@@ -184,7 +206,7 @@ const Header = () => {
 
       {/* Mobile Menu Overlay */}
       <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-300 ${
+        className={`fixed inset-0 z-40 transition-all duration-300 lg:hidden ${
           mobileMenuOpen ? "visible" : "invisible pointer-events-none"
         }`}
       >
