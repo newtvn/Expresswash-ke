@@ -32,6 +32,8 @@ import {
 } from '@/services/accounting/application';
 import { enqueueNotification } from '@/services/accounting/outbox';
 import type { AccountingItem, ChartAccount, Contact, InvoiceLineInput, TaxRate } from '@/types/accounting';
+import { isOutstandingInvoiceOverdue } from '@/services/billingMetrics';
+import { toLocalDateString } from '@/lib/localDate';
 
 // ---------- Types ----------
 
@@ -180,10 +182,6 @@ const formatDate = (value?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
 
-const localDate = (date = new Date()): string => (
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-);
-
 function mapInvoice(row: Record<string, unknown>): Invoice {
   const total = toAmount(row.total);
   const paidAmount = toAmount(row.paid_amount);
@@ -284,7 +282,7 @@ async function createInvoiceFromOrder(orderId: string): Promise<{ success: boole
     paid_amount: 0,
     balance: total,
     status: 'pending',
-    due_date: localDate(dueDate),
+    due_date: toLocalDateString(dueDate),
     due_at: dueDate.toISOString(),
     issued_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
@@ -369,11 +367,7 @@ const invoiceCanBeEdited = (invoice: Invoice): boolean => (
 const hasOutstandingBalance = (invoice: Invoice): boolean => invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.balance > 0;
 const isPartialStatus = (status: InvoiceStatus): boolean => status === 'partial' || status === 'partially_paid';
 const isPastDue = (invoice: Invoice): boolean => {
-  if (!hasOutstandingBalance(invoice) || !invoice.due_date) return false;
-  const dueDate = invoice.due_date.slice(0, 10);
-  const today = new Date();
-  const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  return /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && dueDate < todayLocal;
+  return isOutstandingInvoiceOverdue(invoice.due_date, invoice.balance, invoice.status);
 };
 
 function openWhatsApp(phone: string, invoiceNumber: string) {
@@ -414,7 +408,7 @@ export const AdminInvoices = () => {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceForm, setInvoiceForm] = useState({
     contactId: '',
-    issueDate: localDate(),
+    issueDate: toLocalDateString(new Date()),
     dueDate: '',
     notes: '',
     status: 'pending' as 'draft' | 'pending' | 'sent',
@@ -604,7 +598,7 @@ export const AdminInvoices = () => {
     setEditingInvoice(null);
     setInvoiceForm({
       contactId: '',
-      issueDate: localDate(),
+      issueDate: toLocalDateString(new Date()),
       dueDate: '',
       notes: '',
       status: 'pending',
@@ -626,7 +620,7 @@ export const AdminInvoices = () => {
     setEditingInvoice(invoice);
     setInvoiceForm({
       contactId: matchedContact?.id ?? '',
-      issueDate: invoice.created_at ? localDate(new Date(invoice.created_at)) : localDate(),
+      issueDate: invoice.created_at ? toLocalDateString(new Date(invoice.created_at)) : toLocalDateString(new Date()),
       dueDate: invoice.due_date || '',
       notes: invoice.notes ?? '',
       status: invoice.status === 'draft' ? 'draft' : 'pending',

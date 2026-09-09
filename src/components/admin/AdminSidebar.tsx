@@ -212,7 +212,7 @@ export function AdminSidebar() {
                 sideOffset={4}
               >
                 <DropdownMenuItem asChild>
-                  <Link to="/portal/profile">Profile</Link>
+                  <Link to={`/admin/users/${user?.id}`}>My Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/admin/settings">Settings</Link>

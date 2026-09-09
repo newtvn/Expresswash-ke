@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Invoice } from '@/types';
-import { computeBillingMetrics } from './billingMetrics';
+import { computeBillingMetrics, isOutstandingInvoiceOverdue } from './billingMetrics';
 
 function invoice(overrides: Partial<Invoice>): Invoice {
   return {
@@ -63,5 +63,23 @@ describe('computeBillingMetrics', () => {
 
     expect(result.outstanding).toBe(750);
     expect(result.overdue).toBe(750);
+  });
+});
+
+describe('isOutstandingInvoiceOverdue', () => {
+  const today = new Date(2026, 8, 9);
+
+  it('treats an outstanding invoice before today as overdue', () => {
+    expect(isOutstandingInvoiceOverdue('2026-09-08', 750, 'pending', today)).toBe(true);
+  });
+
+  it('does not treat invoices due today as overdue', () => {
+    expect(isOutstandingInvoiceOverdue('2026-09-09', 750, 'pending', today)).toBe(false);
+  });
+
+  it('excludes settled and non-issued invoices', () => {
+    expect(isOutstandingInvoiceOverdue('2026-09-08', 0, 'paid', today)).toBe(false);
+    expect(isOutstandingInvoiceOverdue('2026-09-08', 750, 'draft', today)).toBe(false);
+    expect(isOutstandingInvoiceOverdue('2026-09-08', 750, 'cancelled', today)).toBe(false);
   });
 });

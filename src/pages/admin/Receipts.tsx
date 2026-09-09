@@ -18,15 +18,9 @@ import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import { useAuthStore } from '@/stores/authStore';
 import { BUSINESS_ALL, useBusinessStore } from '@/stores/businessStore';
+import { toLocalDateString } from '@/lib/localDate';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
-
-const localDate = (date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 // ---------- Types ----------
 
@@ -124,15 +118,15 @@ export const Receipts = () => {
     description: '',
     amount: '',
     category: '',
-    date: localDate(),
+    date: toLocalDateString(new Date()),
     tags: '',
     notes: '',
     reference_number: '',
   });
 
   const queryFilters = {
-    from: dateRange.from ? localDate(dateRange.from) : undefined,
-    to: dateRange.to ? localDate(dateRange.to) : undefined,
+    from: toLocalDateString(dateRange.from),
+    to: toLocalDateString(dateRange.to),
     category: categoryFilter,
     tag: tagFilter || undefined,
     search: search || undefined,
@@ -150,7 +144,7 @@ export const Receipts = () => {
     onSuccess: () => {
       toast.success('Receipt saved');
       setAddOpen(false);
-      setForm({ vendor: '', description: '', amount: '', category: '', date: localDate(), tags: '', notes: '', reference_number: '' });
+      setForm({ vendor: '', description: '', amount: '', category: '', date: toLocalDateString(new Date()), tags: '', notes: '', reference_number: '' });
       qc.invalidateQueries({ queryKey: ['admin', 'receipts'] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -163,13 +157,15 @@ export const Receipts = () => {
       setVoidTarget(null);
       setVoidReason('');
       qc.invalidateQueries({ queryKey: ['admin', 'receipts'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+      qc.invalidateQueries({ queryKey: ['accounting'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const activeReceipts = receipts.filter((receipt) => receipt.status === 'active');
   const totalAmount = activeReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
-  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const currentMonth = toLocalDateString(new Date()).slice(0, 7);
 
   // Collect all unique tags for quick filter
   const allTags = Array.from(new Set(receipts.flatMap((r) => r.tags)));

@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toLocalDateString } from '@/lib/localDate';
 import { cn } from '@/lib/utils';
 
 type DateValue = { from: Date | undefined; to: Date | undefined };
@@ -21,7 +22,7 @@ type DateRangePickerProps = (
   actions?: ReactNode;
 };
 
-const toInputDate = (date?: Date) => date ? date.toISOString().split('T')[0] : '';
+const toInputDate = (date?: Date) => toLocalDateString(date) ?? '';
 const detectPreset = (start: string, end: string): number | null => {
   if (!start || !end) return null;
   const days = Math.round((new Date(`${end}T00:00:00`).getTime() - new Date(`${start}T00:00:00`).getTime()) / 86_400_000);

@@ -331,7 +331,8 @@ export async function listTaxRates(): Promise<TaxRate[]> {
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapTaxRate);
 }
 
@@ -341,7 +342,8 @@ export async function listAccountingItems(): Promise<AccountingItem[]> {
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapAccountingItem);
 }
 
@@ -429,7 +431,8 @@ export async function listBills(limit = 100, business?: string): Promise<Bill[]>
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapBill);
 }
 
@@ -525,7 +528,8 @@ export async function listCreditNotes(limit = 100, business?: string): Promise<C
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapCreditNote);
 }
 
@@ -554,7 +558,8 @@ export async function listCustomerRefunds(limit = 100, business?: string): Promi
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapCustomerRefund);
 }
 
@@ -597,7 +602,8 @@ export async function getCustomerPaymentAllocationOptions(paymentId: string): Pr
     { maxRetries: 2 },
   );
 
-  if (error || !data) return null;
+  if (error) throw new Error(error.message);
+  if (!data) return null;
   return mapAllocationOptions(data as Record<string, unknown>);
 }
 
@@ -607,7 +613,8 @@ export async function listCustomerCreditBalances(business?: string): Promise<Cus
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return ((data ?? []) as Record<string, unknown>[]).map(mapCustomerCreditBalance);
 }
 

@@ -67,7 +67,8 @@ export async function listNotificationOutbox(status?: NotificationOutboxItem['st
 
   const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapOutboxItem);
 }
 

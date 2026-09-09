@@ -27,6 +27,7 @@ import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
 import { toBusinessParam } from '@/types/business';
+import { toLocalDateString } from '@/lib/localDate';
 import { AccountsReportsPanel } from '@/components/admin/accounts/AccountsReportsPanel';
 import { LedgerJournalEntries } from '@/components/admin/accounts/LedgerJournalEntries';
 import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
@@ -156,10 +157,6 @@ const formatDate = (value?: string | null): string => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
-
-const localDateString = (date?: Date): string | undefined => date
-  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  : undefined;
 
 function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -400,7 +397,7 @@ export const Accounts = () => {
   });
   const [billForm, setBillForm] = useState({
     supplierContactId: '',
-    issueDate: localDateString(new Date())!,
+    issueDate: toLocalDateString(new Date()),
     dueDate: '',
     notes: '',
     lines: [makeBillLine()],
@@ -428,7 +425,7 @@ export const Accounts = () => {
     description: '',
     category: '',
     amount: '',
-    expense_date: localDateString(new Date())!,
+    expense_date: toLocalDateString(new Date()),
     payment_method: 'mpesa',
     notes: '',
   });
@@ -437,7 +434,7 @@ export const Accounts = () => {
     creditAccountId: '',
     amount: '',
     description: '',
-    date: localDateString(new Date())!,
+    date: toLocalDateString(new Date()),
   });
 
   // Business scope for reports/overview/operational lists (super_admin can switch).
@@ -451,17 +448,17 @@ export const Accounts = () => {
   const isConsolidated = selectedBusiness === BUSINESS_ALL;
   const consolidatedWriteHint = 'Select a specific business to create records';
 
-  const reportFrom = localDateString(dateRange.from);
-  const reportTo = localDateString(dateRange.to);
+  const reportFrom = toLocalDateString(dateRange.from);
+  const reportTo = toLocalDateString(dateRange.to);
 
-  const { data: summary } = useQuery({
+  const { data: summary, error: summaryError } = useQuery({
     queryKey: ['accounts', 'summary', reportFrom, reportTo],
     queryFn: () => fetchAccountSummary(reportFrom, reportTo),
     enabled: selectedBusiness === 'expresswash',
     refetchInterval: 60000,
   });
 
-  const { data: expenses = [] } = useQuery({
+  const { data: expenses = [], error: expensesError } = useQuery({
     queryKey: ['accounts', 'expenses', selectedBusiness],
     queryFn: () => fetchExpenses(selectedBusiness),
   });
@@ -475,12 +472,12 @@ export const Accounts = () => {
     ),
   });
 
-  const { data: agingData = [] } = useQuery({
+  const { data: agingData = [], error: agingDataError } = useQuery({
     queryKey: ['accounts', 'aging', selectedBusiness],
     queryFn: () => fetchAgingSummary(selectedBusiness),
   });
 
-  const { data: accountingSetup } = useQuery({
+  const { data: accountingSetup, error: accountingSetupError } = useQuery({
     queryKey: ['accounting', 'setup'],
     queryFn: getAccountingSetup,
   });
@@ -494,7 +491,7 @@ export const Accounts = () => {
     queryFn: () => getLedgerOverview(selectedBusiness),
   });
 
-  const { data: operationalAccounting } = useQuery({
+  const { data: operationalAccounting, error: operationalAccountingError } = useQuery({
     queryKey: ['accounting', 'operational', selectedBusiness],
     queryFn: () => getOperationalAccounting(selectedBusiness),
   });
@@ -522,7 +519,7 @@ export const Accounts = () => {
     queryFn: () => getLedgerBalanceSheet(reportTo, selectedBusiness),
   });
 
-  const { data: vatSummary } = useQuery({
+  const { data: vatSummary, error: vatSummaryError } = useQuery({
     queryKey: ['accounting', 'reports', 'vat', selectedBusiness, reportFrom, reportTo],
     queryFn: () => getVatSummary(reportFrom, reportTo, selectedBusiness),
   });
@@ -532,12 +529,12 @@ export const Accounts = () => {
     queryFn: () => getLedgerCashFlow(reportFrom, reportTo, selectedBusiness),
   });
 
-  const { data: receivablesAging } = useQuery({
+  const { data: receivablesAging, error: receivablesAgingError } = useQuery({
     queryKey: ['accounting', 'reports', 'receivables-aging', selectedBusiness, reportTo],
     queryFn: () => getReceivablesAging(reportTo, selectedBusiness),
   });
 
-  const { data: payablesAging } = useQuery({
+  const { data: payablesAging, error: payablesAgingError } = useQuery({
     queryKey: ['accounting', 'reports', 'payables-aging', selectedBusiness, reportTo],
     queryFn: () => getPayablesAging(reportTo, selectedBusiness),
   });
@@ -549,25 +546,25 @@ export const Accounts = () => {
       + receivablesAging.days61To90 + receivablesAging.days90Plus
     : 0;
 
-  const { data: selectedPaymentEvents = [], isLoading: selectedPaymentEventsLoading } = useQuery({
+  const { data: selectedPaymentEvents = [], isLoading: selectedPaymentEventsLoading, error: selectedPaymentEventsError } = useQuery({
     queryKey: ['payments', selectedPayment?.id, 'events'],
     queryFn: () => fetchPaymentEvents(selectedPayment!.id),
     enabled: Boolean(selectedPayment?.id),
   });
 
-  const { data: allocationOptions, isLoading: allocationOptionsLoading } = useQuery({
+  const { data: allocationOptions, isLoading: allocationOptionsLoading, error: allocationOptionsError } = useQuery({
     queryKey: ['payments', allocationTarget?.id, 'allocation-options'],
     queryFn: () => getCustomerPaymentAllocationOptions(allocationTarget!.id),
     enabled: Boolean(allocationTarget?.id),
   });
 
-  const { data: salesByItem = [] } = useQuery({
+  const { data: salesByItem = [], error: salesByItemError } = useQuery({
     queryKey: ['accounts', 'sales-by-item', reportFrom, reportTo],
     queryFn: () => fetchSalesByItem(reportFrom, reportTo),
     enabled: selectedBusiness === 'expresswash',
   });
 
-  const { data: notificationOutbox = [] } = useQuery({
+  const { data: notificationOutbox = [], error: notificationOutboxError } = useQuery({
     queryKey: ['accounting', 'notification-outbox'],
     queryFn: () => listNotificationOutbox(),
   });
@@ -581,7 +578,7 @@ export const Accounts = () => {
         description: '',
         category: '',
         amount: '',
-        expense_date: localDateString(new Date())!,
+        expense_date: toLocalDateString(new Date()),
         payment_method: 'mpesa',
         notes: '',
       });
@@ -600,7 +597,7 @@ export const Accounts = () => {
         creditAccountId: '',
         amount: '',
         description: '',
-        date: localDateString(new Date())!,
+        date: toLocalDateString(new Date()),
       });
       qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['accounting'] });
@@ -611,7 +608,7 @@ export const Accounts = () => {
   const reverseJournalMutation = useMutation({
     mutationFn: (entry: JournalEntry) => reversePostedJournalEntry(
       entry.id,
-      localDateString(new Date())!,
+      toLocalDateString(new Date()),
       `Reversal for ${entry.entryNumber}`,
     ),
     onSuccess: (result) => {
@@ -651,7 +648,7 @@ export const Accounts = () => {
       setAddBillOpen(false);
       setBillForm({
         supplierContactId: '',
-        issueDate: localDateString(new Date())!,
+        issueDate: toLocalDateString(new Date()),
         dueDate: '',
         notes: '',
         lines: [makeBillLine()],
@@ -832,7 +829,23 @@ export const Accounts = () => {
   const formatCurrency = (value: number | undefined) => `KES ${(value ?? 0).toLocaleString()}`;
   const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
   const canReplayOutbox = (item: NotificationOutboxItem) => item.status === 'failed' || item.status === 'dead_letter';
-  const accountingLoadError = paymentsError || ledgerError || profitLossError || balanceSheetError || cashFlowError;
+  const accountingLoadError = summaryError
+    || expensesError
+    || paymentsError
+    || agingDataError
+    || accountingSetupError
+    || ledgerError
+    || operationalAccountingError
+    || profitLossError
+    || balanceSheetError
+    || vatSummaryError
+    || cashFlowError
+    || receivablesAgingError
+    || payablesAgingError
+    || salesByItemError
+    || notificationOutboxError
+    || selectedPaymentEventsError
+    || allocationOptionsError;
   const reportRangeLabel = reportFrom || reportTo
     ? `${reportFrom ?? 'Start'} to ${reportTo ?? 'Today'}`
     : 'All time';
@@ -1023,7 +1036,7 @@ export const Accounts = () => {
                 size="sm"
                 disabled={paymentsReceived.length === 0}
                 onClick={() => downloadCsv(
-                  `payments-${selectedBusiness}-${localDateString(new Date())}.csv`,
+                  `payments-${selectedBusiness}-${toLocalDateString(new Date())}.csv`,
                   ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
                   paymentsReceived.map((p) => [
                     formatDate(p.created_at),

@@ -40,13 +40,7 @@ import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import { useAuthStore } from '@/stores/authStore';
 import { BUSINESS_ALL, useBusinessStore } from '@/stores/businessStore';
-
-const localDate = (date = new Date()): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { toLocalDateString } from '@/lib/localDate';
 
 const EXPENSE_CATEGORIES = [
   'fuel',
@@ -140,10 +134,10 @@ export const ProfitExpense = () => {
   const [formDescription, setFormDescription] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formMethod, setFormMethod] = useState('');
-  const [formDate, setFormDate] = useState(localDate());
+  const [formDate, setFormDate] = useState(toLocalDateString(new Date()));
 
-  const reportFrom = dateRange.from ? localDate(dateRange.from) : undefined;
-  const reportTo = dateRange.to ? localDate(dateRange.to) : undefined;
+  const reportFrom = toLocalDateString(dateRange.from);
+  const reportTo = toLocalDateString(dateRange.to);
 
   // Queries
   const { data: expenses = [], isLoading: expensesLoading, error: expensesError } = useQuery({
@@ -209,7 +203,7 @@ export const ProfitExpense = () => {
     setFormDescription('');
     setFormAmount('');
     setFormMethod('');
-    setFormDate(localDate());
+    setFormDate(toLocalDateString(new Date()));
   };
 
   const handleAddExpense = () => {
