@@ -6,10 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
-import { getInvoices } from '@/services/invoiceService';
+import { getAllInvoices } from '@/services/invoiceService';
 import { toast } from 'sonner';
 import type { Invoice } from '@/types';
 import { InvoiceDownloadButton } from '@/components/shared';
+import { computeBillingMetrics, invoiceIsOverdue } from '@/services/billingMetrics';
+import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
+import { useAuthStore } from '@/stores/authStore';
+import { useBusinessStore } from '@/stores/businessStore';
 
 // ── Row shape used by DataTable ──────────────────────────────────────
 
@@ -20,6 +24,8 @@ interface InvoiceRow {
   orderNumber: string;
   customer: string;
   amount: number;
+  paidAmount: number;
+  balance: number;
   status: string;
   issuedDate: string;
   dueDate: string;
@@ -34,48 +40,13 @@ function toRow(inv: Invoice): InvoiceRow {
     orderNumber: inv.orderNumber || '--',
     customer: inv.customerName,
     amount: inv.total,
+    paidAmount: inv.amountPaid,
+    balance: inv.balance,
     status: inv.status,
     issuedDate: new Date(inv.issuedAt).toLocaleDateString('en-KE'),
     dueDate: new Date(inv.dueAt).toLocaleDateString('en-KE'),
     paidDate: inv.paidAt ? new Date(inv.paidAt).toLocaleDateString('en-KE') : '--',
   };
-}
-
-// ── KPI computation ──────────────────────────────────────────────────
-
-interface KPIData {
-  totalInvoiced: number;
-  paid: number;
-  outstanding: number;
-  overdue: number;
-}
-
-function computeKPIs(invoices: Invoice[]): KPIData {
-  let totalInvoiced = 0;
-  let paid = 0;
-  let outstanding = 0;
-  let overdue = 0;
-
-  for (const inv of invoices) {
-    totalInvoiced += inv.total;
-
-    switch (inv.status) {
-      case 'paid':
-        paid += inv.total;
-        break;
-      case 'overdue':
-        overdue += inv.total;
-        break;
-      case 'sent':
-      case 'partially_paid':
-        outstanding += inv.total;
-        break;
-      default:
-        break;
-    }
-  }
-
-  return { totalInvoiced, paid, outstanding, overdue };
 }
 
 // ── Columns ──────────────────────────────────────────────────────────
@@ -89,6 +60,18 @@ const invoiceColumns: Column<InvoiceRow>[] = [
     header: 'Amount (KES)',
     sortable: true,
     render: (row) => <span className="font-medium">KES {row.amount.toLocaleString()}</span>,
+  },
+  {
+    key: 'paidAmount',
+    header: 'Paid (KES)',
+    sortable: true,
+    render: (row) => <span className="tabular-nums">KES {row.paidAmount.toLocaleString()}</span>,
+  },
+  {
+    key: 'balance',
+    header: 'Balance (KES)',
+    sortable: true,
+    render: (row) => <span className="font-medium tabular-nums">KES {row.balance.toLocaleString()}</span>,
   },
   { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
   { key: 'issuedDate', header: 'Issued', sortable: true },
@@ -159,6 +142,9 @@ function TableSkeleton() {
  */
 export const BillingFinancials = () => {
   const navigate = useNavigate();
+  const rawSelectedBusiness = useBusinessStore((state) => state.selectedBusiness);
+  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'all';
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -169,9 +155,7 @@ export const BillingFinancials = () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch a large page to get all invoices for KPI calculation
-      const result = await getInvoices({ page: 1, limit: 500 });
-      setInvoices(result.data);
+      setInvoices(await getAllInvoices({ business: selectedBusiness }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load invoices';
       setError(message);
@@ -179,18 +163,18 @@ export const BillingFinancials = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedBusiness]);
 
   useEffect(() => {
     fetchInvoices();
   }, [fetchInvoices]);
 
   // Derived data
-  const kpiData = useMemo(() => computeKPIs(invoices), [invoices]);
+  const kpiData = useMemo(() => computeBillingMetrics(invoices), [invoices]);
 
   const allRows = useMemo(() => invoices.map(toRow), [invoices]);
   const pendingRows = useMemo(
-    () => invoices.filter((i) => ['sent', 'draft', 'partially_paid'].includes(i.status)).map(toRow),
+    () => invoices.filter((i) => ['draft', 'pending', 'sent', 'partial', 'partially_paid'].includes(i.status) && !invoiceIsOverdue(i)).map(toRow),
     [invoices],
   );
   const paidRows = useMemo(
@@ -198,7 +182,7 @@ export const BillingFinancials = () => {
     [invoices],
   );
   const overdueRows = useMemo(
-    () => invoices.filter((i) => i.status === 'overdue').map(toRow),
+    () => invoices.filter((i) => invoiceIsOverdue(i)).map(toRow),
     [invoices],
   );
 
@@ -213,8 +197,8 @@ export const BillingFinancials = () => {
         format: 'currency' as const,
       },
       {
-        label: 'Paid',
-        value: kpiData.paid,
+        label: 'Received',
+        value: kpiData.received,
         change: 0,
         changeDirection: 'flat' as const,
         icon: CheckCircle2,
@@ -243,7 +227,10 @@ export const BillingFinancials = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Billing & Financials" description="Manage invoices and track payments">
-        <ExportButton data={allRows} filename="invoices-export" />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <BusinessSwitcher />
+          <ExportButton data={allRows} filename={`invoices-${selectedBusiness}`} />
+        </div>
       </PageHeader>
 
       {/* Summary KPIs */}
@@ -268,8 +255,8 @@ export const BillingFinancials = () => {
       {loading ? (
         <TableSkeleton />
       ) : (
-        <Tabs defaultValue={initialTab} className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue={initialTab} className="min-w-0 space-y-4">
+          <TabsList className="h-auto max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="all">All Invoices ({allRows.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({pendingRows.length})</TabsTrigger>
             <TabsTrigger value="paid">Paid ({paidRows.length})</TabsTrigger>

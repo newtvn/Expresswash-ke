@@ -25,6 +25,7 @@ export interface CreateExpensePayload {
   paymentMethod: string;
   expenseDate: string;
   receiptPath?: string;
+  business?: string;
 }
 
 export interface ExpenseFilters {
@@ -32,6 +33,8 @@ export interface ExpenseFilters {
   status?: string;
   startDate?: string;
   endDate?: string;
+  business?: string;
+  postedOnly?: boolean;
 }
 
 export interface ExpenseSummary {
@@ -41,13 +44,6 @@ export interface ExpenseSummary {
   percentage: number;
 }
 
-export interface ExpenseKPIs {
-  totalRevenue: number;
-  totalExpenses: number;
-  netProfit: number;
-  profitMargin: number;
-}
-
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function mapExpense(row: Record<string, unknown>): Expense {
@@ -55,7 +51,7 @@ function mapExpense(row: Record<string, unknown>): Expense {
     id: row.id as string,
     category: row.category as string,
     description: (row.description as string) ?? '',
-    amount: row.amount as number,
+    amount: Number(row.amount) || 0,
     paymentMethod: (row.payment_method as string) ?? '',
     receiptPath: (row.receipt_path as string) ?? undefined,
     status: row.status as Expense['status'],
@@ -76,6 +72,12 @@ export async function createExpense(
   payload: CreateExpensePayload,
   userId: string,
 ): Promise<{ success: boolean; expense?: Expense; error?: string }> {
+  if (!payload.description.trim() || !Number.isFinite(payload.amount) || payload.amount <= 0) {
+    return { success: false, error: 'Expense requires a description and an amount greater than zero' };
+  }
+  if (!userId) {
+    return { success: false, error: 'An authenticated user is required' };
+  }
   const { data, error } = await retrySupabaseQuery(
     () =>
       supabase
@@ -89,6 +91,7 @@ export async function createExpense(
           receipt_path: payload.receiptPath ?? null,
           status: 'pending',
           created_by: userId,
+          business: payload.business ?? 'expresswash',
         })
         .select()
         .single(),
@@ -123,6 +126,12 @@ export async function getExpenses(filters: ExpenseFilters = {}): Promise<Expense
   if (filters.endDate) {
     query = query.lte('expense_date', filters.endDate);
   }
+  if (filters.business && filters.business !== 'all') {
+    query = query.eq('business', filters.business);
+  }
+  if (filters.postedOnly) {
+    query = query.not('posted_journal_entry_id', 'is', null);
+  }
 
   const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
@@ -135,23 +144,18 @@ export async function getExpenses(filters: ExpenseFilters = {}): Promise<Expense
  */
 export async function approveExpense(
   expenseId: string,
-  adminId: string,
+  _adminId?: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error } = await retrySupabaseQuery(
-    () =>
-      supabase
-        .from('expenses')
-        .update({
-          status: 'approved',
-          approved_by: adminId,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', expenseId),
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('approve_and_post_expense', { p_expense_id: expenseId }),
     { maxRetries: 3 },
   );
 
   if (error) return { success: false, error: error.message };
-  return { success: true };
+  const result = (data ?? {}) as Record<string, unknown>;
+  return result.success === false
+    ? { success: false, error: String(result.error ?? 'Failed to approve expense') }
+    : { success: true };
 }
 
 /**
@@ -160,17 +164,16 @@ export async function approveExpense(
 export async function rejectExpense(
   expenseId: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const { error } = await retrySupabaseQuery(
-    () =>
-      supabase
-        .from('expenses')
-        .update({ status: 'rejected' })
-        .eq('id', expenseId),
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('reject_unposted_expense', { p_expense_id: expenseId }),
     { maxRetries: 3 },
   );
 
   if (error) return { success: false, error: error.message };
-  return { success: true };
+  const result = (data ?? {}) as Record<string, unknown>;
+  return result.success === false
+    ? { success: false, error: String(result.error ?? 'Failed to reject expense') }
+    : { success: true };
 }
 
 // ── Aggregations ─────────────────────────────────────────────────────
@@ -178,16 +181,16 @@ export async function rejectExpense(
 /**
  * Get expense breakdown by category for a given month
  */
-export async function getExpenseSummary(month?: string): Promise<ExpenseSummary[]> {
+export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<ExpenseSummary[]> {
   let query = supabase
     .from('expenses')
     .select('category, amount')
-    .eq('status', 'approved');
+    .eq('status', 'approved')
+    .not('posted_journal_entry_id', 'is', null);
 
-  if (month) {
-    // month format: "2026-02"
-    query = query.gte('expense_date', `${month}-01`).lt('expense_date', getNextMonth(month));
-  }
+  if (filters.startDate) query = query.gte('expense_date', filters.startDate);
+  if (filters.endDate) query = query.lte('expense_date', filters.endDate);
+  if (filters.business && filters.business !== 'all') query = query.eq('business', filters.business);
 
   const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
@@ -216,59 +219,4 @@ export async function getExpenseSummary(month?: string): Promise<ExpenseSummary[
       percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 1000) / 10 : 0,
     }))
     .sort((a, b) => b.total - a.total);
-}
-
-/**
- * Get financial KPIs: revenue, expenses, net profit, margin
- */
-export async function getExpenseKPIs(month?: string): Promise<ExpenseKPIs> {
-  // Total revenue from paid invoices
-  let revenueQuery = supabase
-    .from('invoices')
-    .select('total')
-    .eq('status', 'paid');
-
-  if (month) {
-    revenueQuery = revenueQuery
-      .gte('paid_at', `${month}-01`)
-      .lt('paid_at', getNextMonth(month));
-  }
-
-  // Total approved expenses
-  let expenseQuery = supabase
-    .from('expenses')
-    .select('amount')
-    .eq('status', 'approved');
-
-  if (month) {
-    expenseQuery = expenseQuery
-      .gte('expense_date', `${month}-01`)
-      .lt('expense_date', getNextMonth(month));
-  }
-
-  const [revenueResult, expenseResult] = await Promise.all([
-    retrySupabaseQuery(() => revenueQuery, { maxRetries: 2 }),
-    retrySupabaseQuery(() => expenseQuery, { maxRetries: 2 }),
-  ]);
-
-  const totalRevenue = (revenueResult.data ?? []).reduce(
-    (sum, r) => sum + ((r.total as number) ?? 0),
-    0,
-  );
-  const totalExpenses = (expenseResult.data ?? []).reduce(
-    (sum, r) => sum + ((r.amount as number) ?? 0),
-    0,
-  );
-  const netProfit = totalRevenue - totalExpenses;
-  const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1000) / 10 : 0;
-
-  return { totalRevenue, totalExpenses, netProfit, profitMargin };
-}
-
-// ── Utility ──────────────────────────────────────────────────────────
-
-function getNextMonth(month: string): string {
-  const [year, mon] = month.split('-').map(Number);
-  if (mon === 12) return `${year + 1}-01-01`;
-  return `${year}-${String(mon + 1).padStart(2, '0')}-01`;
 }

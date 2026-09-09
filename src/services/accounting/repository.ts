@@ -79,14 +79,33 @@ function mapAccountingItem(row: Record<string, unknown>): AccountingItem {
 }
 
 function mapJournalEntry(row: Record<string, unknown>): JournalEntry {
+  const lines = Array.isArray(row.lines) ? row.lines : [];
   return {
     id: row.id as string,
     entryNumber: row.entry_number as string,
     sourceType: row.source_type as JournalEntry['sourceType'],
     sourceId: (row.source_id as string) ?? undefined,
+    sourceReference: (row.source_reference as string) ?? undefined,
+    business: (row.business as string) ?? undefined,
     entryDate: row.entry_date as string,
     memo: (row.memo as string) ?? undefined,
     status: row.status as JournalEntry['status'],
+    amount: Number(row.amount) || 0,
+    totalDebit: Number(row.total_debit) || 0,
+    totalCredit: Number(row.total_credit) || 0,
+    reversedEntryId: (row.reversed_entry_id as string) ?? undefined,
+    lines: lines.map((value) => {
+      const line = value as Record<string, unknown>;
+      return {
+        id: String(line.id ?? ''),
+        accountId: String(line.account_id ?? ''),
+        accountCode: String(line.account_code ?? ''),
+        accountName: String(line.account_name ?? ''),
+        description: (line.description as string) ?? undefined,
+        debit: Number(line.debit) || 0,
+        credit: Number(line.credit) || 0,
+      };
+    }),
     postedAt: (row.posted_at as string) ?? undefined,
     createdAt: row.created_at as string,
   };
@@ -194,6 +213,7 @@ function mapCustomerRefund(row: Record<string, unknown>): CustomerRefund {
   const contact = row.contacts as { name?: string } | undefined;
   return {
     id: row.id as string,
+    business: row.business as string,
     refundNumber: row.refund_number as string,
     contactId: (row.contact_id as string) ?? undefined,
     contactName: contact?.name,
@@ -269,7 +289,8 @@ export async function listContacts(): Promise<Contact[]> {
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapContact);
 }
 
@@ -299,7 +320,8 @@ export async function listChartAccounts(): Promise<ChartAccount[]> {
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapAccount);
 }
 
@@ -369,18 +391,18 @@ export async function reverseJournalEntry(id: string, entryDate: string, memo?: 
 }
 
 export async function listJournalEntries(limit = 50, business?: string): Promise<JournalEntry[]> {
-  const biz = toBusinessParam(business);
   const { data, error } = await retrySupabaseQuery(
-    () => {
-      let q = supabase.from('ledger_journal_entries').select('*');
-      if (biz) q = q.eq('business', biz);
-      return q.order('entry_date', { ascending: false }).limit(limit);
-    },
+    () => supabase.rpc('get_ledger_journal_entries', {
+      p_limit: limit,
+      p_business: toBusinessParam(business),
+    }),
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
-  return data.map(mapJournalEntry);
+  if (error) throw new Error(error.message);
+  if (!data) return [];
+  const rows = typeof data === 'string' ? JSON.parse(data) : data;
+  return Array.isArray(rows) ? rows.map(mapJournalEntry) : [];
 }
 
 export async function listAccountBalances(business?: string): Promise<AccountBalance[]> {
@@ -391,7 +413,8 @@ export async function listAccountBalances(business?: string): Promise<AccountBal
     { maxRetries: 2 },
   );
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapAccountBalance);
 }
 
@@ -520,13 +543,14 @@ export async function createCreditNote(input: CreateCreditNoteInput): Promise<Ac
   return mapOperationResult(data, 'Failed to create credit note');
 }
 
-export async function listCustomerRefunds(limit = 100): Promise<CustomerRefund[]> {
+export async function listCustomerRefunds(limit = 100, business?: string): Promise<CustomerRefund[]> {
+  const biz = toBusinessParam(business);
   const { data, error } = await retrySupabaseQuery(
-    () => supabase
-      .from('customer_refunds')
-      .select('*, contacts:contact_id(name)')
-      .order('created_at', { ascending: false })
-      .limit(limit),
+    () => {
+      let q = supabase.from('customer_refunds').select('*, contacts:contact_id(name)');
+      if (biz) q = q.eq('business', biz);
+      return q.order('created_at', { ascending: false }).limit(limit);
+    },
     { maxRetries: 2 },
   );
 
@@ -577,9 +601,9 @@ export async function getCustomerPaymentAllocationOptions(paymentId: string): Pr
   return mapAllocationOptions(data as Record<string, unknown>);
 }
 
-export async function listCustomerCreditBalances(): Promise<CustomerCreditBalance[]> {
+export async function listCustomerCreditBalances(business?: string): Promise<CustomerCreditBalance[]> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.rpc('list_customer_credit_balances'),
+    () => supabase.rpc('list_customer_credit_balances', { p_business: toBusinessParam(business) }),
     { maxRetries: 2 },
   );
 

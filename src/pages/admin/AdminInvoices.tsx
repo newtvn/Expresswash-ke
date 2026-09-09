@@ -19,6 +19,9 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
+import { useBusinessStore, BUSINESS_ALL } from '@/stores/businessStore';
+import { toBusinessParam } from '@/types/business';
+import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import { InvoiceListTabs } from '@/components/admin/invoices/InvoiceListTabs';
 import {
   createAccountingInvoice,
@@ -60,6 +63,7 @@ export interface Invoice {
   paid_amount: number;
   balance: number;
   posted_journal_entry_id?: string;
+  business?: string;
   status: InvoiceStatus;
   due_date: string;
   created_at: string;
@@ -90,25 +94,41 @@ type InvoiceFormLine = {
 
 // ---------- Service helpers ----------
 
-async function fetchInvoices(): Promise<Invoice[]> {
-  const { data } = await supabase
-    .from('invoices')
-    .select('*')
-    .order('created_at', { ascending: false });
+async function fetchInvoices(business?: string): Promise<Invoice[]> {
+  const scopedBusiness = toBusinessParam(business);
+  const pageSize = 500;
+  const invoiceRows: Record<string, unknown>[] = [];
+  for (let page = 0; ; page += 1) {
+    let query = supabase
+      .from('invoices')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(page * pageSize, (page + 1) * pageSize - 1);
+    if (scopedBusiness) query = query.eq('business', scopedBusiness);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    invoiceRows.push(...((data ?? []) as Record<string, unknown>[]));
+    if ((data?.length ?? 0) < pageSize) break;
+  }
 
-  const invoices = (data ?? []).map(mapInvoice);
+  const invoices = invoiceRows.map(mapInvoice);
   const invoiceIds = invoices.map((invoice) => invoice.id);
 
   if (invoiceIds.length === 0) return invoices;
 
-  const { data: lines } = await supabase
-    .from('invoice_lines')
-    .select('invoice_id,item_id,description_snapshot,quantity,unit_price,discount_amount,tax_rate_id,tax_amount,line_total,revenue_account_id,created_at')
-    .in('invoice_id', invoiceIds)
-    .order('created_at', { ascending: true });
+  const lines: Record<string, unknown>[] = [];
+  for (let offset = 0; offset < invoiceIds.length; offset += 200) {
+    const { data, error } = await supabase
+      .from('invoice_lines')
+      .select('invoice_id,item_id,description_snapshot,quantity,unit_price,discount_amount,tax_rate_id,tax_amount,line_total,revenue_account_id,created_at')
+      .in('invoice_id', invoiceIds.slice(offset, offset + 200))
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(error.message);
+    lines.push(...((data ?? []) as Record<string, unknown>[]));
+  }
 
   const linesByInvoice = new Map<string, Invoice['items']>();
-  (lines ?? []).forEach((row) => {
+  lines.forEach((row) => {
     const invoiceId = row.invoice_id as string;
     const current = linesByInvoice.get(invoiceId) ?? [];
     current.push({
@@ -160,6 +180,10 @@ const formatDate = (value?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
 
+const localDate = (date = new Date()): string => (
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+);
+
 function mapInvoice(row: Record<string, unknown>): Invoice {
   const total = toAmount(row.total);
   const paidAmount = toAmount(row.paid_amount);
@@ -179,6 +203,7 @@ function mapInvoice(row: Record<string, unknown>): Invoice {
     paid_amount: paidAmount,
     balance: storedBalance ?? Math.max(total - paidAmount, 0),
     posted_journal_entry_id: (row.posted_journal_entry_id as string) ?? undefined,
+    business: (row.business as string) ?? undefined,
     status: (row.status as InvoiceStatus) ?? 'pending',
     due_date: (row.due_date as string) ?? (row.due_at as string) ?? '',
     created_at: (row.created_at as string) ?? (row.issued_at as string),
@@ -259,7 +284,7 @@ async function createInvoiceFromOrder(orderId: string): Promise<{ success: boole
     paid_amount: 0,
     balance: total,
     status: 'pending',
-    due_date: dueDate.toISOString().split('T')[0],
+    due_date: localDate(dueDate),
     due_at: dueDate.toISOString(),
     issued_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
@@ -345,8 +370,10 @@ const hasOutstandingBalance = (invoice: Invoice): boolean => invoice.status !== 
 const isPartialStatus = (status: InvoiceStatus): boolean => status === 'partial' || status === 'partially_paid';
 const isPastDue = (invoice: Invoice): boolean => {
   if (!hasOutstandingBalance(invoice) || !invoice.due_date) return false;
-  const dueDate = new Date(invoice.due_date);
-  return !Number.isNaN(dueDate.getTime()) && dueDate < new Date();
+  const dueDate = invoice.due_date.slice(0, 10);
+  const today = new Date();
+  const todayLocal = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  return /^\d{4}-\d{2}-\d{2}$/.test(dueDate) && dueDate < todayLocal;
 };
 
 function openWhatsApp(phone: string, invoiceNumber: string) {
@@ -373,6 +400,10 @@ async function generateInvoicePdf(invoiceId: string) {
 
 export const AdminInvoices = () => {
   const { user } = useAuthStore();
+  const rawSelectedBusiness = useBusinessStore((state) => state.selectedBusiness);
+  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
+  const isConsolidated = selectedBusiness === BUSINESS_ALL;
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
@@ -383,7 +414,7 @@ export const AdminInvoices = () => {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceForm, setInvoiceForm] = useState({
     contactId: '',
-    issueDate: new Date().toISOString().split('T')[0],
+    issueDate: localDate(),
     dueDate: '',
     notes: '',
     status: 'pending' as 'draft' | 'pending' | 'sent',
@@ -398,9 +429,9 @@ export const AdminInvoices = () => {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState({ name: '', header_text: '', footer_text: '', payment_terms: 'Net 14 days', bank_details: '' });
 
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['admin', 'invoices'],
-    queryFn: fetchInvoices,
+  const { data: invoices = [], isLoading, error: invoicesError } = useQuery({
+    queryKey: ['admin', 'invoices', selectedBusiness],
+    queryFn: () => fetchInvoices(selectedBusiness),
     refetchInterval: 30000,
   });
 
@@ -454,6 +485,7 @@ export const AdminInvoices = () => {
         status: invoiceForm.status,
         post: invoiceForm.post,
         lines: invoiceForm.lines.map(invoiceLineToInput),
+        businessId: isConsolidated ? undefined : selectedBusiness,
       };
 
       return editingInvoice
@@ -564,7 +596,7 @@ export const AdminInvoices = () => {
   });
 
   const totals = {
-    paid: invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.total, 0),
+    paid: invoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled').reduce((s, i) => s + i.paid_amount, 0),
     pending: invoices.filter(hasOutstandingBalance).reduce((s, i) => s + i.balance, 0),
   };
 
@@ -572,7 +604,7 @@ export const AdminInvoices = () => {
     setEditingInvoice(null);
     setInvoiceForm({
       contactId: '',
-      issueDate: new Date().toISOString().split('T')[0],
+      issueDate: localDate(),
       dueDate: '',
       notes: '',
       status: 'pending',
@@ -594,7 +626,7 @@ export const AdminInvoices = () => {
     setEditingInvoice(invoice);
     setInvoiceForm({
       contactId: matchedContact?.id ?? '',
-      issueDate: invoice.created_at ? new Date(invoice.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      issueDate: invoice.created_at ? localDate(new Date(invoice.created_at)) : localDate(),
       dueDate: invoice.due_date || '',
       notes: invoice.notes ?? '',
       status: invoice.status === 'draft' ? 'draft' : 'pending',
@@ -648,7 +680,8 @@ export const AdminInvoices = () => {
     <div className="space-y-6">
       <PageHeader title="Invoices" description="Manage all invoices, templates, and payment tracking">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <Button onClick={openNewInvoiceDialog}>
+          <BusinessSwitcher />
+          <Button disabled={isConsolidated} title={isConsolidated ? 'Select a specific business to create an invoice' : undefined} onClick={openNewInvoiceDialog}>
             <Plus className="w-4 h-4 mr-2" /> New Invoice
           </Button>
           <Button variant="outline" onClick={() => setTemplateDialogOpen(true)}>
@@ -656,6 +689,12 @@ export const AdminInvoices = () => {
           </Button>
         </div>
       </PageHeader>
+
+      {invoicesError && (
+        <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          Failed to load invoices: {invoicesError instanceof Error ? invoicesError.message : 'Unknown error'}
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
@@ -755,22 +794,22 @@ export const AdminInvoices = () => {
               {!selectedInvoice.posted_journal_entry_id && selectedInvoice.status !== 'draft' && selectedInvoice.status !== 'cancelled' && (
                 <Button
                   variant="outline"
-                  disabled={postInvoiceMutation.isPending}
+                  disabled={isConsolidated || postInvoiceMutation.isPending}
                   onClick={() => postInvoiceMutation.mutate(selectedInvoice.id)}
                 >
                   Post to Ledger
                 </Button>
               )}
-              <Button variant="outline" onClick={() => { setPaymentAmount(''); setPaymentDialogOpen(true); }}>
+              <Button variant="outline" disabled={isConsolidated} onClick={() => { setPaymentAmount(''); setPaymentDialogOpen(true); }}>
                 <Edit2 className="h-4 w-4 mr-2" /> Update Payment
               </Button>
               {invoiceCanBeEdited(selectedInvoice) && (
-                <Button variant="outline" onClick={() => openEditInvoiceDialog(selectedInvoice)}>
+                <Button variant="outline" disabled={isConsolidated} onClick={() => openEditInvoiceDialog(selectedInvoice)}>
                   Edit Invoice
                 </Button>
               )}
               {selectedInvoice.balance > 0 && selectedInvoice.status !== 'cancelled' && (
-                <Button variant="outline" onClick={() => { setCreditAmount(String(selectedInvoice.balance)); setCreditDialogOpen(true); }}>
+                <Button variant="outline" disabled={isConsolidated} onClick={() => { setCreditAmount(String(selectedInvoice.balance)); setCreditDialogOpen(true); }}>
                   Credit Note
                 </Button>
               )}
@@ -1029,7 +1068,7 @@ export const AdminInvoices = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setInvoiceDialogOpen(false)}>Cancel</Button>
             <Button
-              disabled={invoiceMutation.isPending}
+              disabled={isConsolidated || invoiceMutation.isPending}
               onClick={() => {
                 if (!invoiceForm.contactId) {
                   toast.error('Customer is required');
@@ -1063,7 +1102,7 @@ export const AdminInvoices = () => {
             <DialogDescription>Record a new payment against this invoice. The invoice balance and status update together.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
               <div className="p-3 rounded-lg bg-muted text-center"><p className="text-muted-foreground text-xs">Invoice Total</p><p className="font-bold">KES {selectedInvoice?.total.toLocaleString()}</p></div>
               <div className="p-3 rounded-lg bg-muted text-center"><p className="text-muted-foreground text-xs">Previously Paid</p><p className="font-bold">KES {selectedInvoice?.paid_amount.toLocaleString()}</p></div>
               <div className="p-3 rounded-lg bg-muted text-center"><p className="text-muted-foreground text-xs">Balance</p><p className="font-bold">KES {selectedInvoice?.balance.toLocaleString()}</p></div>
@@ -1085,7 +1124,7 @@ export const AdminInvoices = () => {
                 This records a payment event. To mark paid, enter the current balance.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label>Method *</Label>
                 <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as PaymentMethod)}>
@@ -1121,7 +1160,7 @@ export const AdminInvoices = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
             <Button
-              disabled={paymentMutation.isPending || !paymentAmount}
+              disabled={paymentMutation.isPending || !Number.isFinite(Number(paymentAmount)) || Number(paymentAmount) <= 0 || Number(paymentAmount) > (selectedInvoice?.balance ?? 0)}
               onClick={() => {
                 if (!selectedInvoice) return;
                 const amount = parseFloat(paymentAmount);
@@ -1162,7 +1201,7 @@ export const AdminInvoices = () => {
             <DialogDescription>Reduce this invoice balance with an auditable credit note and reversal-style ledger posting.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div className="rounded-lg bg-muted p-3">
                 <p className="text-xs text-muted-foreground">Invoice Balance</p>
                 <p className="font-semibold">KES {selectedInvoice?.balance.toLocaleString()}</p>
@@ -1200,7 +1239,7 @@ export const AdminInvoices = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreditDialogOpen(false)}>Cancel</Button>
             <Button
-              disabled={creditNoteMutation.isPending || !selectedInvoice}
+              disabled={creditNoteMutation.isPending || !selectedInvoice || !creditReason.trim() || !Number.isFinite(Number(creditAmount)) || Number(creditAmount) <= 0 || Number(creditAmount) > (selectedInvoice?.balance ?? 0)}
               onClick={() => {
                 if (!selectedInvoice) return;
                 const amount = parseFloat(creditAmount);

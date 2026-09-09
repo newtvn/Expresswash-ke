@@ -1,8 +1,9 @@
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Package, User, Users } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
+import { Info, Package, User, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DateRangePicker } from '@/components/shared/DateRangePicker';
 import type {
   LedgerBalanceSheetReport,
@@ -116,7 +117,28 @@ export function AccountsReportsPanel({
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Balance Sheet</CardTitle>
+            <CardTitle className="flex items-center gap-1.5 text-base">
+              Balance Sheet
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Explain account codes"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <Info className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="start" className="max-w-72 space-y-2 p-3 leading-relaxed">
+                    <p className="font-medium">These are chart-of-accounts codes, not amounts.</p>
+                    <p className="text-xs text-muted-foreground">
+                      1xxx Assets · 2xxx Liabilities · 3xxx Equity · 4xxx Income · 5xxx Expenses
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-2 text-center">
@@ -161,7 +183,7 @@ export function AccountsReportsPanel({
               <span className="font-bold">{formatCurrency(vatSummary?.netVatPayable)}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              VAT is calculated from posted invoices, bills, and expenses in the canonical accounting tables.
+              VAT is calculated from posted invoices, credit notes, and bills in the canonical accounting tables.
             </p>
           </CardContent>
         </Card>
@@ -214,7 +236,7 @@ export function AccountsReportsPanel({
       {showOperationalSales && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Sales by Customer</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Cash Received by Customer</CardTitle></CardHeader>
           <CardContent>
             {orders.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
@@ -224,7 +246,7 @@ export function AccountsReportsPanel({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(value) => `KES ${Number(value).toLocaleString()}`} />
+                  <ChartTooltip formatter={(value) => `KES ${Number(value).toLocaleString()}`} />
                   <Bar dataKey="total" fill="#2563eb" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -233,7 +255,7 @@ export function AccountsReportsPanel({
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" /> Sales by Admin</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" /> Cash Received by Admin</CardTitle></CardHeader>
           <CardContent>
             {salesByPersonData.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
@@ -244,7 +266,7 @@ export function AccountsReportsPanel({
                     {salesByPersonData.map((_, index) => <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
                   </Pie>
                   <Legend />
-                  <Tooltip formatter={(value) => `KES ${Number(value).toLocaleString()}`} />
+                  <ChartTooltip formatter={(value) => `KES ${Number(value).toLocaleString()}`} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -252,7 +274,7 @@ export function AccountsReportsPanel({
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Sales by Item Type</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Posted Invoice Sales by Item</CardTitle></CardHeader>
           <CardContent>
             {salesByItem.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No item data yet</p>
@@ -262,7 +284,7 @@ export function AccountsReportsPanel({
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip
+                  <ChartTooltip
                     formatter={(value, name) => [
                       name === 'total' ? `KES ${Number(value).toLocaleString()}` : Number(value).toLocaleString(),
                       name === 'total' ? 'Amount' : 'Quantity',

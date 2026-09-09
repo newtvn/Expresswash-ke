@@ -22,6 +22,11 @@ function money(value: unknown): number {
   return Number(value) || 0;
 }
 
+function reportData(data: unknown, error: { message?: string } | null): Record<string, unknown> {
+  if (error) throw new Error(error.message || 'Failed to load accounting report');
+  return parseRpcJson(data);
+}
+
 function mapAccountRows(rows: unknown, amountKey: 'amount' | 'balance'): LedgerReportAccountRow[] {
   if (!Array.isArray(rows)) return [];
 
@@ -91,7 +96,7 @@ export async function getLedgerProfitAndLoss(from?: string, to?: string, busines
     { maxRetries: 2 },
   );
 
-  const report = error ? {} : parseRpcJson(data);
+  const report = reportData(data, error);
 
   return {
     from: (report.from as string) ?? from ?? null,
@@ -114,7 +119,7 @@ export async function getLedgerCashFlow(from?: string, to?: string, business?: s
     { maxRetries: 2 },
   );
 
-  const report = error ? {} : parseRpcJson(data);
+  const report = reportData(data, error);
 
   return {
     from: (report.from as string) ?? from ?? null,
@@ -133,7 +138,7 @@ export async function getLedgerBalanceSheet(asOf?: string, business?: string): P
     { maxRetries: 2 },
   );
 
-  const report = error ? {} : parseRpcJson(data);
+  const report = reportData(data, error);
 
   return {
     asOf: String(report.as_of ?? asOf ?? ''),
@@ -157,7 +162,7 @@ export async function getVatSummary(from?: string, to?: string, business?: strin
     { maxRetries: 2 },
   );
 
-  const report = error ? {} : parseRpcJson(data);
+  const report = reportData(data, error);
 
   return {
     from: (report.from as string) ?? from ?? null,
@@ -174,7 +179,8 @@ export async function getReceivablesAging(asOf?: string, business?: string): Pro
     { maxRetries: 2 },
   );
 
-  return mapAgingReport(error ? null : data);
+  if (error) throw new Error(error.message || 'Failed to load receivables aging');
+  return mapAgingReport(data);
 }
 
 export async function getPayablesAging(asOf?: string, business?: string): Promise<AgingReport> {
@@ -183,5 +189,6 @@ export async function getPayablesAging(asOf?: string, business?: string): Promis
     { maxRetries: 2 },
   );
 
-  return mapAgingReport(error ? null : data);
+  if (error) throw new Error(error.message || 'Failed to load payables aging');
+  return mapAgingReport(data);
 }

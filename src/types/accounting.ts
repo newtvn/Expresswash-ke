@@ -9,7 +9,8 @@ export type LedgerSourceType =
   | 'payment_made'
   | 'credit_note'
   | 'manual_adjustment'
-  | 'reversal';
+  | 'reversal'
+  | 'external';
 
 export interface Contact {
   id: string;
@@ -154,6 +155,7 @@ export interface CreditNote {
 
 export interface CustomerRefund {
   id: string;
+  business: string;
   refundNumber: string;
   contactId?: string;
   contactName?: string;
@@ -288,11 +290,28 @@ export interface JournalEntry {
   entryNumber: string;
   sourceType: LedgerSourceType;
   sourceId?: string;
+  sourceReference?: string;
+  business?: string;
   entryDate: string;
   memo?: string;
   status: 'draft' | 'posted' | 'voided' | 'reversed';
+  amount: number;
+  totalDebit: number;
+  totalCredit: number;
+  reversedEntryId?: string;
+  lines: JournalLine[];
   postedAt?: string;
   createdAt: string;
+}
+
+export interface JournalLine {
+  id: string;
+  accountId: string;
+  accountCode: string;
+  accountName: string;
+  description?: string;
+  debit: number;
+  credit: number;
 }
 
 export interface AccountBalance {
