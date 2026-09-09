@@ -135,7 +135,8 @@ export async function getExpenses(filters: ExpenseFilters = {}): Promise<Expense
 
   const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data.map(mapExpense);
 }
 
@@ -194,7 +195,8 @@ export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<E
 
   const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
-  if (error || !data || data.length === 0) return [];
+  if (error) throw new Error(error.message);
+  if (!data || data.length === 0) return [];
 
   // Aggregate by category
   const byCategory: Record<string, { total: number; count: number }> = {};

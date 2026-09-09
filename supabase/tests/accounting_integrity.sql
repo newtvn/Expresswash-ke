@@ -24,6 +24,10 @@ DECLARE
   v_aging JSONB;
   v_unposted_invoice UUID;
   v_goalhub_invoice UUID;
+  v_native_invoice UUID;
+  v_native_payment UUID;
+  v_native_payment_entry UUID;
+  v_expected_failure BOOLEAN;
   v_receipt UUID;
   v_actor UUID := gen_random_uuid();
 BEGIN
@@ -58,12 +62,16 @@ BEGIN
     HAVING COUNT(*) = 2
   ) THEN RAISE EXCEPTION 'Reversal lines do not exactly mirror the original'; END IF;
 
+  v_expected_failure := FALSE;
   BEGIN
     PERFORM reverse_journal_entry(v_entry, CURRENT_DATE, 'Duplicate reversal');
-    RAISE EXCEPTION 'Second reversal unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM = 'Second reversal unexpectedly succeeded' THEN RAISE; END IF;
+    IF SQLERRM <> 'Only posted journal entries can be reversed' THEN
+      RAISE EXCEPTION 'Second reversal failed for the wrong reason: %', SQLERRM;
+    END IF;
+    v_expected_failure := TRUE;
   END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Second reversal unexpectedly succeeded'; END IF;
 
   v_second := post_journal_entry(
     'manual_adjustment', NULL, CURRENT_DATE, 'date guard fixture',
@@ -72,12 +80,16 @@ BEGIN
       jsonb_build_object('account_id', v_other_income, 'credit', 10)
     ), 'expresswash'
   );
+  v_expected_failure := FALSE;
   BEGIN
     PERFORM reverse_journal_entry(v_second, CURRENT_DATE - 1, 'Invalid date');
-    RAISE EXCEPTION 'Earlier-dated reversal unexpectedly succeeded';
   EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM = 'Earlier-dated reversal unexpectedly succeeded' THEN RAISE; END IF;
+    IF SQLERRM <> 'Reversal date cannot precede the original entry date' THEN
+      RAISE EXCEPTION 'Earlier-dated reversal failed for the wrong reason: %', SQLERRM;
+    END IF;
+    v_expected_failure := TRUE;
   END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Earlier-dated reversal unexpectedly succeeded'; END IF;
 
   v_details := get_ledger_journal_entries(200, 'expresswash');
   IF NOT EXISTS (
@@ -117,6 +129,44 @@ BEGIN
     RAISE EXCEPTION 'Goalhub Payments Received does not reconcile to cash-flow inflows: %', v_cash_flow;
   END IF;
 
+  -- Reversed external and native receipts no longer overstate Payments Received.
+  SELECT journal_entry_id INTO v_reversal
+  FROM ledger_ingest_events WHERE external_id = 'audit-booking-cash';
+  PERFORM reverse_journal_entry(v_reversal, CURRENT_DATE, 'Reverse external cash receipt fixture');
+  v_feed := get_accounting_payments_received(CURRENT_DATE, CURRENT_DATE, 'goalhub');
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(v_feed) row
+    WHERE row->>'external_id' = 'audit-booking-cash'
+  ) THEN RAISE EXCEPTION 'Reversed Goalhub receipt remained in Payments Received'; END IF;
+
+  INSERT INTO invoices(
+    invoice_number, customer_name, subtotal, vat_rate, vat_amount, discount,
+    total, paid_amount, balance, status, issued_at, due_at, business
+  ) VALUES (
+    'AUDIT-NATIVE-REVERSAL', 'Native Reversal', 90, 0, 0, 0,
+    90, 90, 0, 'paid', NOW(), NOW(), 'expresswash'
+  ) RETURNING id INTO v_native_invoice;
+  INSERT INTO payments(invoice_id, invoice_number, reference_number, customer_name, amount, method, status, completed_at, business)
+  VALUES (v_native_invoice, 'AUDIT-NATIVE-REVERSAL', 'AUDIT-NATIVE-REVERSAL', 'Native Reversal', 90, 'cash', 'completed', NOW(), 'expresswash')
+  RETURNING id INTO v_native_payment;
+  v_native_payment_entry := post_journal_entry(
+    'payment_received', v_native_payment, CURRENT_DATE, 'Native payment reversal fixture',
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash, 'debit', 90),
+      jsonb_build_object('account_id', accounting_system_account_id('accounts_receivable'), 'credit', 90)
+    ), 'expresswash'
+  );
+  UPDATE payments SET posted_journal_entry_id = v_native_payment_entry WHERE id = v_native_payment;
+  IF NOT EXISTS (
+    SELECT 1 FROM jsonb_array_elements(get_accounting_payments_received(CURRENT_DATE, CURRENT_DATE, 'expresswash')) row
+    WHERE row->>'id' = v_native_payment::TEXT
+  ) THEN RAISE EXCEPTION 'Posted native receipt missing before reversal'; END IF;
+  PERFORM reverse_journal_entry(v_native_payment_entry, CURRENT_DATE, 'Reverse native cash receipt fixture');
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(get_accounting_payments_received(CURRENT_DATE, CURRENT_DATE, 'expresswash')) row
+    WHERE row->>'id' = v_native_payment::TEXT
+  ) THEN RAISE EXCEPTION 'Reversed native receipt remained in Payments Received'; END IF;
+
   -- Approval and posting are atomic; unapproved expenses cannot hit the ledger.
   INSERT INTO expenses(category, amount, description, payment_method, expense_date, status, business, created_by)
   VALUES ('supplies', 275, 'audit approved expense', 'cash', CURRENT_DATE, 'pending', 'expresswash', v_actor)
@@ -129,12 +179,16 @@ BEGIN
   INSERT INTO expenses(category, amount, description, payment_method, expense_date, status, business, created_by)
   VALUES ('fuel', 50, 'audit pending expense', 'cash', CURRENT_DATE, 'pending', 'expresswash', v_actor)
   RETURNING id INTO v_expense;
+  v_expected_failure := FALSE;
   BEGIN
     PERFORM post_expense_to_ledger(v_expense);
-    RAISE EXCEPTION 'Pending expense unexpectedly posted';
   EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM = 'Pending expense unexpectedly posted' THEN RAISE; END IF;
+    IF SQLERRM <> 'Only approved expenses can be posted' THEN
+      RAISE EXCEPTION 'Pending expense failed for the wrong reason: %', SQLERRM;
+    END IF;
+    v_expected_failure := TRUE;
   END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Pending expense unexpectedly posted'; END IF;
   PERFORM reject_unposted_expense(v_expense);
   IF (SELECT status FROM expenses WHERE id = v_expense) <> 'rejected' THEN RAISE EXCEPTION 'Expense rejection failed'; END IF;
 
@@ -223,6 +277,7 @@ BEGIN
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM set_config('request.jwt.claim.sub', v_actor::TEXT, true);
   IF NOT accounting_is_admin() OR is_super_admin() THEN RAISE EXCEPTION 'Regular-admin fixture claims are invalid'; END IF;
+  v_expected_failure := FALSE;
   BEGIN
     PERFORM post_journal_entry(
       'manual_adjustment', NULL, CURRENT_DATE, 'forbidden cross-business fixture',
@@ -231,10 +286,12 @@ BEGIN
         jsonb_build_object('account_id', v_other_income, 'credit', 1)
       ), 'goalhub'
     );
-    RAISE EXCEPTION 'Regular admin unexpectedly posted to Goalhub';
-  EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM = 'Regular admin unexpectedly posted to Goalhub' THEN RAISE; END IF;
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_expected_failure := TRUE;
+  WHEN OTHERS THEN
+    RAISE EXCEPTION 'Cross-business post failed for the wrong reason: %', SQLERRM;
   END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Regular admin unexpectedly posted to Goalhub'; END IF;
 END $$;
 
 ROLLBACK;

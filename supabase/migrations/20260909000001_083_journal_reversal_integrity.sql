@@ -239,7 +239,9 @@ BEGIN
         p.checkout_request_id,
         p.result_desc
       FROM payments p
+      LEFT JOIN ledger_journal_entries pe ON pe.id = p.posted_journal_entry_id
       WHERE p.status = 'completed'
+        AND (p.posted_journal_entry_id IS NULL OR pe.status = 'posted')
         AND (p_from IS NULL OR p.created_at::DATE >= p_from)
         AND (p_to IS NULL OR p.created_at::DATE <= p_to)
         AND (v_business IS NULL OR p.business = v_business)
@@ -283,7 +285,7 @@ BEGIN
       ) cash ON cash.cash_received > 0
       WHERE ie.status = 'posted'
         AND ie.source_system = 'goalhub'
-        AND e.status IN ('posted', 'reversed')
+        AND e.status = 'posted'
         AND (p_from IS NULL OR e.entry_date >= p_from)
         AND (p_to IS NULL OR e.entry_date <= p_to)
         AND (v_business IS NULL OR ie.business = v_business)
