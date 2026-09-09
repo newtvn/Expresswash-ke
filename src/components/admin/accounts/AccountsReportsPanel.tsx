@@ -161,7 +161,7 @@ export function AccountsReportsPanel({
               <span className="font-bold">{formatCurrency(vatSummary?.netVatPayable)}</span>
             </div>
             <p className="text-xs text-muted-foreground">
-              VAT is calculated from posted invoices, bills, and expenses in the canonical accounting tables.
+              VAT is calculated from posted invoices, credit notes, and bills in the canonical accounting tables.
             </p>
           </CardContent>
         </Card>
@@ -214,7 +214,7 @@ export function AccountsReportsPanel({
       {showOperationalSales && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Sales by Customer</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Users className="h-4 w-4" /> Cash Received by Customer</CardTitle></CardHeader>
           <CardContent>
             {orders.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
@@ -233,7 +233,7 @@ export function AccountsReportsPanel({
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" /> Sales by Admin</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4" /> Cash Received by Admin</CardTitle></CardHeader>
           <CardContent>
             {salesByPersonData.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No data yet</p>
@@ -252,7 +252,7 @@ export function AccountsReportsPanel({
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Sales by Item Type</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Package className="h-4 w-4" /> Posted Invoice Sales by Item</CardTitle></CardHeader>
           <CardContent>
             {salesByItem.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">No item data yet</p>

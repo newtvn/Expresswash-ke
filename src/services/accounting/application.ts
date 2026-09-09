@@ -73,14 +73,11 @@ export async function saveAccountingContact(input: Partial<Contact> & { name: st
 }
 
 export async function getOperationalAccounting(business?: string) {
-  // Bills and credit notes carry a business slug and are scoped. customer_refunds
-  // has no business column and list_customer_credit_balances is a global RPC, so
-  // those two remain unscoped until the backend gains a business dimension for them.
   const [bills, creditNotes, refunds, customerCredits] = await Promise.all([
     repository.listBills(100, business),
     repository.listCreditNotes(100, business),
-    repository.listCustomerRefunds(),
-    repository.listCustomerCreditBalances(),
+    repository.listCustomerRefunds(100, business),
+    repository.listCustomerCreditBalances(business),
   ]);
 
   return {
@@ -100,7 +97,16 @@ export async function createSupplierBill(input: CreateBillInput) {
     return { success: false, error: 'At least one bill line is required' };
   }
 
-  const invalidLine = input.lines.find((line) => !line.description.trim() || line.quantity <= 0 || line.unitPrice < 0);
+  const invalidLine = input.lines.find((line) => (
+    !line.description.trim()
+    || !Number.isFinite(line.quantity)
+    || !Number.isFinite(line.unitPrice)
+    || line.quantity <= 0
+    || line.unitPrice < 0
+    || (line.discountAmount ?? 0) < 0
+    || (line.discountAmount ?? 0) > line.quantity * line.unitPrice
+    || (line.taxAmount ?? 0) < 0
+  ));
   if (invalidLine) {
     return { success: false, error: 'Each bill line needs a description, quantity, and valid price' };
   }
@@ -117,7 +123,20 @@ function validateInvoiceInput(input: CreateInvoiceInput) {
     return 'At least one invoice line is required';
   }
 
-  const invalidLine = input.lines.find((line) => !line.description.trim() || line.quantity <= 0 || line.unitPrice < 0);
+  if (input.dueDate && input.issueDate && input.dueDate < input.issueDate) {
+    return 'Due date cannot be before the issue date';
+  }
+
+  const invalidLine = input.lines.find((line) => (
+    !line.description.trim()
+    || !Number.isFinite(line.quantity)
+    || !Number.isFinite(line.unitPrice)
+    || line.quantity <= 0
+    || line.unitPrice < 0
+    || (line.discountAmount ?? 0) < 0
+    || (line.discountAmount ?? 0) > line.quantity * line.unitPrice
+    || (line.taxAmount ?? 0) < 0
+  ));
   if (invalidLine) {
     return 'Each invoice line needs a description, quantity, and valid price';
   }
@@ -174,6 +193,10 @@ export async function recordCustomerRefund(input: RecordCustomerRefundInput) {
 
   if (!Number.isFinite(input.amount) || input.amount <= 0) {
     return { success: false, error: 'Refund amount must be greater than zero' };
+  }
+
+  if (!input.reason?.trim()) {
+    return { success: false, error: 'A refund reason is required' };
   }
 
   return repository.recordCustomerRefund(input);

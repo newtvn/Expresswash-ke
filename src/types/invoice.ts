@@ -19,7 +19,9 @@ export interface Invoice {
   vatAmount: number;
   discount: number;
   total: number;
-  status: 'draft' | 'sent' | 'paid' | 'partially_paid' | 'overdue' | 'cancelled';
+  amountPaid: number;
+  balance: number;
+  status: 'draft' | 'pending' | 'sent' | 'paid' | 'partial' | 'partially_paid' | 'overdue' | 'cancelled';
   issuedAt: string;
   dueAt: string;
   paidAt?: string;
@@ -32,6 +34,7 @@ export interface InvoiceFilters {
   startDate?: string;
   endDate?: string;
   search?: string;
+  business?: string;
   page: number;
   limit: number;
 }

@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { DollarSign, TrendingUp, TrendingDown, Percent, Plus, CheckCircle, XCircle, Loader2, FileWarning } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Percent, Plus, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/config/queryKeys';
@@ -32,11 +32,21 @@ import {
   approveExpense,
   rejectExpense,
   getExpenseSummary,
-  getExpenseKPIs,
   type Expense,
   type CreateExpensePayload,
 } from '@/services/expenseService';
-import { getFinancialReport } from '@/services/reportService';
+import { getLedgerProfitAndLoss } from '@/services/accounting/reports';
+import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
+import { DateRangePicker } from '@/components/shared/DateRangePicker';
+import { useAuthStore } from '@/stores/authStore';
+import { BUSINESS_ALL, useBusinessStore } from '@/stores/businessStore';
+
+const localDate = (date = new Date()): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 const EXPENSE_CATEGORIES = [
   'fuel',
@@ -113,47 +123,52 @@ const expenseColumns: Column<Expense>[] = [
 export const ProfitExpense = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const rawSelectedBusiness = useBusinessStore((state) => state.selectedBusiness);
+  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
+  const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
+  const isConsolidated = selectedBusiness === BUSINESS_ALL;
+  const today = new Date();
   const [addOpen, setAddOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: new Date(today.getFullYear(), today.getMonth(), 1),
+    to: today,
+  });
 
   // Form state for new expense
   const [formCategory, setFormCategory] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formAmount, setFormAmount] = useState('');
   const [formMethod, setFormMethod] = useState('');
-  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formDate, setFormDate] = useState(localDate());
+
+  const reportFrom = dateRange.from ? localDate(dateRange.from) : undefined;
+  const reportTo = dateRange.to ? localDate(dateRange.to) : undefined;
 
   // Queries
-  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
-    queryKey: queryKeys.expenses.list({}),
-    queryFn: () => getExpenses(),
+  const { data: expenses = [], isLoading: expensesLoading, error: expensesError } = useQuery({
+    queryKey: queryKeys.expenses.list({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness }),
+    queryFn: () => getExpenses({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness }),
   });
 
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: queryKeys.expenses.kpis(),
-    queryFn: () => getExpenseKPIs(),
+  const { data: profitAndLoss, isLoading: kpisLoading, error: profitLossError } = useQuery({
+    queryKey: ['accounting', 'reports', 'profit-loss', selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo, selectedBusiness),
   });
 
-  const { data: summary = [], isLoading: summaryLoading } = useQuery({
-    queryKey: queryKeys.expenses.summary(),
-    queryFn: () => getExpenseSummary(),
-  });
-
-  const { data: financialReport } = useQuery({
-    queryKey: [...queryKeys.reports.all, 'financial-pl'],
-    queryFn: () => getFinancialReport(
-      new Date(new Date().setDate(1)).toISOString().split('T')[0],
-      new Date().toISOString().split('T')[0],
-    ),
+  const { data: summary = [], isLoading: summaryLoading, error: summaryError } = useQuery({
+    queryKey: [...queryKeys.expenses.summary(), selectedBusiness, reportFrom, reportTo],
+    queryFn: () => getExpenseSummary({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness }),
   });
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: (payload: CreateExpensePayload) => createExpense(payload, user?.id ?? ''),
+    mutationFn: (payload: CreateExpensePayload) => createExpense({ ...payload, business: selectedBusiness }, user?.id ?? ''),
     onSuccess: (result) => {
       if (result.success) {
         toast.success('Expense added');
         queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+        queryClient.invalidateQueries({ queryKey: ['accounting'] });
         setAddOpen(false);
         resetForm();
       } else {
@@ -169,6 +184,7 @@ export const ProfitExpense = () => {
       if (result.success) {
         toast.success('Expense approved');
         queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+        queryClient.invalidateQueries({ queryKey: ['accounting'] });
       } else {
         toast.error(result.error ?? 'Failed to approve expense');
       }
@@ -181,6 +197,7 @@ export const ProfitExpense = () => {
       if (result.success) {
         toast.success('Expense rejected');
         queryClient.invalidateQueries({ queryKey: queryKeys.expenses.all });
+        queryClient.invalidateQueries({ queryKey: ['accounting'] });
       } else {
         toast.error(result.error ?? 'Failed to reject expense');
       }
@@ -192,18 +209,19 @@ export const ProfitExpense = () => {
     setFormDescription('');
     setFormAmount('');
     setFormMethod('');
-    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormDate(localDate());
   };
 
   const handleAddExpense = () => {
-    if (!formCategory || !formDescription || !formAmount || !formMethod) {
+    const amount = Number(formAmount);
+    if (!formCategory || !formDescription.trim() || !Number.isFinite(amount) || amount <= 0 || !formMethod) {
       toast.error('Please fill in all required fields');
       return;
     }
     createMutation.mutate({
       category: formCategory,
       description: formDescription,
-      amount: parseFloat(formAmount),
+      amount,
       paymentMethod: formMethod,
       expenseDate: formDate,
     });
@@ -220,10 +238,14 @@ export const ProfitExpense = () => {
   };
 
   // KPI data
+  const totalRevenue = profitAndLoss?.totalIncome ?? 0;
+  const totalExpenses = profitAndLoss?.totalExpenses ?? 0;
+  const netProfit = profitAndLoss?.netProfit ?? 0;
+  const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 1_000) / 10 : 0;
   const kpiCards = [
     {
       label: 'Total Revenue',
-      value: kpis?.totalRevenue ?? 0,
+      value: totalRevenue,
       change: 0,
       changeDirection: 'flat' as const,
       icon: DollarSign,
@@ -231,7 +253,7 @@ export const ProfitExpense = () => {
     },
     {
       label: 'Total Expenses',
-      value: kpis?.totalExpenses ?? 0,
+      value: totalExpenses,
       change: 0,
       changeDirection: 'flat' as const,
       icon: TrendingDown,
@@ -239,7 +261,7 @@ export const ProfitExpense = () => {
     },
     {
       label: 'Net Profit',
-      value: kpis?.netProfit ?? 0,
+      value: netProfit,
       change: 0,
       changeDirection: 'flat' as const,
       icon: TrendingUp,
@@ -247,13 +269,14 @@ export const ProfitExpense = () => {
     },
     {
       label: 'Profit Margin',
-      value: kpis?.profitMargin ?? 0,
+      value: profitMargin,
       change: 0,
       changeDirection: 'flat' as const,
       icon: Percent,
       format: 'percentage' as const,
     },
   ];
+  const loadError = expensesError || profitLossError || summaryError;
 
   // Expense columns with actions
   const columnsWithActions: Column<Expense>[] = [
@@ -269,6 +292,8 @@ export const ProfitExpense = () => {
               size="icon"
               className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
               onClick={() => setConfirmAction({ id: row.id, action: 'approve' })}
+              disabled={isConsolidated}
+              title={isConsolidated ? 'Select a business to approve expenses' : 'Approve and post to the ledger'}
             >
               <CheckCircle className="w-4 h-4" />
             </Button>
@@ -277,6 +302,8 @@ export const ProfitExpense = () => {
               size="icon"
               className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
               onClick={() => setConfirmAction({ id: row.id, action: 'reject' })}
+              disabled={isConsolidated}
+              title={isConsolidated ? 'Select a business to reject expenses' : 'Reject expense'}
             >
               <XCircle className="w-4 h-4" />
             </Button>
@@ -289,12 +316,29 @@ export const ProfitExpense = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Profit & Expenses" description="Financial overview and expense tracking">
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Expense
-        </Button>
+      <PageHeader title="Profit & Expenses" description="Posted-ledger performance and expense approvals">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <BusinessSwitcher />
+          <Button onClick={() => setAddOpen(true)} disabled={isConsolidated} title={isConsolidated ? 'Select a business to add an expense' : undefined}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Expense
+          </Button>
+        </div>
       </PageHeader>
+
+      {loadError && (
+        <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          Accounting data could not be loaded: {loadError instanceof Error ? loadError.message : 'Unknown error'}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium">Reporting period</p>
+          <p className="text-xs text-muted-foreground">KPI figures come from posted double-entry journal lines.</p>
+        </div>
+        <DateRangePicker date={dateRange} onDateChange={setDateRange} />
+      </div>
 
       {/* Summary KPIs */}
       {kpisLoading ? (
@@ -315,28 +359,10 @@ export const ProfitExpense = () => {
         </div>
       )}
 
-      {/* Outstanding Receivables */}
-      {financialReport && (financialReport.outstanding_receivables > 0 || financialReport.overdue_count > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <KPICard
-            label="Outstanding Receivables"
-            value={financialReport.outstanding_receivables}
-            format="currency"
-            icon={FileWarning}
-          />
-          <KPICard
-            label="Overdue Invoices"
-            value={financialReport.overdue_count}
-            format="number"
-            icon={FileWarning}
-          />
-        </div>
-      )}
-
       {/* Expense Breakdown */}
       <Card className="bg-card border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Expense Breakdown</CardTitle>
+          <CardTitle className="text-lg font-semibold">Posted Expense Records</CardTitle>
         </CardHeader>
         <CardContent>
           {summaryLoading ? (
@@ -346,7 +372,7 @@ export const ProfitExpense = () => {
               ))}
             </div>
           ) : summary.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No approved expenses to display</p>
+            <p className="text-sm text-muted-foreground text-center py-8">No approved and posted expense records in this period</p>
           ) : (
             <div className="space-y-4">
               {summary.map((item, index) => (
@@ -382,13 +408,15 @@ export const ProfitExpense = () => {
           <CardTitle className="text-lg">All Expenses</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
-            data={expenses}
-            columns={columnsWithActions}
-            searchable
-            searchPlaceholder="Search expenses..."
-            pageSize={10}
-          />
+          {expensesLoading ? <Skeleton className="h-48 w-full" /> : (
+            <DataTable
+              data={expenses}
+              columns={columnsWithActions}
+              searchable
+              searchPlaceholder="Search expenses..."
+              pageSize={10}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -423,12 +451,13 @@ export const ProfitExpense = () => {
                 rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <Label>Amount (KES) *</Label>
                 <Input
                   type="number"
-                  min="0"
+                  min="0.01"
+                  step="0.01"
                   value={formAmount}
                   onChange={(e) => setFormAmount(e.target.value)}
                   placeholder="0"
@@ -463,7 +492,7 @@ export const ProfitExpense = () => {
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
             <Button
               onClick={handleAddExpense}
-              disabled={createMutation.isPending || !formCategory || !formDescription || !formAmount || !formMethod}
+              disabled={createMutation.isPending || !formCategory || !formDescription.trim() || !Number.isFinite(Number(formAmount)) || Number(formAmount) <= 0 || !formMethod}
             >
               {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Add Expense
@@ -477,8 +506,10 @@ export const ProfitExpense = () => {
         open={!!confirmAction}
         onOpenChange={(open) => { if (!open) setConfirmAction(null); }}
         title={confirmAction?.action === 'approve' ? 'Approve Expense' : 'Reject Expense'}
-        description={`Are you sure you want to ${confirmAction?.action} this expense?`}
-        confirmLabel={confirmAction?.action === 'approve' ? 'Yes, Approve' : 'Yes, Reject'}
+        description={confirmAction?.action === 'approve'
+          ? 'Approval posts this expense to the ledger in the same transaction. Verify the amount and payment method first.'
+          : 'Reject this unposted expense? It will remain in the audit record with rejected status.'}
+        confirmLabel={confirmAction?.action === 'approve' ? 'Approve & Post' : 'Reject Expense'}
         onConfirm={handleConfirmAction}
       />
     </div>

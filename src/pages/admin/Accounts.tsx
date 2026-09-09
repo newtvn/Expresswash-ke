@@ -81,6 +81,12 @@ interface AccountPayment {
   result_desc?: string;
   unapplied_amount?: number | string;
   posted_journal_entry_id?: string;
+  source_kind?: 'native' | 'external';
+  business?: string;
+  currency?: string;
+  event_type?: string;
+  external_id?: string;
+  reference?: string;
 }
 
 interface AccountExpense {
@@ -108,12 +114,7 @@ interface AgingInvoice {
   posted_journal_entry_id?: string;
 }
 
-interface AccountOrder {
-  total: number | string;
-  status: number;
-  created_at: string;
-  customer_name?: string;
-}
+interface AccountOrder { total: number | string; customer_name?: string; }
 
 interface PaymentStatusEvent {
   id: string;
@@ -155,6 +156,10 @@ const formatDate = (value?: string | null): string => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
+
+const localDateString = (date?: Date): string | undefined => date
+  ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  : undefined;
 
 function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -230,47 +235,38 @@ const formatStatusTrigger = (value?: string | null): string => {
 
 // ---------- Service helpers ----------
 
-async function fetchAccountSummary() {
-  const [ordersRes, paymentsRes, expensesRes] = await Promise.all([
-    supabase.from('orders').select('total, status, created_at, customer_name'),
-    supabase.from('payments').select('id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, payer_phone_matches_intent, unapplied_amount, posted_journal_entry_id'),
-    supabase.from('expenses').select('id, amount, category, expense_date, payment_method, status, description'),
-  ]);
-
-  const orders = (ordersRes.data ?? []) as AccountOrder[];
-  const payments = (paymentsRes.data ?? []) as AccountPayment[];
-  const expenses = (expensesRes.data ?? []) as AccountExpense[];
-
-  const totalRevenue = payments.filter((p) => p.status === 'completed').reduce((s, p) => s + toAmount(p.amount), 0);
-  const totalExpenses = expenses.filter((e) => e.status !== 'rejected').reduce((s, e) => s + toAmount(e.amount), 0);
-  const totalReceivable = orders
-    .filter((o) => o.status !== 13 && o.status !== 14)
-    .reduce((s, o) => s + toAmount(o.total), 0);
-  const outstanding = totalReceivable - totalRevenue;
-
-  return { totalRevenue, totalExpenses, outstanding, netProfit: totalRevenue - totalExpenses, payments, expenses, orders };
+async function fetchAccountSummary(from?: string, to?: string) {
+  const payments = (await fetchPaymentsReceived(from, to, 'expresswash'))
+    .filter((payment) => payment.source_kind === 'native');
+  const byCustomer = payments.reduce<Record<string, number>>((totals, payment) => {
+    const customer = payment.customer_name?.trim() || 'Customer';
+    totals[customer] = (totals[customer] ?? 0) + toAmount(payment.amount);
+    return totals;
+  }, {});
+  const orders: AccountOrder[] = Object.entries(byCustomer)
+    .map(([customer_name, total]) => ({ customer_name, total }))
+    .sort((a, b) => toAmount(b.total) - toAmount(a.total));
+  return { payments, orders };
 }
 
 async function fetchExpenses(business?: string) {
   const biz = toBusinessParam(business);
   let q = supabase.from('expenses').select('*').order('expense_date', { ascending: false });
   if (biz) q = q.eq('business', biz);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
   return (data ?? []) as AccountExpense[];
 }
 
 async function fetchPaymentsReceived(from?: string, to?: string, business?: string) {
-  const biz = toBusinessParam(business);
-  let q = supabase
-    .from('payments')
-    .select('id, invoice_id, amount, status, created_at, method, customer_name, recorded_by, provider, provider_status, phone_number, payer_phone_number, payer_phone_matches_intent, merchant_request_id, checkout_request_id, mpesa_receipt_number, result_desc, unapplied_amount, posted_journal_entry_id')
-    .eq('status', 'completed')
-    .order('created_at', { ascending: false });
-  if (biz) q = q.eq('business', biz);
-  if (from) q = q.gte('created_at', from);
-  if (to) q = q.lte('created_at', to + 'T23:59:59');
-  const { data } = await q;
-  return (data ?? []) as AccountPayment[];
+  const { data, error } = await supabase.rpc('get_accounting_payments_received', {
+    p_from: from ?? null,
+    p_to: to ?? null,
+    p_business: toBusinessParam(business),
+  });
+  if (error) throw new Error(error.message);
+  const rows = typeof data === 'string' ? JSON.parse(data) : data;
+  return (Array.isArray(rows) ? rows : []) as AccountPayment[];
 }
 
 async function fetchPaymentEvents(paymentId: string): Promise<PaymentStatusEvent[]> {
@@ -283,25 +279,19 @@ async function fetchPaymentEvents(paymentId: string): Promise<PaymentStatusEvent
   return (data ?? []) as PaymentStatusEvent[];
 }
 
-async function fetchSalesByItem(): Promise<SalesByItemRow[]> {
-  const { data, error } = await supabase
-    .from('order_items')
-    .select('name, quantity, total_price')
-    .limit(500);
+async function fetchSalesByItem(from?: string, to?: string): Promise<SalesByItemRow[]> {
+  const { data, error } = await supabase.rpc('get_accounting_sales_by_item', {
+    p_from: from ?? null,
+    p_to: to ?? null,
+    p_business: 'expresswash',
+  });
   if (error) throw new Error(error.message);
-
-  const grouped = (data ?? []).reduce<Record<string, SalesByItemRow>>((acc, item) => {
-    const name = String(item.name ?? 'Item');
-    const current = acc[name] ?? { name, quantity: 0, total: 0 };
-    current.quantity += toAmount(item.quantity || 1);
-    current.total += toAmount(item.total_price);
-    acc[name] = current;
-    return acc;
-  }, {});
-
-  return Object.values(grouped)
-    .sort((a, b) => (b.total || b.quantity) - (a.total || a.quantity))
-    .slice(0, 10);
+  const rows = typeof data === 'string' ? JSON.parse(data) : data;
+  return (Array.isArray(rows) ? rows : []).slice(0, 10).map((row: Record<string, unknown>) => ({
+    name: String(row.name ?? 'Item'),
+    quantity: toAmount(row.quantity),
+    total: toAmount(row.total),
+  }));
 }
 
 async function fetchAgingSummary(business?: string) {
@@ -309,9 +299,11 @@ async function fetchAgingSummary(business?: string) {
   let q = supabase
     .from('invoices')
     .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id')
-    .neq('status', 'paid');
+    .not('status', 'in', '(draft,cancelled,paid)')
+    .not('posted_journal_entry_id', 'is', null);
   if (biz) q = q.eq('business', biz);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
   return (data ?? []) as AgingInvoice[];
 }
 
@@ -408,7 +400,7 @@ export const Accounts = () => {
   });
   const [billForm, setBillForm] = useState({
     supplierContactId: '',
-    issueDate: new Date().toISOString().split('T')[0],
+    issueDate: localDateString(new Date())!,
     dueDate: '',
     notes: '',
     lines: [makeBillLine()],
@@ -436,7 +428,7 @@ export const Accounts = () => {
     description: '',
     category: '',
     amount: '',
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: localDateString(new Date())!,
     payment_method: 'mpesa',
     notes: '',
   });
@@ -445,7 +437,7 @@ export const Accounts = () => {
     creditAccountId: '',
     amount: '',
     description: '',
-    date: new Date().toISOString().split('T')[0],
+    date: localDateString(new Date())!,
   });
 
   // Business scope for reports/overview/operational lists (super_admin can switch).
@@ -459,9 +451,13 @@ export const Accounts = () => {
   const isConsolidated = selectedBusiness === BUSINESS_ALL;
   const consolidatedWriteHint = 'Select a specific business to create records';
 
-  const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['accounts', 'summary'],
-    queryFn: fetchAccountSummary,
+  const reportFrom = localDateString(dateRange.from);
+  const reportTo = localDateString(dateRange.to);
+
+  const { data: summary } = useQuery({
+    queryKey: ['accounts', 'summary', reportFrom, reportTo],
+    queryFn: () => fetchAccountSummary(reportFrom, reportTo),
+    enabled: selectedBusiness === 'expresswash',
     refetchInterval: 60000,
   });
 
@@ -470,11 +466,11 @@ export const Accounts = () => {
     queryFn: () => fetchExpenses(selectedBusiness),
   });
 
-  const { data: paymentsReceived = [] } = useQuery({
-    queryKey: ['accounts', 'payments', selectedBusiness, dateRange.from?.toISOString().split('T')[0], dateRange.to?.toISOString().split('T')[0]],
+  const { data: paymentsReceived = [], error: paymentsError } = useQuery({
+    queryKey: ['accounts', 'payments', selectedBusiness, reportFrom, reportTo],
     queryFn: () => fetchPaymentsReceived(
-      dateRange.from?.toISOString().split('T')[0],
-      dateRange.to?.toISOString().split('T')[0],
+      reportFrom,
+      reportTo,
       selectedBusiness,
     ),
   });
@@ -483,9 +479,6 @@ export const Accounts = () => {
     queryKey: ['accounts', 'aging', selectedBusiness],
     queryFn: () => fetchAgingSummary(selectedBusiness),
   });
-
-  const reportFrom = dateRange.from?.toISOString().split('T')[0];
-  const reportTo = dateRange.to?.toISOString().split('T')[0];
 
   const { data: accountingSetup } = useQuery({
     queryKey: ['accounting', 'setup'],
@@ -496,7 +489,7 @@ export const Accounts = () => {
   const contacts = accountingSetup?.contacts ?? [];
   const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
 
-  const { data: ledgerOverview } = useQuery({
+  const { data: ledgerOverview, error: ledgerError } = useQuery({
     queryKey: ['accounting', 'ledger-overview', selectedBusiness],
     queryFn: () => getLedgerOverview(selectedBusiness),
   });
@@ -519,12 +512,12 @@ export const Accounts = () => {
     : 0;
   const billTotal = billForm.lines.reduce((sum, line) => sum + toAmount(line.amount) + toAmount(line.taxAmount), 0);
 
-  const { data: profitAndLoss } = useQuery({
+  const { data: profitAndLoss, error: profitLossError } = useQuery({
     queryKey: ['accounting', 'reports', 'profit-loss', selectedBusiness, reportFrom, reportTo],
     queryFn: () => getLedgerProfitAndLoss(reportFrom, reportTo, selectedBusiness),
   });
 
-  const { data: balanceSheet } = useQuery({
+  const { data: balanceSheet, error: balanceSheetError } = useQuery({
     queryKey: ['accounting', 'reports', 'balance-sheet', selectedBusiness, reportTo],
     queryFn: () => getLedgerBalanceSheet(reportTo, selectedBusiness),
   });
@@ -534,7 +527,7 @@ export const Accounts = () => {
     queryFn: () => getVatSummary(reportFrom, reportTo, selectedBusiness),
   });
 
-  const { data: cashFlow } = useQuery({
+  const { data: cashFlow, error: cashFlowError } = useQuery({
     queryKey: ['accounting', 'reports', 'cash-flow', selectedBusiness, reportFrom, reportTo],
     queryFn: () => getLedgerCashFlow(reportFrom, reportTo, selectedBusiness),
   });
@@ -569,8 +562,9 @@ export const Accounts = () => {
   });
 
   const { data: salesByItem = [] } = useQuery({
-    queryKey: ['accounts', 'sales-by-item'],
-    queryFn: fetchSalesByItem,
+    queryKey: ['accounts', 'sales-by-item', reportFrom, reportTo],
+    queryFn: () => fetchSalesByItem(reportFrom, reportTo),
+    enabled: selectedBusiness === 'expresswash',
   });
 
   const { data: notificationOutbox = [] } = useQuery({
@@ -587,7 +581,7 @@ export const Accounts = () => {
         description: '',
         category: '',
         amount: '',
-        expense_date: new Date().toISOString().split('T')[0],
+        expense_date: localDateString(new Date())!,
         payment_method: 'mpesa',
         notes: '',
       });
@@ -606,7 +600,7 @@ export const Accounts = () => {
         creditAccountId: '',
         amount: '',
         description: '',
-        date: new Date().toISOString().split('T')[0],
+        date: localDateString(new Date())!,
       });
       qc.invalidateQueries({ queryKey: ['accounts'] });
       qc.invalidateQueries({ queryKey: ['accounting'] });
@@ -617,7 +611,7 @@ export const Accounts = () => {
   const reverseJournalMutation = useMutation({
     mutationFn: (entry: JournalEntry) => reversePostedJournalEntry(
       entry.id,
-      new Date().toISOString().split('T')[0],
+      localDateString(new Date())!,
       `Reversal for ${entry.entryNumber}`,
     ),
     onSuccess: (result) => {
@@ -657,7 +651,7 @@ export const Accounts = () => {
       setAddBillOpen(false);
       setBillForm({
         supplierContactId: '',
-        issueDate: new Date().toISOString().split('T')[0],
+        issueDate: localDateString(new Date())!,
         dueDate: '',
         notes: '',
         lines: [makeBillLine()],
@@ -833,11 +827,12 @@ export const Accounts = () => {
     && toAmount(invoice.total) > 0
   ));
   const unpostedPayments = paymentsReceived.filter((payment) => !payment.posted_journal_entry_id && toAmount(payment.amount) > 0);
-  const unpostedExpenses = expenses.filter((expense) => expense.status !== 'rejected' && !expense.posted_journal_entry_id && toAmount(expense.amount) > 0);
+  const unpostedExpenses = expenses.filter((expense) => expense.status === 'approved' && !expense.posted_journal_entry_id && toAmount(expense.amount) > 0);
 
   const formatCurrency = (value: number | undefined) => `KES ${(value ?? 0).toLocaleString()}`;
   const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
   const canReplayOutbox = (item: NotificationOutboxItem) => item.status === 'failed' || item.status === 'dead_letter';
+  const accountingLoadError = paymentsError || ledgerError || profitLossError || balanceSheetError || cashFlowError;
   const reportRangeLabel = reportFrom || reportTo
     ? `${reportFrom ?? 'Start'} to ${reportTo ?? 'Today'}`
     : 'All time';
@@ -905,6 +900,12 @@ export const Accounts = () => {
         </div>
       </PageHeader>
 
+      {accountingLoadError && (
+        <div role="alert" className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          Accounting data could not be loaded: {accountingLoadError instanceof Error ? accountingLoadError.message : 'Unknown error'}
+        </div>
+      )}
+
       {/* KPI Summary */}
       <p className="-mb-3 text-xs text-muted-foreground">Ledger totals · {reportRangeLabel}</p>
       <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
@@ -967,6 +968,7 @@ export const Accounts = () => {
             reversePending={reverseJournalMutation.isPending}
             writesDisabled={isConsolidated}
             formatDate={formatDate}
+            formatCurrency={formatCurrency}
             onReverseJournalEntry={(entry) => reverseJournalMutation.mutate(entry)}
           />
         </TabsContent>
@@ -1021,14 +1023,14 @@ export const Accounts = () => {
                 size="sm"
                 disabled={paymentsReceived.length === 0}
                 onClick={() => downloadCsv(
-                  `payments-${selectedBusiness}-${new Date().toISOString().split('T')[0]}.csv`,
+                  `payments-${selectedBusiness}-${localDateString(new Date())}.csv`,
                   ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
                   paymentsReceived.map((p) => [
                     formatDate(p.created_at),
                     p.customer_name ?? '',
                     toAmount(p.amount),
                     p.method ?? '',
-                    p.mpesa_receipt_number ?? p.checkout_request_id ?? '',
+                    p.mpesa_receipt_number ?? p.reference ?? p.checkout_request_id ?? '',
                     p.status ?? '',
                   ]),
                 )}
@@ -1048,6 +1050,7 @@ export const Accounts = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">{p.customer_name ?? 'Customer'}</p>
+                          {p.source_kind === 'external' && <Badge variant="secondary" className="text-xs capitalize">{humanizeCode(p.event_type)}</Badge>}
                           {p.provider && <Badge variant="outline" className="text-xs">{formatPaymentProvider(p.provider)}</Badge>}
                           {toAmount(p.unapplied_amount) > 0 && <Badge variant="secondary" className="text-xs">Credit {formatCurrency(toAmount(p.unapplied_amount))}</Badge>}
                           {p.posted_journal_entry_id && <Badge variant="outline" className="text-xs">Posted</Badge>}
@@ -1057,13 +1060,16 @@ export const Accounts = () => {
                           {formatPaymentMethod(p.method)} · {formatDate(p.created_at)}
                           {p.provider_status ? ` · ${formatPaymentStatus(p.provider_status)}` : ''}
                         </p>
+                        {(p.external_id || p.reference) && (
+                          <p className="text-xs text-muted-foreground">Reference: {p.external_id ?? p.reference}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
                           <p className="font-semibold text-green-600">KES {toAmount(p.amount).toLocaleString()}</p>
                           {toAmount(p.unapplied_amount) > 0 && <p className="text-xs text-muted-foreground">Unapplied {formatCurrency(toAmount(p.unapplied_amount))}</p>}
                         </div>
-                        {toAmount(p.unapplied_amount) > 0 && (
+                        {p.source_kind !== 'external' && toAmount(p.unapplied_amount) > 0 && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1077,9 +1083,11 @@ export const Accounts = () => {
                             Allocate
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" onClick={() => setSelectedPayment(p)}>
-                          <GitCommitHorizontal className="h-3 w-3 mr-1" /> View trail
-                        </Button>
+                        {p.source_kind !== 'external' && (
+                          <Button size="sm" variant="outline" onClick={() => setSelectedPayment(p)}>
+                            <GitCommitHorizontal className="h-3 w-3 mr-1" /> View trail
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -2168,7 +2176,7 @@ export const Accounts = () => {
                 </div>
               </div>
               <div>
-                <Label htmlFor="refund-reason">Reason</Label>
+                <Label htmlFor="refund-reason">Reason *</Label>
                 <Textarea
                   id="refund-reason"
                   name="refund-reason"
@@ -2183,12 +2191,16 @@ export const Accounts = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRefundTarget(null)}>Cancel</Button>
             <Button
-              disabled={refundMutation.isPending || !refundTarget}
+              disabled={refundMutation.isPending || !refundTarget || !refundForm.reason.trim()}
               onClick={() => {
                 if (!refundTarget) return;
                 const amount = toAmount(refundForm.amount);
                 if (amount <= 0 || amount > refundableAmount) {
                   toast.error('Enter a valid refund amount within the remaining refundable amount');
+                  return;
+                }
+                if (!refundForm.reason.trim()) {
+                  toast.error('Enter a reason for the refund');
                   return;
                 }
                 refundMutation.mutate({
@@ -2197,7 +2209,7 @@ export const Accounts = () => {
                   amount,
                   method: refundForm.method,
                   reference: refundForm.reference || undefined,
-                  reason: refundForm.reason || undefined,
+                  reason: refundForm.reason.trim(),
                 });
               }}
             >

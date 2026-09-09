@@ -11,6 +11,8 @@ import {
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function mapInvoice(row: Record<string, unknown>, items: Record<string, unknown>[]): Invoice {
+  const total = Number(row.total) || 0;
+  const amountPaid = Number(row.paid_amount) || 0;
   return {
     id: row.id as string,
     invoiceNumber: row.invoice_number as string,
@@ -25,14 +27,16 @@ function mapInvoice(row: Record<string, unknown>, items: Record<string, unknown>
       unitPrice: i.unit_price as number,
       total: i.total as number,
     })),
-    subtotal: row.subtotal as number,
-    vatRate: row.vat_rate as number,
-    vatAmount: row.vat_amount as number,
-    discount: (row.discount as number) ?? 0,
-    total: row.total as number,
+    subtotal: Number(row.subtotal) || 0,
+    vatRate: Number(row.vat_rate) || 0,
+    vatAmount: Number(row.vat_amount) || 0,
+    discount: Number(row.discount) || 0,
+    total,
+    amountPaid,
+    balance: row.balance == null ? Math.max(total - amountPaid, 0) : Number(row.balance) || 0,
     status: row.status as Invoice['status'],
-    issuedAt: row.issued_at as string,
-    dueAt: row.due_at as string,
+    issuedAt: (row.issued_at as string) ?? (row.created_at as string),
+    dueAt: (row.due_at as string) ?? (row.due_date as string) ?? '',
     paidAt: (row.paid_at as string) ?? undefined,
     pdfUrl: (row.pdf_url as string) ?? undefined,
   };
@@ -90,21 +94,28 @@ export const getInvoices = async (
       `invoice_number.ilike.%${filters.search}%,customer_name.ilike.%${filters.search}%,order_number.ilike.%${filters.search}%`,
     );
   }
+  if (filters.business && filters.business !== 'all') {
+    query = query.eq('business', filters.business);
+  }
 
   const start = (filters.page - 1) * filters.limit;
   query = query.range(start, start + filters.limit - 1).order('issued_at', { ascending: false });
 
   const { data: invoices, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
-  if (error || !invoices) {
-    return { data: [], total: 0, page: filters.page, limit: filters.limit, totalPages: 0 };
+  if (error) throw new Error(error.message);
+  if (!invoices) return { data: [], total: 0, page: filters.page, limit: filters.limit, totalPages: 0 };
+
+  if (invoices.length === 0) {
+    return { data: [], total: count ?? 0, page: filters.page, limit: filters.limit, totalPages: 0 };
   }
 
   const invoiceIds = invoices.map((inv) => inv.id);
-  const { data: allItems } = await retrySupabaseQuery(
+  const { data: allItems, error: itemsError } = await retrySupabaseQuery(
     () => supabase.from('invoice_items').select('*').in('invoice_id', invoiceIds),
     { maxRetries: 2 }
   );
+  if (itemsError) throw new Error(itemsError.message);
 
   const itemsByInvoice = (allItems ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, item) => {
     const iid = item.invoice_id as string;
@@ -123,6 +134,18 @@ export const getInvoices = async (
     limit: filters.limit,
     totalPages: Math.ceil(total / filters.limit),
   };
+};
+
+/** Fetches every invoice page so accounting totals are never capped by a UI page size. */
+export const getAllInvoices = async (filters: Omit<InvoiceFilters, 'page' | 'limit'> = {}): Promise<Invoice[]> => {
+  const limit = 500;
+  const first = await getInvoices({ ...filters, page: 1, limit });
+  if (first.totalPages <= 1) return first.data;
+
+  const remaining = await Promise.all(
+    Array.from({ length: first.totalPages - 1 }, (_, index) => getInvoices({ ...filters, page: index + 2, limit })),
+  );
+  return [first, ...remaining].flatMap((page) => page.data);
 };
 
 export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null> => {
@@ -156,7 +179,7 @@ export const getPayments = async (
 };
 
 export const createInvoice = async (
-  data: Omit<Invoice, 'id' | 'invoiceNumber' | 'issuedAt'>,
+  data: Omit<Invoice, 'id' | 'invoiceNumber' | 'issuedAt' | 'amountPaid' | 'balance'>,
 ): Promise<{ success: boolean; invoice?: Invoice }> => {
   const { data: inserted, error } = await retrySupabaseQuery(
     () => supabase
