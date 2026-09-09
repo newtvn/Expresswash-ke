@@ -18,7 +18,7 @@ Status values: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED`.
 | ACC-12 | All five pages | High | Verify loading, empty, error, filtering, business scope, responsive layout, keyboard/dialog behavior, and detail paths locally. | Desktop browser walkthrough + responsive source/build checks | DONE |
 | ACC-13 | Regression | High | Run type-check, lint, unit, integration, build, database assertions, and browser smoke suite. | Evidence below | DONE |
 | ACC-14 | Deployment | High | Verify migration order before applying and document release requirements without mutating production during tests. | Local migration ledger + release note below | DONE |
-| ACC-15 | Delivery | High | Commit cleanly, push branch, and open a PR containing scope, risk, migration, and test evidence for user review. | GitHub PR URL | IN PROGRESS |
+| ACC-15 | Delivery | High | Commit cleanly, push branch, and open a PR containing scope, risk, migration, and test evidence for user review. | [PR #67](https://github.com/newtvn/Expresswash-ke/pull/67) | DONE |
 | ACC-16 | Accounts / Payments | Critical | Reconcile Payments Received with Goalhub cash-receipt ingest events while excluding non-cash wallet/redemption/refund movements and preventing double-counting. | RPC reconciliation + local Goalhub fixtures + UI | DONE |
 
 ## Verification evidence
