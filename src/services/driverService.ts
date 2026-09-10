@@ -202,6 +202,18 @@ export const completeRouteStop = async (
   return { success: !error && data === true };
 };
 
+export const transitionOwnDeliveryStop = async (
+  stopId: string,
+  targetStatus: 11 | 12,
+): Promise<{ success: boolean }> => {
+  const { data, error } = await supabase.rpc('transition_own_delivery_stop', {
+    p_stop_id: stopId,
+    p_target_status: targetStatus,
+  });
+
+  return { success: !error && data === true };
+};
+
 export const getDriverPerformance = async (
   driverId: string,
 ): Promise<DriverPerformanceStats | null> => {

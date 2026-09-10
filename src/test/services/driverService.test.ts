@@ -6,7 +6,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { rpc: mockRpc },
 }));
 
-import { completeRouteStop } from '@/services/driverService';
+import { completeRouteStop, transitionOwnDeliveryStop } from '@/services/driverService';
 
 describe('driverService.completeRouteStop', () => {
   beforeEach(() => {
@@ -32,5 +32,37 @@ describe('driverService.completeRouteStop', () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: 'RPC failed' } });
 
     await expect(completeRouteStop('stop-1')).resolves.toEqual({ success: false });
+  });
+});
+
+describe('driverService.transitionOwnDeliveryStop', () => {
+  beforeEach(() => {
+    mockRpc.mockReset();
+  });
+
+  it('starts an owned delivery stop through the guarded RPC', async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+
+    await expect(transitionOwnDeliveryStop('stop-1', 11)).resolves.toEqual({ success: true });
+    expect(mockRpc).toHaveBeenCalledWith('transition_own_delivery_stop', {
+      p_stop_id: 'stop-1',
+      p_target_status: 11,
+    });
+  });
+
+  it('completes an owned delivery stop through the guarded RPC', async () => {
+    mockRpc.mockResolvedValue({ data: true, error: null });
+
+    await expect(transitionOwnDeliveryStop('stop-1', 12)).resolves.toEqual({ success: true });
+    expect(mockRpc).toHaveBeenCalledWith('transition_own_delivery_stop', {
+      p_stop_id: 'stop-1',
+      p_target_status: 12,
+    });
+  });
+
+  it('rejects duplicate, out-of-order, or unauthorized transitions', async () => {
+    mockRpc.mockResolvedValue({ data: false, error: null });
+
+    await expect(transitionOwnDeliveryStop('stop-1', 12)).resolves.toEqual({ success: false });
   });
 });

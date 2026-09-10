@@ -12,8 +12,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MapPin, Clock, CheckCircle, Package, Navigation, Ruler, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
-import { advanceOrderToStatus, updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
+import { getDriverRoutes, completeRouteStop, transitionOwnDeliveryStop } from '@/services/driverService';
+import { advanceOrderToStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
 import { ORDER_STATUS, getOrderStatusLabel } from '@/constants/orderStatus';
 import { Order } from '@/types';
 
@@ -64,10 +64,13 @@ export const PickupDelivery = () => {
    */
   const completeMutation = useMutation({
     mutationFn: async ({ stopId, orderId, type }: { stopId: string; orderId: string; type: 'pickup' | 'delivery' }) => {
-      const newStatus = type === 'pickup'
-        ? ORDER_STATUS.PICKED_UP
-        : ORDER_STATUS.DELIVERED;
-      const statusResult = await advanceOrderToStatus(orderId, newStatus);
+      if (type === 'delivery') {
+        const result = await transitionOwnDeliveryStop(stopId, ORDER_STATUS.DELIVERED);
+        if (!result.success) throw new Error('Delivery is not ready to be completed');
+        return;
+      }
+
+      const statusResult = await advanceOrderToStatus(orderId, ORDER_STATUS.PICKED_UP);
       if (!statusResult.success) throw new Error(statusResult.error ?? 'Failed to update order status');
       const stopResult = await completeRouteStop(stopId);
       if (!stopResult.success) throw new Error('Failed to complete route stop');
@@ -75,6 +78,7 @@ export const PickupDelivery = () => {
     onSuccess: () => {
       toast.success('Stop completed and order updated!');
       qc.invalidateQueries({ queryKey: ['driver', 'routes', user?.id] });
+      qc.invalidateQueries({ queryKey: ['driver', 'assigned-orders', user?.id] });
       setMeasurementDialog(null);
     },
     onError: () => toast.error('Failed to complete stop'),
@@ -82,22 +86,14 @@ export const PickupDelivery = () => {
 
   // Separate mutation for driver-only status updates (e.g. Out for Delivery)
   const statusUpdateMutation = useMutation({
-    mutationFn: async ({ orderId, status }: { orderId: string; status: number }) => {
-      // Guard: drivers can only set these statuses
-      const allowedStatuses = [
-        ORDER_STATUS.PICKED_UP,
-        ORDER_STATUS.OUT_FOR_DELIVERY,
-        ORDER_STATUS.DELIVERED,
-      ];
-      if (!allowedStatuses.includes(status)) {
-        throw new Error('You are not authorized to set this status');
-      }
-      const result = await updateOrderStatus(orderId, status);
-      if (!result.success) throw new Error(result.error ?? 'Failed to update order status');
+    mutationFn: async ({ stopId }: { stopId: string }) => {
+      const result = await transitionOwnDeliveryStop(stopId, ORDER_STATUS.OUT_FOR_DELIVERY);
+      if (!result.success) throw new Error('Delivery is not ready to start');
     },
     onSuccess: () => {
       toast.success('Order status updated!');
       qc.invalidateQueries({ queryKey: ['driver', 'routes', user?.id] });
+      qc.invalidateQueries({ queryKey: ['driver', 'assigned-orders', user?.id] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to update status'),
   });
@@ -295,83 +291,92 @@ export const PickupDelivery = () => {
     </Card>
   );
 
-  const StopCard = ({ stop }: { stop: typeof allStops[0] }) => (
-    <Card className={stop.status === 'completed' ? 'opacity-60' : ''}>
-      <CardContent className="py-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">
-                #{assignedOrders.find((order) => order.id === stop.orderId)?.trackingCode ?? stop.orderId}
-              </span>
-              <Badge variant={stop.status === 'completed' ? 'secondary' : 'default'} className="text-xs capitalize">{stop.status}</Badge>
+  const StopCard = ({ stop }: { stop: typeof allStops[0] }) => {
+    const assignedOrder = assignedOrders.find((order) => order.id === stop.orderId);
+    const deliveryCanStart = assignedOrder?.status === ORDER_STATUS.READY_FOR_DELIVERY;
+    const deliveryCanComplete = assignedOrder?.status === ORDER_STATUS.OUT_FOR_DELIVERY;
+
+    return (
+      <Card className={stop.status === 'completed' ? 'opacity-60' : ''}>
+        <CardContent className="py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">
+                  #{assignedOrder?.trackingCode ?? stop.orderId}
+                </span>
+                <Badge variant={stop.status === 'completed' ? 'secondary' : 'default'} className="text-xs capitalize">
+                  {stop.type === 'delivery' && assignedOrder
+                    ? getOrderStatusLabel(assignedOrder.status)
+                    : stop.status}
+                </Badge>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{stop.address}</div>
+                <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{stop.scheduledTime}</div>
+                <div className="flex items-center gap-1"><Package className="h-3 w-3" />{stop.customerName}</div>
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground space-y-1">
-              <div className="flex items-center gap-1"><MapPin className="h-3 w-3" />{stop.address}</div>
-              <div className="flex items-center gap-1"><Clock className="h-3 w-3" />{stop.scheduledTime}</div>
-              <div className="flex items-center gap-1"><Package className="h-3 w-3" />{stop.customerName}</div>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            {stop.status === 'pending' && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(stop.address)}`)}
-                >
-                  <Navigation className="h-3 w-3 mr-1" /> Navigate
-                </Button>
-                {stop.type === 'pickup' ? (
+            <div className="flex flex-col gap-2">
+              {stop.status === 'pending' && (
+                <>
                   <Button
                     size="sm"
-                    onClick={() => handleCompletePickup(stop.id ?? stop.orderId, stop.orderId)}
-                    disabled={completeMutation.isPending}
+                    variant="outline"
+                    onClick={() => window.open(`https://maps.google.com/?q=${encodeURIComponent(stop.address)}`)}
                   >
-                    <Ruler className="h-3 w-3 mr-1" /> Measure & Pick Up
+                    <Navigation className="h-3 w-3 mr-1" /> Navigate
                   </Button>
-                ) : (
-                  <>
+                  {stop.type === 'pickup' ? (
                     <Button
                       size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        statusUpdateMutation.mutate({
-                          orderId: stop.orderId,
-                          status: ORDER_STATUS.OUT_FOR_DELIVERY,
-                        })
-                      }
-                      disabled={statusUpdateMutation.isPending}
-                    >
-                      <Truck className="h-3 w-3 mr-1" /> Out for Delivery
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        completeMutation.mutate({
-                          stopId: stop.id ?? stop.orderId,
-                          orderId: stop.orderId,
-                          type: stop.type,
-                        })
-                      }
+                      onClick={() => handleCompletePickup(stop.id ?? stop.orderId, stop.orderId)}
                       disabled={completeMutation.isPending}
                     >
-                      <CheckCircle className="h-3 w-3 mr-1" /> Mark Delivered
+                      <Ruler className="h-3 w-3 mr-1" /> Measure & Pick Up
                     </Button>
-                  </>
-                )}
-              </>
-            )}
-            {stop.status === 'completed' && (
-              <Badge className="bg-green-100 text-green-800 text-xs">
-                <CheckCircle className="h-3 w-3 mr-1" /> Done
-              </Badge>
-            )}
+                  ) : (
+                    <>
+                      {deliveryCanStart && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => statusUpdateMutation.mutate({ stopId: stop.id! })}
+                          disabled={!stop.id || statusUpdateMutation.isPending}
+                        >
+                          <Truck className="h-3 w-3 mr-1" /> Out for Delivery
+                        </Button>
+                      )}
+                      {deliveryCanComplete && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            completeMutation.mutate({
+                              stopId: stop.id!,
+                              orderId: stop.orderId,
+                              type: stop.type,
+                            })
+                          }
+                          disabled={!stop.id || completeMutation.isPending}
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" /> Mark Delivered
+                        </Button>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+              {stop.status === 'completed' && (
+                <Badge className="bg-green-100 text-green-800 text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" /> Done
+                </Badge>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-6">
