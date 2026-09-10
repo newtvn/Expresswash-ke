@@ -180,7 +180,7 @@ export const ItemIntake = () => {
     setSubmitting(true);
     try {
       const imageUrl = await uploadImage();
-      const { error } = await supabase.from('warehouse_intake').insert({
+      const { data: intake, error } = await supabase.from('warehouse_intake').insert({
         order_id: form.orderId,
         order_number: form.orderNumber,
         customer_name: form.customerName,
@@ -192,11 +192,11 @@ export const ItemIntake = () => {
         received_at: new Date().toISOString(),
         received_by: user?.name ?? 'Warehouse Staff',
         image_url: imageUrl,
-      });
-      if (error) {
-        toast.error('Failed to log intake: ' + error.message);
+      }).select('id').single();
+      if (error || !intake) {
+        toast.error('Failed to log intake: ' + (error?.message ?? 'No intake record returned'));
       } else {
-        await supabase.from('warehouse_processing').insert({
+        const { error: processingError } = await supabase.from('warehouse_processing').insert({
           order_id: form.orderId,
           order_number: form.orderNumber,
           customer_name: form.customerName,
@@ -207,7 +207,15 @@ export const ItemIntake = () => {
           warehouse_location: form.warehouseLocation || 'Unassigned',
           started_at: new Date().toISOString(),
         });
-        await supabase.from('orders').update({ status: 4, updated_at: new Date().toISOString() }).eq('id', form.orderId);
+        if (processingError) {
+          // Avoid leaving an intake record that can never enter processing.
+          await supabase.from('warehouse_intake').delete().eq('id', intake.id);
+          toast.error('Failed to create processing record: ' + processingError.message);
+          return;
+        }
+
+        // Intake does not change order status: the driver already advanced the
+        // order to PICKED_UP (5). Starting washing advances it to processing.
         toast.success(`Item logged: ${form.itemName} for ${form.orderNumber}`);
         setForm({ orderId: '', orderNumber: '', customerName: '', itemName: '', itemType: '', quantity: 1, conditionNotes: '', warehouseLocation: '' });
         clearImage();
