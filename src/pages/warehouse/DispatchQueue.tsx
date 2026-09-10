@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageCheck, Truck, MapPin, Clock, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProcessingItems, getDispatchQueue, getWarehouseStats } from '@/services/warehouseService';
+import { dispatchWarehouseOrder, getProcessingItems, getDispatchQueue, getWarehouseStats } from '@/services/warehouseService';
 import { getDrivers } from '@/services/driverService';
 import { supabase } from '@/lib/supabase';
 
@@ -161,33 +161,8 @@ const DispatchQueue = () => {
 
   const dispatchMutation = useMutation({
     mutationFn: async ({ row }: { row: DispatchRow }) => {
-      const now = new Date().toISOString();
-
-      if (row.dispatchId) {
-        const { error } = await supabase
-          .from('warehouse_dispatch')
-          .update({ scheduled_delivery: now })
-          .eq('id', row.dispatchId);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await supabase.from('warehouse_dispatch').insert({
-          order_id: row.orderId,
-          order_number: row.orderNumber,
-          customer_name: row.customerName,
-          zone: row.zone || 'Unassigned',
-          items: [`${row.itemName} x${row.quantity}`],
-          total_items: row.quantity,
-          ready_since: row.readySince,
-          assigned_driver: row.assignedDriver,
-          scheduled_delivery: now,
-        });
-        if (error) throw new Error(error.message);
-      }
-
-      await supabase
-        .from('orders')
-        .update({ status: 10, updated_at: now })
-        .eq('id', row.orderId);
+      const result = await dispatchWarehouseOrder(row.orderId);
+      if (!result.success) throw new Error(result.error ?? 'Order was not dispatched');
     },
     onSuccess: () => {
       toast.success('Order dispatched for delivery');

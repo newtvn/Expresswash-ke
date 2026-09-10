@@ -112,6 +112,20 @@ export const getDispatchQueue = async (): Promise<DispatchItem[]> => {
   return data.map(mapDispatch);
 };
 
+export const dispatchWarehouseOrder = async (
+  orderId: string,
+): Promise<{ success: boolean; error?: string }> => {
+  const { data, error } = await supabase.rpc('dispatch_warehouse_order', {
+    p_order_id: orderId,
+  });
+
+  if (error || data !== true) {
+    return { success: false, error: error?.message ?? 'Order was not dispatched' };
+  }
+
+  return { success: true };
+};
+
 export const getWarehouseStats = async (): Promise<WarehouseStats> => {
   const { data, error } = await retrySupabaseQuery(
     () => supabase.from('warehouse_stats').select('*').limit(1).single(),
