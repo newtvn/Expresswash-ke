@@ -1,5 +1,17 @@
 import { defineConfig } from 'vitest/config';
+import { BaseSequencer, type TestSpecification } from 'vitest/node';
 import { resolve } from 'path';
+
+class IntegrationJourneySequencer extends BaseSequencer {
+  async sort(files: TestSpecification[]): Promise<TestSpecification[]> {
+    const journey = ['auth.integration', 'customer.integration', 'driver.integration', 'admin.integration'];
+    return [...files].sort((left, right) => {
+      const leftIndex = journey.findIndex((name) => left.moduleId.includes(name));
+      const rightIndex = journey.findIndex((name) => right.moduleId.includes(name));
+      return leftIndex - rightIndex;
+    });
+  }
+}
 
 export default defineConfig({
   test: {
@@ -19,7 +31,7 @@ export default defineConfig({
     poolOptions: { forks: { singleFork: true } },
     // Run files sequentially — they share state via globalThis (customer → driver → admin)
     fileParallelism: false,
-    sequence: { concurrent: false },
+    sequence: { concurrent: false, sequencer: IntegrationJourneySequencer },
   },
   resolve: {
     alias: {

@@ -185,6 +185,53 @@ export interface RecordCustomerRefundInput {
   reason?: string;
 }
 
+export type ProviderRefundStatus =
+  | 'draft'
+  | 'submitting'
+  | 'requested'
+  | 'processing'
+  | 'completed'
+  | 'rejected'
+  | 'failed_retryable';
+
+export interface ProviderRefundRequest {
+  id: string;
+  paymentId: string;
+  invoiceId?: string;
+  business: string;
+  provider: string;
+  amount: number;
+  currency: string;
+  reason: string;
+  status: ProviderRefundStatus;
+  providerPaymentMethod?: string;
+  providerMessage?: string;
+  attemptCount: number;
+  customerRefundId?: string;
+  postedJournalEntryId?: string;
+  completionEvidenceReference?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface RequestProviderRefundInput {
+  paymentId: string;
+  amount: number;
+  reason: string;
+  idempotencyKey: string;
+}
+
+export interface CompleteProviderRefundInput {
+  refundRequestId: string;
+  evidenceReference: string;
+}
+
+export interface ProviderRefundOperationResult extends AccountingOperationResult {
+  requestId?: string;
+  message?: string;
+}
+
 export interface PaymentAllocationInput {
   invoiceId: string;
   amount: number;

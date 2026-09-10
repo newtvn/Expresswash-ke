@@ -5,16 +5,12 @@
  * sign-out, and negative paths (wrong password, inactive account).
  */
 import { describe, it, expect, afterAll } from 'vitest';
-import { createClient } from '@supabase/supabase-js';
 import {
   TEST_ACCOUNTS,
   adminClient,
+  createTestClient,
   getAuthenticatedClient,
 } from './helpers';
-
-const SUPABASE_URL = 'https://bsmlzvenkeumebfbpsab.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzbWx6dmVua2V1bWViZmJwc2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0ODkyNTAsImV4cCI6MjA4ODA2NTI1MH0.sv4TsAtJy4cPqZsj4BN_U-NdfB2XwwuVdDmAqUAU6BU';
 
 // ─────────────────────────────────────────────────────────────────────
 // 1. CUSTOMER AUTH
@@ -46,7 +42,7 @@ describe('Auth › Customer sign-in', () => {
   });
 
   it('rejects wrong password', async () => {
-    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const client = createTestClient();
     const { error } = await client.auth.signInWithPassword({
       email: TEST_ACCOUNTS.customer.email,
       password: 'WrongPassword123!',
