@@ -50,6 +50,16 @@ describe('orderService - Pricing Calculations', () => {
       expect(result1.label).toBe(result2.label);
       expect(result2.label).toBe(result3.label);
     });
+
+    it('never estimates delivery before a future pickup date', async () => {
+      const pickupDate = new Date();
+      pickupDate.setDate(pickupDate.getDate() + 7);
+      const pickup = pickupDate.toISOString().split('T')[0];
+
+      const result = await calculateETA('Kitengela', pickup);
+
+      expect(result.date >= pickup).toBe(true);
+    });
   });
 
   describe('getDeliveryFee', () => {

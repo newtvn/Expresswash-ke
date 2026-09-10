@@ -94,8 +94,20 @@ function mapOrder(row: Record<string, unknown>, items: Record<string, unknown>[]
 // - Greater Nairobi (Westlands, etc.): 2 business days (48 hours, skip weekends and holidays)
 // - Deliveries only Monday to Friday (excluding holidays)
 // - Example: Order Monday in Nairobi → Delivered Wednesday (if no holidays)
-export async function calculateETA(zone: string): Promise<{ label: string; date: string }> {
+export async function calculateETA(
+  zone: string,
+  pickupDate?: string,
+): Promise<{ label: string; date: string }> {
   const now = new Date();
+  const requestedPickup = pickupDate
+    ? new Date(`${pickupDate}T12:00:00`)
+    : null;
+  const startsOnFuturePickup = requestedPickup !== null
+    && !Number.isNaN(requestedPickup.getTime())
+    && requestedPickup > now;
+  // Cleaning cannot finish before the items have been collected. Use noon for
+  // date-only pickup values so timezone conversion cannot shift the day.
+  const processingStart = startsOnFuturePickup ? requestedPickup : now;
   const z = zone.toLowerCase();
 
   let businessDaysToAdd = 0;
@@ -119,10 +131,10 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
   }
 
   // Fetch holidays within the next 30 days with error handling
-  const endDate = new Date(now);
+  const endDate = new Date(processingStart);
   endDate.setDate(endDate.getDate() + 30);
   const holidays = await getHolidayDates(
-    new Date(now),
+    new Date(processingStart),
     endDate
   ).catch(err => {
     orderLogger.warn('Failed to fetch holidays for ETA calculation', err);
@@ -141,7 +153,7 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
   };
 
   // Calculate delivery date, adding only business days (Mon-Fri, excluding holidays)
-  const eta = new Date(now);
+  const eta = new Date(processingStart);
   let addedDays = 0;
 
   while (addedDays < businessDaysToAdd) {
@@ -155,19 +167,11 @@ export async function calculateETA(zone: string): Promise<{ label: string; date:
 
   // If same day delivery but it's already late, weekend, or holiday, move to next business day
   if (businessDaysToAdd === 0) {
-    const currentHour = now.getHours();
-    // If it's past 2 PM or it's not a business day, move to next business day
-    if (currentHour >= 14 || !isBusinessDay(eta)) {
-      let safety = 0;
-      while (!isBusinessDay(eta) && safety++ < 365) {
-        eta.setDate(eta.getDate() + 1);
-      }
-      // Move to next business day
+    // The 2 PM cut-off applies only to a pickup happening today. Future pickups
+    // remain eligible for same-day delivery on the selected pickup date.
+    const afterSameDayCutoff = !startsOnFuturePickup && now.getHours() >= 14;
+    if (afterSameDayCutoff) {
       eta.setDate(eta.getDate() + 1);
-      safety = 0;
-      while (!isBusinessDay(eta) && safety++ < 365) {
-        eta.setDate(eta.getDate() + 1);
-      }
     }
   }
 
@@ -278,7 +282,7 @@ export const createOrder = async (
       return { success: false, error: 'Unable to generate tracking code. Please try again in a few moments.' };
     }
 
-    const eta = await calculateETA(payload.zone);
+    const eta = await calculateETA(payload.zone, payload.pickupDate);
 
     // Server-side pricing validation — authoritative amounts
     // Skip if caller already validated (e.g. RequestPickup does its own server pricing call)
@@ -636,25 +640,56 @@ export const getOrderByUUID = async (orderId: string): Promise<Order | null> => 
 };
 
 export const updateOrderStatus = async (
-  trackingCode: string,
+  orderIdentifier: string,
   newStatus: number,
-): Promise<{ success: boolean; order?: Order }> => {
-  const { data: existing } = await supabase
-    .from('orders')
-    .select('id')
-    .ilike('tracking_code', trackingCode)
-    .single();
+): Promise<{ success: boolean; order?: Order; error?: string }> => {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(orderIdentifier);
+  const lookup = supabase.from('orders').select('id, tracking_code');
+  const { data: existing } = isUuid
+    ? await lookup.eq('id', orderIdentifier).single()
+    : await lookup.ilike('tracking_code', orderIdentifier).single();
 
-  if (!existing) return { success: false };
+  if (!existing) return { success: false, error: 'Order not found' };
 
   const { error } = await supabase
     .from('orders')
     .update({ status: newStatus, updated_at: new Date().toISOString() })
     .eq('id', existing.id);
 
-  if (error) return { success: false };
+  if (error) return { success: false, error: error.message };
 
-  const order = await getOrderById(trackingCode);
+  const order = await getOrderByUUID(existing.id);
+  return { success: true, order: order ?? undefined };
+};
+
+/** Progress an order one database-approved stage at a time. */
+export const advanceOrderToStatus = async (
+  orderIdentifier: string,
+  targetStatus: number,
+): Promise<{ success: boolean; order?: Order; error?: string }> => {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    .test(orderIdentifier);
+  const lookup = supabase.from('orders').select('id, status');
+  const { data: current } = isUuid
+    ? await lookup.eq('id', orderIdentifier).single()
+    : await lookup.ilike('tracking_code', orderIdentifier).single();
+
+  if (!current) return { success: false, error: 'Order not found' };
+  if (current.status > targetStatus) {
+    return { success: false, error: 'Order has already passed the requested stage' };
+  }
+
+  for (let status = current.status + 1; status <= targetStatus; status++) {
+    const { error } = await supabase
+      .from('orders')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', current.id)
+      .eq('status', status - 1);
+    if (error) return { success: false, error: error.message };
+  }
+
+  const order = await getOrderByUUID(current.id);
   return { success: true, order: order ?? undefined };
 };
 
@@ -689,8 +724,23 @@ export const assignDriverToOrder = async (
     return { success: false, error: 'Order not found' };
   }
 
-  // Only advance status to DRIVER_ASSIGNED if order is CONFIRMED (2).
-  // For other statuses, just attach the driver without changing status.
+  if (current.status > ORDER_STATUS.DRIVER_ASSIGNED) {
+    return { success: false, error: 'This order can no longer be reassigned' };
+  }
+
+  // Confirm pending quotes first because the database intentionally rejects a
+  // direct PENDING -> DRIVER_ASSIGNED jump.
+  if (current.status === ORDER_STATUS.PENDING) {
+    const { error: confirmError } = await supabase
+      .from('orders')
+      .update({ status: ORDER_STATUS.CONFIRMED, updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .eq('status', ORDER_STATUS.PENDING);
+    if (confirmError) {
+      return { success: false, error: `Failed to confirm quote: ${confirmError.message}` };
+    }
+  }
+
   const updatePayload: Record<string, unknown> = {
     driver_id: driverId,
     driver_name: driverName,
@@ -698,7 +748,7 @@ export const assignDriverToOrder = async (
     updated_at: new Date().toISOString(),
   };
 
-  if (current.status === ORDER_STATUS.CONFIRMED) {
+  if (current.status <= ORDER_STATUS.CONFIRMED) {
     updatePayload.status = ORDER_STATUS.DRIVER_ASSIGNED;
   }
 

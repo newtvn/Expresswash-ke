@@ -13,7 +13,7 @@ import { MapPin, Clock, CheckCircle, Package, Navigation, Ruler, Truck } from 'l
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { getDriverRoutes, completeRouteStop } from '@/services/driverService';
-import { updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
+import { advanceOrderToStatus, updateOrderStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
 import { ORDER_STATUS, getOrderStatusLabel } from '@/constants/orderStatus';
 import { notifyOrderStatus, buildPickupSmsMessage } from '@/services/notificationService';
 import { Order } from '@/types';
@@ -65,11 +65,13 @@ export const PickupDelivery = () => {
    */
   const completeMutation = useMutation({
     mutationFn: async ({ stopId, orderId, type }: { stopId: string; orderId: string; type: 'pickup' | 'delivery' }) => {
-      await completeRouteStop(stopId);
       const newStatus = type === 'pickup'
         ? ORDER_STATUS.PICKED_UP
         : ORDER_STATUS.DELIVERED;
-      await updateOrderStatus(orderId, newStatus);
+      const statusResult = await advanceOrderToStatus(orderId, newStatus);
+      if (!statusResult.success) throw new Error(statusResult.error ?? 'Failed to update order status');
+      const stopResult = await completeRouteStop(stopId);
+      if (!stopResult.success) throw new Error('Failed to complete route stop');
     },
     onSuccess: () => {
       toast.success('Stop completed and order updated!');
@@ -91,7 +93,8 @@ export const PickupDelivery = () => {
       if (!allowedStatuses.includes(status)) {
         throw new Error('You are not authorized to set this status');
       }
-      await updateOrderStatus(orderId, status);
+      const result = await updateOrderStatus(orderId, status);
+      if (!result.success) throw new Error(result.error ?? 'Failed to update order status');
     },
     onSuccess: () => {
       toast.success('Order status updated!');

@@ -154,12 +154,12 @@ export const RequestPickup = () => {
     }
   }, [activeZones, quickBooking.zone]);
 
-  // Fetch ETA when zone changes
+  // Fetch ETA when the zone or requested pickup date changes
   useEffect(() => {
     let cancelled = false;
 
     if (zone) {
-      calculateETA(zone)
+      calculateETA(zone, pickupDate)
         .then((result) => {
           if (!cancelled) setEta(result);
         })
@@ -177,7 +177,7 @@ export const RequestPickup = () => {
     return () => {
       cancelled = true;
     };
-  }, [zone]);
+  }, [zone, pickupDate]);
 
   const addItem = useCallback(() => setItems(prev => [...prev, newItemForm()]), []);
 
