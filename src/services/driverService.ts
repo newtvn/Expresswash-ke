@@ -195,14 +195,11 @@ export const updateDriverStatus = async (
 export const completeRouteStop = async (
   stopId: string,
 ): Promise<{ success: boolean }> => {
-  const { error } = await supabase
-    .from('route_stops')
-    .update({
-      status: 'completed',
-      completed_time: new Date().toISOString(),
-    })
-    .eq('id', stopId);
-  return { success: !error };
+  const { data, error } = await supabase.rpc('complete_own_route_stop', {
+    p_stop_id: stopId,
+  });
+
+  return { success: !error && data === true };
 };
 
 export const getDriverPerformance = async (
