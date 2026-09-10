@@ -18,6 +18,9 @@ DECLARE
   v_expense UUID;
   v_invoice UUID;
   v_payment UUID;
+  v_provider_payment UUID;
+  v_provider_request UUID;
+  v_provider_complete JSONB;
   v_refund JSONB;
   v_allocation_options JSONB;
   v_customer_credits JSONB;
@@ -231,6 +234,101 @@ BEGIN
   v_refund := record_customer_refund(v_invoice, v_payment, 601, 'mpesa', NULL, 'Exceeds cap');
   IF (v_refund->>'success')::BOOLEAN IS NOT FALSE OR v_refund->>'error' NOT LIKE 'Refund amount exceeds%' THEN
     RAISE EXCEPTION 'Cumulative refund cap failed: %', v_refund;
+  END IF;
+
+  -- Provider refunds reserve one request without posting cash until settlement.
+  INSERT INTO payments(
+    invoice_id, invoice_number, customer_name, amount, method, status,
+    completed_at, business, provider, provider_payment_id, provider_status,
+    provider_metadata, mpesa_receipt_number
+  ) VALUES (
+    v_invoice, 'AUDIT-REFUND-INVOICE', 'Audit Customer', 1000, 'mpesa', 'completed',
+    NOW(), 'expresswash', 'pesapal', 'audit-provider-payment', 'completed',
+    '{"currency":"KES"}'::jsonb, 'AUDIT-CONFIRMATION'
+  ) RETURNING id INTO v_provider_payment;
+
+  v_result := prepare_provider_refund_request(v_provider_payment, 1000, 'Provider refund fixture', 'audit-provider-refund-1');
+  v_provider_request := (v_result->>'request_id')::UUID;
+  IF (v_result->>'success')::BOOLEAN IS NOT TRUE OR (v_result->>'idempotent')::BOOLEAN IS TRUE THEN
+    RAISE EXCEPTION 'Provider refund reservation failed: %', v_result;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM provider_refund_requests
+    WHERE id = v_provider_request AND (customer_refund_id IS NOT NULL OR posted_journal_entry_id IS NOT NULL)
+  ) THEN RAISE EXCEPTION 'Provider reservation posted accounting before completion'; END IF;
+
+  v_result := prepare_provider_refund_request(v_provider_payment, 1000, 'Provider refund fixture', 'audit-provider-refund-1');
+  IF (v_result->>'idempotent')::BOOLEAN IS NOT TRUE OR (v_result->>'request_id')::UUID <> v_provider_request THEN
+    RAISE EXCEPTION 'Provider refund idempotency failed: %', v_result;
+  END IF;
+
+  v_expected_failure := FALSE;
+  BEGIN
+    PERFORM prepare_provider_refund_request(v_provider_payment, 1000, 'Provider refund fixture', 'audit-provider-refund-2');
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'Only one provider refund request is allowed per payment' THEN
+      RAISE EXCEPTION 'Second provider request failed for the wrong reason: %', SQLERRM;
+    END IF;
+    v_expected_failure := TRUE;
+  END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Second provider refund request unexpectedly succeeded'; END IF;
+
+  -- Provider submission state is server-owned, even for a super admin.
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claim.sub', v_actor::TEXT, true);
+  v_expected_failure := FALSE;
+  BEGIN
+    PERFORM mark_provider_refund_submission(
+      v_provider_request, 'processing', 'Forged browser-side provider result',
+      'AUDIT-CONFIRMATION', 'M-PESA'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_expected_failure := TRUE;
+  WHEN OTHERS THEN
+    RAISE EXCEPTION 'Direct admin provider mutation failed for the wrong reason: %', SQLERRM;
+  END;
+  IF NOT v_expected_failure THEN RAISE EXCEPTION 'Admin directly changed provider submission state'; END IF;
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+
+  PERFORM mark_provider_refund_submission(
+    v_provider_request, 'processing', 'Refund request successfully',
+    'AUDIT-CONFIRMATION', 'M-PESA'
+  );
+  IF EXISTS (
+    SELECT 1 FROM provider_refund_requests
+    WHERE id = v_provider_request AND (status <> 'processing' OR posted_journal_entry_id IS NOT NULL)
+  ) THEN RAISE EXCEPTION 'Provider acceptance was incorrectly treated as completed'; END IF;
+
+  v_provider_complete := complete_provider_refund_request(v_provider_request, 'AUDIT-SETTLEMENT-EVIDENCE');
+  IF (v_provider_complete->>'success')::BOOLEAN IS NOT TRUE
+    OR v_provider_complete->>'status' <> 'completed'
+  THEN RAISE EXCEPTION 'Provider refund completion failed: %', v_provider_complete; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM provider_refund_requests
+    WHERE id = v_provider_request AND status = 'completed'
+      AND customer_refund_id IS NOT NULL AND posted_journal_entry_id IS NOT NULL
+      AND completion_evidence_reference = 'AUDIT-SETTLEMENT-EVIDENCE'
+  ) THEN RAISE EXCEPTION 'Completed provider refund is missing accounting/evidence links'; END IF;
+
+  v_provider_complete := complete_provider_refund_request(v_provider_request, 'AUDIT-SETTLEMENT-EVIDENCE');
+  IF (v_provider_complete->>'idempotent')::BOOLEAN IS NOT TRUE THEN
+    RAISE EXCEPTION 'Provider completion replay was not idempotent: %', v_provider_complete;
+  END IF;
+
+  v_expected_failure := FALSE;
+  BEGIN
+    PERFORM mark_provider_refund_submission(
+      v_provider_request, 'rejected', 'Late provider response must not rewrite settlement',
+      'AUDIT-CONFIRMATION', 'M-PESA'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'Provider refund request cannot transition from completed' THEN
+      RAISE EXCEPTION 'Completed provider mutation failed for the wrong reason: %', SQLERRM;
+    END IF;
+    v_expected_failure := TRUE;
+  END;
+  IF NOT v_expected_failure THEN
+    RAISE EXCEPTION 'Completed provider refund was mutable';
   END IF;
 
   -- Customer credits and aging are scoped/recognized at the accounting boundary.

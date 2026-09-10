@@ -16,9 +16,13 @@ import type {
   CustomerCreditBalance,
   CustomerPaymentAllocationOptions,
   CustomerRefund,
+  CompleteProviderRefundInput,
   JournalEntry,
   JournalEntryInput,
   RecordCustomerRefundInput,
+  ProviderRefundOperationResult,
+  ProviderRefundRequest,
+  RequestProviderRefundInput,
   RecordBillPaymentInput,
   TaxRate,
   UpdateInvoiceInput,
@@ -226,6 +230,29 @@ function mapCustomerRefund(row: Record<string, unknown>): CustomerRefund {
     status: row.status as CustomerRefund['status'],
     postedJournalEntryId: (row.posted_journal_entry_id as string) ?? undefined,
     createdAt: row.created_at as string,
+  };
+}
+
+function mapProviderRefundRequest(row: Record<string, unknown>): ProviderRefundRequest {
+  return {
+    id: row.id as string,
+    paymentId: row.payment_id as string,
+    invoiceId: (row.invoice_id as string) ?? undefined,
+    business: row.business as string,
+    provider: row.provider as string,
+    amount: Number(row.amount) || 0,
+    currency: (row.currency as string) ?? 'KES',
+    reason: row.reason as string,
+    status: row.status as ProviderRefundRequest['status'],
+    providerPaymentMethod: (row.provider_payment_method as string) ?? undefined,
+    providerMessage: (row.provider_message as string) ?? undefined,
+    attemptCount: Number(row.attempt_count) || 0,
+    customerRefundId: (row.customer_refund_id as string) ?? undefined,
+    postedJournalEntryId: (row.posted_journal_entry_id as string) ?? undefined,
+    completionEvidenceReference: (row.completion_evidence_reference as string) ?? undefined,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    completedAt: (row.completed_at as string) ?? undefined,
   };
 }
 
@@ -578,6 +605,49 @@ export async function recordCustomerRefund(input: RecordCustomerRefundInput): Pr
 
   if (error) return failedOperation(error, 'Failed to record refund');
   return mapOperationResult(data, 'Failed to record refund');
+}
+
+export async function listProviderRefundRequests(limit = 100, business?: string): Promise<ProviderRefundRequest[]> {
+  const biz = toBusinessParam(business);
+  const { data, error } = await retrySupabaseQuery(
+    () => {
+      let query = supabase.from('provider_refund_requests').select('*');
+      if (biz) query = query.eq('business', biz);
+      return query.order('created_at', { ascending: false }).limit(limit);
+    },
+    { maxRetries: 2 },
+  );
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(mapProviderRefundRequest);
+}
+
+export async function requestProviderRefund(input: RequestProviderRefundInput): Promise<ProviderRefundOperationResult> {
+  const { data, error } = await supabase.functions.invoke('refund-payment', {
+    body: { action: 'request', ...input },
+  });
+  if (error) return { success: false, error: error.message };
+  const result = (data ?? {}) as Record<string, unknown>;
+  return {
+    success: result.success === true,
+    error: result.error ? String(result.error) : undefined,
+    requestId: (result.requestId as string) ?? undefined,
+    status: (result.status as string) ?? undefined,
+    message: (result.message as string) ?? undefined,
+    idempotent: result.idempotent as boolean | undefined,
+  };
+}
+
+export async function completeProviderRefund(input: CompleteProviderRefundInput): Promise<ProviderRefundOperationResult> {
+  const { data, error } = await supabase.functions.invoke('refund-payment', {
+    body: { action: 'confirm-completed', ...input },
+  });
+  if (error) return { success: false, error: error.message };
+  const result = (data ?? {}) as Record<string, unknown>;
+  return {
+    ...mapOperationResult(result, 'Failed to complete provider refund'),
+    requestId: (result.provider_refund_request_id as string) ?? input.refundRequestId,
+    message: (result.message as string) ?? undefined,
+  };
 }
 
 export async function allocateCustomerPayment(input: AllocateCustomerPaymentInput): Promise<AccountingOperationResult> {

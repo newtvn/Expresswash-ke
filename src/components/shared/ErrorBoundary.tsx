@@ -11,6 +11,7 @@ interface ErrorBoundaryProps {
   showHomeButton?: boolean;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   onReset?: () => void;
+  resetKeys?: readonly unknown[];
 }
 
 interface ErrorBoundaryState {
@@ -72,6 +73,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     // Store errorInfo in state
     this.setState({ errorInfo });
+  }
+
+  componentDidUpdate(previousProps: ErrorBoundaryProps): void {
+    if (!this.state.hasError || !this.props.resetKeys) return;
+
+    const previousKeys = previousProps.resetKeys ?? [];
+    const resetKeysChanged =
+      previousKeys.length !== this.props.resetKeys.length ||
+      this.props.resetKeys.some((key, index) => !Object.is(key, previousKeys[index]));
+
+    if (resetKeysChanged) this.handleReset();
   }
 
   handleReset = () => {

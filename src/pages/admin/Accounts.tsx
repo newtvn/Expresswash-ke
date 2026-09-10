@@ -42,6 +42,7 @@ import {
 import { listNotificationOutbox, replayNotificationOutbox } from '@/services/accounting/outbox';
 import {
   allocateCustomerPayment,
+  completeProviderRefund,
   createSupplierBill,
   getAccountingSetup,
   getCustomerPaymentAllocationOptions,
@@ -53,10 +54,11 @@ import {
   postPaymentReceivedLedgerEntry,
   recordSupplierBillPayment,
   recordCustomerRefund,
+  requestProviderRefund,
   reversePostedJournalEntry,
   saveAccountingContact,
 } from '@/services/accounting/application';
-import type { Bill, ChartAccount, Contact, JournalEntry, NotificationOutboxItem } from '@/types/accounting';
+import type { Bill, ChartAccount, Contact, JournalEntry, NotificationOutboxItem, ProviderRefundRequest } from '@/types/accounting';
 
 type DateRange = { from: Date | undefined; to: Date | undefined };
 type ExpenseCategory = 'fuel' | 'supplies' | 'salary' | 'rent' | 'utilities' | 'marketing' | 'maintenance' | 'other';
@@ -381,6 +383,8 @@ export const Accounts = () => {
   const [billPaymentTarget, setBillPaymentTarget] = useState<Bill | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<AccountPayment | null>(null);
   const [refundTarget, setRefundTarget] = useState<AccountPayment | null>(null);
+  const [providerRefundTarget, setProviderRefundTarget] = useState<AccountPayment | null>(null);
+  const [providerCompletionTarget, setProviderCompletionTarget] = useState<ProviderRefundRequest | null>(null);
   const [allocationTarget, setAllocationTarget] = useState<AccountPayment | null>(null);
   const [contactForm, setContactForm] = useState<{
     name: string;
@@ -413,6 +417,8 @@ export const Accounts = () => {
     reference: '',
     reason: '',
   });
+  const [providerRefundForm, setProviderRefundForm] = useState({ amount: '', reason: '', idempotencyKey: '' });
+  const [completionEvidence, setCompletionEvidence] = useState('');
   const [allocationRows, setAllocationRows] = useState<AllocationFormRow[]>([makeAllocationRow()]);
   const [expenseForm, setExpenseForm] = useState<{
     description: string;
@@ -498,6 +504,7 @@ export const Accounts = () => {
 
   const bills = operationalAccounting?.bills ?? [];
   const refunds = operationalAccounting?.refunds ?? [];
+  const providerRefunds = operationalAccounting?.providerRefunds ?? [];
   const customerCredits = operationalAccounting?.customerCredits ?? [];
   const refundableAmount = refundTarget
     ? Math.max(
@@ -687,6 +694,37 @@ export const Accounts = () => {
       qc.invalidateQueries({ queryKey: ['accounts'] });
     },
     onError: (e: Error) => toast.error(e.message),
+  });
+
+  const providerRefundMutation = useMutation({
+    mutationFn: requestProviderRefund,
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'PesaPal refund request failed');
+        return;
+      }
+      toast.success('PesaPal accepted the refund request for processing');
+      setProviderRefundTarget(null);
+      setProviderRefundForm({ amount: '', reason: '', idempotencyKey: '' });
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const completeProviderRefundMutation = useMutation({
+    mutationFn: completeProviderRefund,
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to complete PesaPal refund');
+        return;
+      }
+      toast.success('PesaPal refund completion recorded and posted');
+      setProviderCompletionTarget(null);
+      setCompletionEvidence('');
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['accounts'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   const allocationMutation = useMutation({
@@ -1267,7 +1305,7 @@ export const Accounts = () => {
               <CardTitle>Customer Credits & Refunds</CardTitle>
             </CardHeader>
             <CardContent>
-              {customerCredits.length === 0 && refunds.length === 0 && (operationalAccounting?.creditNotes.length ?? 0) === 0 ? (
+              {customerCredits.length === 0 && refunds.length === 0 && providerRefunds.length === 0 && (operationalAccounting?.creditNotes.length ?? 0) === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-12">No customer credits, credit notes, or refunds recorded yet</p>
               ) : (
                 <div className="space-y-4">
@@ -1359,7 +1397,60 @@ export const Accounts = () => {
                   <Separator />
 
                   <div>
-                    <p className="text-sm font-medium mb-2">Refunds</p>
+                    <p className="text-sm font-medium mb-2">PesaPal Refund Requests</p>
+                    {providerRefunds.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No provider refund requests yet</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {providerRefunds.map((refund) => (
+                          <div key={refund.id} className="rounded-lg border p-3">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="text-sm font-semibold">{formatCurrency(refund.amount)}</p>
+                                  <Badge variant="outline">{humanizeCode(refund.status)}</Badge>
+                                  <Badge variant="outline">PesaPal</Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  Requested {formatDate(refund.createdAt)} · {refund.currency} · Attempt {refund.attemptCount}
+                                </p>
+                                <p className="text-xs mt-1">{refund.reason}</p>
+                                {refund.providerMessage && <p className="text-xs text-muted-foreground mt-1">Provider: {refund.providerMessage}</p>}
+                                {refund.status === 'completed' && (
+                                  <p className="text-xs text-muted-foreground mt-1">Completion evidence: {refund.completionEvidenceReference}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 sm:justify-end">
+                                {refund.postedJournalEntryId ? (
+                                  <Badge variant="outline">Posted</Badge>
+                                ) : (
+                                  <Badge variant="secondary">No journal posted</Badge>
+                                )}
+                                {(refund.status === 'requested' || refund.status === 'processing') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isConsolidated}
+                                    onClick={() => {
+                                      setProviderCompletionTarget(refund);
+                                      setCompletionEvidence('');
+                                    }}
+                                  >
+                                    Confirm Completion
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <p className="text-sm font-medium mb-2">Refunds Already Sent / Posted</p>
                     {refunds.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No refunds yet</p>
                     ) : (
@@ -2092,8 +2183,24 @@ export const Accounts = () => {
                     });
                   }}
                 >
-                  <RotateCcw className="h-4 w-4 mr-2" /> Record Refund
+                  <RotateCcw className="h-4 w-4 mr-2" /> Record Refund Already Sent
                 </Button>
+                {selectedPayment.provider === 'pesapal' && selectedPayment.status === 'completed' && (
+                  <Button
+                    disabled={isConsolidated || providerRefunds.some((refund) => refund.paymentId === selectedPayment.id)}
+                    title={isConsolidated ? consolidatedWriteHint : undefined}
+                    onClick={() => {
+                      setProviderRefundTarget(selectedPayment);
+                      setProviderRefundForm({
+                        amount: String(selectedPayment.amount),
+                        reason: '',
+                        idempotencyKey: crypto.randomUUID(),
+                      });
+                    }}
+                  >
+                    Request Refund Through PesaPal
+                  </Button>
+                )}
               </div>
 
               <div>
@@ -2227,6 +2334,129 @@ export const Accounts = () => {
               }}
             >
               {refundMutation.isPending ? 'Saving...' : 'Record Refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!providerRefundTarget} onOpenChange={(open) => {
+        if (!open) {
+          setProviderRefundTarget(null);
+          setProviderRefundForm({ amount: '', reason: '', idempotencyKey: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request Refund Through PesaPal</DialogTitle>
+            <DialogDescription>
+              This sends money back to the originally charged card or mobile-money wallet. PesaPal acceptance means processing has started; no accounting refund is posted until completion is confirmed.
+            </DialogDescription>
+          </DialogHeader>
+          {providerRefundTarget && (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <div className="rounded-lg bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Customer</p>
+                  <p className="font-semibold">{providerRefundTarget.customer_name ?? 'Customer'}</p>
+                </div>
+                <div className="rounded-lg bg-muted p-3">
+                  <p className="text-xs text-muted-foreground">Original PesaPal Payment</p>
+                  <p className="font-semibold">{formatCurrency(toAmount(providerRefundTarget.amount))}</p>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="provider-refund-amount">Refund Amount (KES) *</Label>
+                <Input
+                  id="provider-refund-amount"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  max={toAmount(providerRefundTarget.amount)}
+                  value={providerRefundForm.amount}
+                  onChange={(event) => setProviderRefundForm((current) => ({ ...current, amount: event.target.value }))}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">Mobile-money payments require a full refund. Card payments may be partial or full.</p>
+              </div>
+              <div>
+                <Label htmlFor="provider-refund-reason">Reason *</Label>
+                <Textarea
+                  id="provider-refund-reason"
+                  value={providerRefundForm.reason}
+                  onChange={(event) => setProviderRefundForm((current) => ({ ...current, reason: event.target.value }))}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProviderRefundTarget(null)}>Cancel</Button>
+            <Button
+              disabled={providerRefundMutation.isPending || !providerRefundTarget || !providerRefundForm.reason.trim()}
+              onClick={() => {
+                if (!providerRefundTarget) return;
+                const amount = toAmount(providerRefundForm.amount);
+                if (amount <= 0 || amount > toAmount(providerRefundTarget.amount)) {
+                  toast.error('Enter a valid refund amount');
+                  return;
+                }
+                providerRefundMutation.mutate({
+                  paymentId: providerRefundTarget.id,
+                  amount,
+                  reason: providerRefundForm.reason.trim(),
+                  idempotencyKey: providerRefundForm.idempotencyKey,
+                });
+              }}
+            >
+              {providerRefundMutation.isPending ? 'Submitting...' : 'Request PesaPal Refund'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!providerCompletionTarget} onOpenChange={(open) => {
+        if (!open) {
+          setProviderCompletionTarget(null);
+          setCompletionEvidence('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm PesaPal Refund Completion</DialogTitle>
+            <DialogDescription>
+              Use this only after independently verifying that PesaPal completed the refund. This action posts the cash-out accounting journal exactly once.
+            </DialogDescription>
+          </DialogHeader>
+          {providerCompletionTarget && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg bg-muted p-3 text-sm">
+                <p><span className="text-muted-foreground">Amount:</span> {formatCurrency(providerCompletionTarget.amount)}</p>
+                <p><span className="text-muted-foreground">Business:</span> {humanizeCode(providerCompletionTarget.business)}</p>
+                <p><span className="text-muted-foreground">Provider state:</span> {humanizeCode(providerCompletionTarget.status)}</p>
+              </div>
+              <div>
+                <Label htmlFor="refund-completion-evidence">PesaPal Evidence Reference *</Label>
+                <Input
+                  id="refund-completion-evidence"
+                  value={completionEvidence}
+                  onChange={(event) => setCompletionEvidence(event.target.value)}
+                  placeholder="Settlement report or support case reference"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProviderCompletionTarget(null)}>Cancel</Button>
+            <Button
+              disabled={completeProviderRefundMutation.isPending || !providerCompletionTarget || !completionEvidence.trim()}
+              onClick={() => {
+                if (!providerCompletionTarget) return;
+                completeProviderRefundMutation.mutate({
+                  refundRequestId: providerCompletionTarget.id,
+                  evidenceReference: completionEvidence.trim(),
+                });
+              }}
+            >
+              {completeProviderRefundMutation.isPending ? 'Posting...' : 'Confirm Completed and Post'}
             </Button>
           </DialogFooter>
         </DialogContent>

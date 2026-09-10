@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   FileText, Plus, Download, MessageSquare, CheckCircle2, Clock, AlertCircle,
-  Trash2,
+  Trash2, Edit2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';

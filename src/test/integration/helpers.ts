@@ -1,48 +1,65 @@
 /**
  * Integration test helpers — uses a REAL Supabase connection.
- * No mocks, no jsdom. Hits the live database.
+ * No mocks, no jsdom. Hits the explicitly selected database.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// ── Environment ──────────────────────────────────────────────────────
-const SUPABASE_URL = 'https://bsmlzvenkeumebfbpsab.supabase.co';
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzbWx6dmVua2V1bWViZmJwc2FiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0ODkyNTAsImV4cCI6MjA4ODA2NTI1MH0.sv4TsAtJy4cPqZsj4BN_U-NdfB2XwwuVdDmAqUAU6BU';
-const SUPABASE_SERVICE_ROLE_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzbWx6dmVua2V1bWViZmJwc2FiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjQ4OTI1MCwiZXhwIjoyMDg4MDY1MjUwfQ.ZdblNUkLF8qWwrHjrJVs5BhV302aPrN2S7Fsxfpw5g4';
+const requiredEnvironment = (name: string): string => {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing ${name}. Integration tests require runtime-only credentials.`);
+  }
+  return value;
+};
 
-// ── Test accounts ────────────────────────────────────────────────────
+const SUPABASE_URL = process.env.TEST_SUPABASE_URL?.trim() || 'http://127.0.0.1:54321';
+const SUPABASE_ANON_KEY = requiredEnvironment('TEST_SUPABASE_ANON_KEY');
+const SUPABASE_SERVICE_ROLE_KEY = requiredEnvironment('TEST_SUPABASE_SERVICE_ROLE_KEY');
+
+const targetHost = new URL(SUPABASE_URL).hostname;
+const isLocalTarget = targetHost === '127.0.0.1' || targetHost === 'localhost';
+
+if (!isLocalTarget && process.env.ALLOW_PRODUCTION_INTEGRATION_TESTS !== 'true') {
+  throw new Error(
+    `Refusing integration tests against non-local Supabase host ${targetHost}. ` +
+      'Set ALLOW_PRODUCTION_INTEGRATION_TESTS=true only for an explicitly authorized run.',
+  );
+}
+
 export const TEST_ACCOUNTS = {
   customer: {
-    email: 'ngethenan768+user@gmail.com',
-    password: 'TestExpressWash2026!',
-    id: '25776d85-3068-49cf-858c-49404f903cdc',
+    email: requiredEnvironment('TEST_CUSTOMER_EMAIL'),
+    password: requiredEnvironment('TEST_CUSTOMER_PASSWORD'),
+    id: requiredEnvironment('TEST_CUSTOMER_ID'),
     name: 'Test Customer',
     role: 'customer' as const,
     zone: 'kitengela',
   },
   driver: {
-    email: 'ngethenan768+driver@gmail.com',
-    password: 'TestExpressWash2026!',
-    id: '6736e857-d573-48d4-9aed-7ba57a918516',
+    email: requiredEnvironment('TEST_DRIVER_EMAIL'),
+    password: requiredEnvironment('TEST_DRIVER_PASSWORD'),
+    id: requiredEnvironment('TEST_DRIVER_ID'),
     name: 'Test Driver',
     role: 'driver' as const,
     zone: 'kitengela',
   },
   admin: {
-    email: 'ngethenan768+admin@gmail.com',
-    password: 'TestExpressWash2026!',
-    id: 'ca2e02b3-aa10-4787-942a-fd707511d1e1',
-    name: 'Nathan Ngethe',
+    email: requiredEnvironment('TEST_ADMIN_EMAIL'),
+    password: requiredEnvironment('TEST_ADMIN_PASSWORD'),
+    id: requiredEnvironment('TEST_ADMIN_ID'),
+    name: 'Test Admin',
     role: 'admin' as const,
     zone: 'kitengela',
   },
 } as const;
 
-// ── Admin client (bypasses RLS) ──────────────────────────────────────
 export const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// ── Per-user authenticated client factory ────────────────────────────
+/** Create an unauthenticated client against the same guarded test target. */
+export function createTestClient(): SupabaseClient {
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
 export async function getAuthenticatedClient(
   email: string,
   password: string,
@@ -64,20 +81,17 @@ export async function getAuthenticatedClient(
 
     lastError = error?.message ?? 'no session';
     if (attempt < maxAttempts) {
-      // Wait before retry (1s, 2s)
-      await new Promise((r) => setTimeout(r, attempt * 1000));
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
     }
   }
 
-  throw new Error(`Auth failed for ${email} after ${maxAttempts} attempts: ${lastError}`);
+  throw new Error(`Authentication failed after ${maxAttempts} attempts: ${lastError}`);
 }
 
-// ── Cleanup tracker ──────────────────────────────────────────────────
-// Stores IDs of records created during tests so they can be removed afterwards.
 interface CleanupEntry {
   table: string;
   id: string;
-  column?: string; // default: 'id'
+  column?: string;
 }
 
 const cleanupQueue: CleanupEntry[] = [];
@@ -86,10 +100,7 @@ export function trackForCleanup(table: string, id: string, column = 'id') {
   cleanupQueue.push({ table, id, column });
 }
 
-/**
- * Delete all tracked records in reverse order (to respect FK ordering).
- * Uses the service-role client so RLS is bypassed.
- */
+/** Delete tracked fixtures in reverse dependency order. */
 export async function runCleanup() {
   const reversed = [...cleanupQueue].reverse();
   for (const { table, id, column } of reversed) {
@@ -98,9 +109,6 @@ export async function runCleanup() {
   cleanupQueue.length = 0;
 }
 
-// ── Shared test data for realistic scenarios ─────────────────────────
-
-/** Realistic carpet / rug order mimicking a Kitengela household */
 export const REALISTIC_ORDER_ITEMS = [
   {
     name: 'Living Room Persian Carpet',
@@ -109,8 +117,8 @@ export const REALISTIC_ORDER_ITEMS = [
     lengthInches: 120,
     widthInches: 96,
     pricePerSqInch: 0.35,
-    unitPrice: Math.round(120 * 96 * 0.35), // 4032
-    totalPrice: Math.round(120 * 96 * 0.35), // 4032
+    unitPrice: Math.round(120 * 96 * 0.35),
+    totalPrice: Math.round(120 * 96 * 0.35),
   },
   {
     name: 'Bedroom Shaggy Rug',
@@ -119,8 +127,8 @@ export const REALISTIC_ORDER_ITEMS = [
     lengthInches: 72,
     widthInches: 48,
     pricePerSqInch: 0.40,
-    unitPrice: Math.round(72 * 48 * 0.40), // 1382
-    totalPrice: Math.round(72 * 48 * 0.40) * 2, // 2764 (approximate due to rounding)
+    unitPrice: Math.round(72 * 48 * 0.40),
+    totalPrice: Math.round(72 * 48 * 0.40) * 2,
   },
   {
     name: 'Dining Chair Cushion Covers',
@@ -129,13 +137,13 @@ export const REALISTIC_ORDER_ITEMS = [
     lengthInches: 18,
     widthInches: 18,
     pricePerSqInch: 0.45,
-    unitPrice: Math.round(18 * 18 * 0.45), // 146
-    totalPrice: Math.round(18 * 18 * 0.45) * 6, // 876
+    unitPrice: Math.round(18 * 18 * 0.45),
+    totalPrice: Math.round(18 * 18 * 0.45) * 6,
   },
 ];
 
 export function computeOrderTotals(items: typeof REALISTIC_ORDER_ITEMS, zone: string) {
-  const subtotal = items.reduce((sum, i) => sum + i.totalPrice, 0);
+  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
   const deliveryFee = getDeliveryFeeForZone(zone);
   const vat = Math.round((subtotal + deliveryFee) * 0.16);
   const total = subtotal + deliveryFee + vat;
@@ -143,17 +151,17 @@ export function computeOrderTotals(items: typeof REALISTIC_ORDER_ITEMS, zone: st
 }
 
 function getDeliveryFeeForZone(zone: string): number {
-  const z = zone.toLowerCase();
-  if (z.includes('kitengela') || z.includes('athi river')) return 300;
-  if (z.includes('syokimau')) return 350;
-  if (z.includes('nairobi') || z.includes('westlands')) return 500;
+  const normalizedZone = zone.toLowerCase();
+  if (normalizedZone.includes('kitengela') || normalizedZone.includes('athi river')) return 300;
+  if (normalizedZone.includes('syokimau')) return 350;
+  if (normalizedZone.includes('nairobi') || normalizedZone.includes('westlands')) return 500;
   return 600;
 }
 
-/** Return the next weekday YYYY-MM-DD (for pickup dates) */
+/** Return the next weekday as YYYY-MM-DD. */
 export function nextBusinessDay(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
-  return d.toISOString().split('T')[0];
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  while (date.getDay() === 0 || date.getDay() === 6) date.setDate(date.getDate() + 1);
+  return date.toISOString().split('T')[0];
 }

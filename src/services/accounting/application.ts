@@ -6,6 +6,8 @@ import type {
   CreateInvoiceInput,
   JournalEntryInput,
   RecordCustomerRefundInput,
+  CompleteProviderRefundInput,
+  RequestProviderRefundInput,
   RecordBillPaymentInput,
   UpdateInvoiceInput,
 } from '@/types/accounting';
@@ -73,10 +75,11 @@ export async function saveAccountingContact(input: Partial<Contact> & { name: st
 }
 
 export async function getOperationalAccounting(business?: string) {
-  const [bills, creditNotes, refunds, customerCredits] = await Promise.all([
+  const [bills, creditNotes, refunds, providerRefunds, customerCredits] = await Promise.all([
     repository.listBills(100, business),
     repository.listCreditNotes(100, business),
     repository.listCustomerRefunds(100, business),
+    repository.listProviderRefundRequests(100, business),
     repository.listCustomerCreditBalances(business),
   ]);
 
@@ -84,6 +87,7 @@ export async function getOperationalAccounting(business?: string) {
     bills,
     creditNotes,
     refunds,
+    providerRefunds,
     customerCredits,
   };
 }
@@ -200,6 +204,22 @@ export async function recordCustomerRefund(input: RecordCustomerRefundInput) {
   }
 
   return repository.recordCustomerRefund(input);
+}
+
+export async function requestProviderRefund(input: RequestProviderRefundInput) {
+  if (!input.paymentId) return { success: false, error: 'Payment is required' };
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    return { success: false, error: 'Refund amount must be greater than zero' };
+  }
+  if (!input.reason.trim()) return { success: false, error: 'A refund reason is required' };
+  if (input.idempotencyKey.trim().length < 8) return { success: false, error: 'A valid idempotency key is required' };
+  return repository.requestProviderRefund(input);
+}
+
+export async function completeProviderRefund(input: CompleteProviderRefundInput) {
+  if (!input.refundRequestId) return { success: false, error: 'Refund request is required' };
+  if (!input.evidenceReference.trim()) return { success: false, error: 'Completion evidence reference is required' };
+  return repository.completeProviderRefund(input);
 }
 
 export async function allocateCustomerPayment(input: AllocateCustomerPaymentInput) {

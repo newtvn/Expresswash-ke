@@ -34,7 +34,22 @@ export interface ProviderPaymentStatus {
   amount?: number;
   confirmationCode?: string;
   paymentMethod?: string;
+  currency?: string;
   payerPhoneNumber?: string;
+  raw: Record<string, unknown>;
+}
+
+export interface RefundPaymentRequest {
+  confirmationCode: string;
+  amount: number;
+  username: string;
+  remarks: string;
+}
+
+export interface RefundPaymentResult {
+  accepted: boolean;
+  providerStatus: 'requested' | 'rejected';
+  message: string;
   raw: Record<string, unknown>;
 }
 
@@ -42,6 +57,7 @@ export interface PaymentProvider {
   name: PaymentProviderName;
   startPayment(request: StartPaymentRequest): Promise<StartPaymentResult>;
   getPaymentStatus(orderTrackingId: string): Promise<ProviderPaymentStatus>;
+  requestRefund(request: RefundPaymentRequest): Promise<RefundPaymentResult>;
 }
 
 const PESAPAL_SANDBOX_BASE_URL = 'https://cybqa.pesapal.com/pesapalv3';
@@ -71,6 +87,12 @@ function normalizeAmount(amount: number): number {
 
 function truncate(value: string, maxLength: number): string {
   return value.length > maxLength ? value.slice(0, maxLength) : value;
+}
+
+function requestSignal(): AbortSignal {
+  const configured = Number(Deno.env.get('PESAPAL_REQUEST_TIMEOUT_MS') ?? 15_000);
+  const timeout = Number.isFinite(configured) && configured >= 100 ? configured : 15_000;
+  return AbortSignal.timeout(timeout);
 }
 
 export function formatPhoneNumber(phone: string): string {
@@ -204,6 +226,7 @@ class PesapalProvider implements PaymentProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: requestSignal(),
     });
 
     const data = await readJson(response);
@@ -234,6 +257,7 @@ class PesapalProvider implements PaymentProvider {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+      signal: requestSignal(),
     });
 
     const data = await readJson(response);
@@ -255,12 +279,43 @@ class PesapalProvider implements PaymentProvider {
       amount: data.amount === undefined || data.amount === null ? undefined : Number(data.amount),
       confirmationCode: data.confirmation_code ? String(data.confirmation_code) : undefined,
       paymentMethod: data.payment_method ? String(data.payment_method) : undefined,
+      currency: data.currency ? String(data.currency).toUpperCase() : undefined,
       payerPhoneNumber: getStringField(data, [
         'phone_number',
         'payer_phone_number',
         'customer_phone_number',
         'msisdn',
       ]),
+      raw: data,
+    };
+  }
+
+  async requestRefund(request: RefundPaymentRequest): Promise<RefundPaymentResult> {
+    const token = await this.requestToken();
+    const response = await fetch(`${this.baseUrl}/api/Transactions/RefundRequest`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        confirmation_code: request.confirmationCode,
+        amount: normalizeAmount(request.amount).toFixed(2),
+        username: truncate(request.username, 100),
+        remarks: truncate(request.remarks, 200),
+      }),
+      signal: requestSignal(),
+    });
+
+    const data = await readJson(response);
+    const status = String(data.status ?? data.error ?? response.status);
+    const accepted = response.ok && status === '200';
+
+    return {
+      accepted,
+      providerStatus: accepted ? 'requested' : 'rejected',
+      message: String(data.message || (accepted ? 'Refund request received' : 'Refund request rejected')),
       raw: data,
     };
   }
@@ -276,6 +331,7 @@ class PesapalProvider implements PaymentProvider {
         consumer_key: requiredEnv('PESAPAL_CONSUMER_KEY'),
         consumer_secret: requiredEnv('PESAPAL_CONSUMER_SECRET'),
       }),
+      signal: requestSignal(),
     });
 
     const data = await readJson(response);
