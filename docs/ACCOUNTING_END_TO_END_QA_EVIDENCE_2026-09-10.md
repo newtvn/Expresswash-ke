@@ -3,8 +3,8 @@
 ## Run identity and verdict
 
 - Reviewed base commit: `c55bb0f95df154f18ccb5cf27f3faf7dfc4737b8`
-- Branch: `fix/accounting-review-followups`
-- Pull request at start of continuation: PR #68, merged
+- Release commit: `968e41d5dfaed714d3e0fa19f2b3695ffd9dbe61`
+- Pull requests: #68 and #69, merged
 - Tester: Codex
 - Test window: 2026-09-09 through 2026-09-10 EAT (`Africa/Nairobi`)
 - Local web: `http://127.0.0.1:8080`
@@ -16,10 +16,10 @@
 The fixes and local automated suites pass, and production now contains migration
 `084` plus the `refund-payment` Edge Function. The full runbook release gate is
 still not met: the formerly tracked production service-role credential has not
-been proven rotated/revoked, Render's deployed commit could not be retrieved,
-the authenticated multi-role/viewport browser matrix remains incomplete and
-exposed deployed invoice/error-boundary regressions, and genuine PesaPal
-sandbox/live settlement evidence is outstanding.
+been proven rotated/revoked, the authenticated multi-role/viewport browser
+matrix remains incomplete, the post-deploy ACC-17/18 browser retest is blocked
+by Chrome's open extension UI, and genuine PesaPal sandbox/live settlement
+evidence is outstanding.
 
 ## Changes made during the run
 
@@ -30,7 +30,8 @@ sandbox/live settlement evidence is outstanding.
 - Type-check and production build now resolve the symbol.
 - The authenticated production smoke failed: the Payment dialog opened, but
   Cancel crashed `/admin/invoices` with `Edit2 is not defined`. The deployed
-  bundle therefore does not yet contain or correctly apply the reviewed fix.
+  bundle at that time did not contain the reviewed fix. PR #69 subsequently
+  deployed the fix; its authenticated production retest is pending.
 
 ### ACC-18 — sticky admin error boundary
 
@@ -42,6 +43,8 @@ sandbox/live settlement evidence is outstanding.
   `/admin/invoices` to `/admin/accounts`, but the invoice error boundary stayed
   visible. The Try Again control recovered the Accounts page. Back/Forward,
   Home, Reload, and the remaining keyboard recovery paths are still pending.
+  PR #69 subsequently deployed the route-reset change; its authenticated
+  production retest is pending.
 
 ### ACC-19 — provider-backed PesaPal refunds
 
@@ -280,6 +283,27 @@ The final browser diagnostic check contained no captured errors and two Sentry
 configuration warnings. The `Edit2` failure is evidenced by the rendered error
 boundary, even though it was not retained in the final diagnostic log buffer.
 
+### Fix rollout — 2026-09-10
+
+The accounting/refund follow-up was committed as `73554a0`, reviewed by GitHub
+CI, and merged through PR #69 as `968e41d`. Build, lint/type-check, security
+audit, and preview checks passed. Render auto-deploy
+`dep-dah2qsnavr4c73e1rdig` completed successfully in 33 seconds, and the Render
+dashboard identifies `968e41d` as the live production commit.
+
+Local verification after the merge passed: 118 unit/component tests, TypeScript
+with no errors, the production build, lint with nine pre-existing warnings and
+no errors, and all 55 guarded integration tests against local Supabase. No
+production integration suite was run. The existing local QA fixtures were used;
+an attempted fixture reseed was stopped by the local Auth admin-key path before
+any fixture change, then the guarded suite completed normally.
+
+The authenticated post-deploy browser smoke could not start because Chrome
+reported an open extension UI and detached its debugger during sign-in. Failed
+automation attempts left both credential fields empty and made no authenticated
+request. Dismissing that Chrome extension UI is required before ACC-17/18 can be
+closed.
+
 ## Incident during the run
 
 Before the unsafe test discovery was identified, the first `npm test` invocation
@@ -307,10 +331,10 @@ Supabase. The final clean-replay run completed in 2.15 seconds.
 2. Review production for artifacts or state changes from the unintended legacy
    integration run and remove or restore only confirmed QA records through an
    approved production change process.
-3. Commit and review the migration/function/frontend working tree so the deployed
-   backend can be tied to an immutable source SHA.
-4. Confirm Render deploy ID/status/SHA equals the reviewed release commit.
-5. Deploy and retest ACC-17/18, fix or accept the role landing/mobile-overlay
+3. **Closed:** migration, function, frontend, and evidence were reviewed and
+   merged through PR #69 as immutable release commit `968e41d`.
+4. **Closed:** Render deploy `dep-dah2qsnavr4c73e1rdig` is live at `968e41d`.
+5. Retest ACC-17/18, fix or accept the role landing/mobile-overlay
    findings, and complete the still-missing desktop, keyboard, navigation,
    loading/empty/error-state, console, and network portions of the runbook.
 6. Run the genuine PesaPal sandbox suite. Perform a live low-value refund only if
