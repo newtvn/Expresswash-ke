@@ -260,14 +260,18 @@ export const PickupDelivery = () => {
 
   // Orders assigned directly (admin) that don't yet have a route stop
   const directPickups = assignedOrders.filter(
-    (o) => o.id && !routeStopOrderIds.has(o.id)
+    (o) => o.id
+      && o.status >= ORDER_STATUS.CONFIRMED
+      && o.status <= ORDER_STATUS.PICKUP_SCHEDULED
+      && !routeStopOrderIds.has(o.id)
   );
 
   const allStops = routes.flatMap((r) =>
     r.stops.map((s) => ({ ...s, routeId: r.id, routeDate: r.date }))
   );
-  const deliveryStops = allStops.filter((s) => s.type === 'delivery');
-  const totalPickups = directPickups.length + allStops.filter((s) => s.type === 'pickup').length;
+  const pendingPickupStops = allStops.filter((s) => s.type === 'pickup' && s.status === 'pending');
+  const deliveryStops = allStops.filter((s) => s.type === 'delivery' && s.status === 'pending');
+  const totalPickups = directPickups.length + pendingPickupStops.length;
   const totalDeliveries = deliveryStops.length;
 
   // Card for direct order assignments
@@ -315,7 +319,9 @@ export const PickupDelivery = () => {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">#{stop.orderId}</span>
+              <span className="font-semibold text-sm">
+                #{assignedOrders.find((order) => order.id === stop.orderId)?.trackingCode ?? stop.orderId}
+              </span>
               <Badge variant={stop.status === 'completed' ? 'secondary' : 'default'} className="text-xs capitalize">{stop.status}</Badge>
             </div>
             <div className="text-sm text-muted-foreground space-y-1">
@@ -398,12 +404,12 @@ export const PickupDelivery = () => {
             <TabsTrigger value="deliveries">Deliveries ({totalDeliveries} pending)</TabsTrigger>
           </TabsList>
           <TabsContent value="pickups" className="mt-4 space-y-3">
-            {directPickups.length === 0 && allStops.filter((s) => s.type === 'pickup').length === 0 ? (
+            {directPickups.length === 0 && pendingPickupStops.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No pickups assigned</p>
             ) : (
               <>
                 {directPickups.map((o) => <OrderCard key={o.id} order={o} />)}
-                {allStops.filter((s) => s.type === 'pickup').map((s, i) => <StopCard key={s.id ?? i} stop={s} />)}
+                {pendingPickupStops.map((s, i) => <StopCard key={s.id ?? i} stop={s} />)}
               </>
             )}
           </TabsContent>
