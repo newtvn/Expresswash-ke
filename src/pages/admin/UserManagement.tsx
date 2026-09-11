@@ -29,6 +29,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
+const formatJoinedDate = (value?: string) => {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 export const UserManagement = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -102,10 +107,6 @@ export const UserManagement = () => {
   };
 
   const all = useMemo(() => allResult?.data ?? [], [allResult?.data]);
-  const formatJoinedDate = (value?: string) => {
-    if (!value) return '—';
-    return new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
   const customers = useMemo(() => all.filter((userProfile) => userProfile.role === 'customer'), [all]);
   const drivers = useMemo(() => all.filter((userProfile) => userProfile.role === 'driver'), [all]);
   const staff = useMemo(
@@ -144,7 +145,7 @@ export const UserManagement = () => {
     }
   };
 
-  const columns: Column<UserProfile>[] = [
+  const columns: Column<UserProfile>[] = useMemo(() => [
     { key: 'name', header: 'Name', sortable: true },
     { key: 'email', header: 'Email', sortable: true },
     { key: 'phone', header: 'Phone' },
@@ -220,7 +221,7 @@ export const UserManagement = () => {
         </div>
       ),
     },
-  ];
+  ], [toggleMutation]);
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,5 @@
 export { SalesChart } from './SalesChart';
+export { RevenueSparkline } from './RevenueSparkline';
 export { RevenueChart } from './RevenueChart';
 export { ZonePerformanceChart } from './ZonePerformanceChart';
 export { OrderStatusPieChart } from './OrderStatusPieChart';
