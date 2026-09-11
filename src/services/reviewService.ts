@@ -200,23 +200,30 @@ export async function getPendingReviews(): Promise<Review[]> {
   return data.map(mapReview);
 }
 
-/**
- * Get all reviews with optional status filter (admin)
- */
-export async function getAllReviews(status?: string): Promise<Review[]> {
+export interface ReviewPage {
+  rows: Review[];
+  total: number;
+}
+
+/** Server-paginated reviews (admin). Search matches the review text. */
+export async function getReviewsPage(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<ReviewPage> {
+  const from = params.page * params.pageSize;
   let query = supabase
     .from('reviews')
-    .select(REVIEW_SELECT)
-    .order('created_at', { ascending: false });
+    .select(REVIEW_SELECT, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, from + params.pageSize - 1);
 
-  if (status) {
-    query = query.eq('status', status);
-  }
+  const term = (params.search ?? '').trim();
+  if (term) query = query.ilike('review_text', `%${term}%`);
 
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
-
-  if (error || !data) return [];
-  return data.map(mapReview);
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error || !data) return { rows: [], total: count ?? 0 };
+  return { rows: data.map(mapReview), total: count ?? 0 };
 }
 
 /**

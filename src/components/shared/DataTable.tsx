@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ChevronUp, ChevronDown, Search, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Paginator } from './Paginator';
 
 export interface Column<T> {
   key: string;
@@ -18,6 +19,20 @@ export interface Column<T> {
   render?: (item: T) => React.ReactNode;
   sortable?: boolean;
   className?: string;
+}
+
+/**
+ * Server-driven pagination. When provided, DataTable renders exactly the rows
+ * passed in `data` (the current page), skips client-side filter/sort, and shows
+ * the shared Paginator. Search input changes are delegated via onSearchChange.
+ */
+export interface ServerPagination {
+  page: number; // 0-indexed
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onSearchChange?: (term: string) => void;
 }
 
 interface DataTableProps<T> {
@@ -29,6 +44,7 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   className?: string;
   emptyMessage?: string;
+  serverPagination?: ServerPagination;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -40,13 +56,19 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowClick,
   className,
   emptyMessage = 'No data found',
+  serverPagination,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(0);
 
+  const isServer = !!serverPagination;
+  // In server mode the caller owns filtering/sorting/paging, so render `data` as-is.
+  const canSort = (col: Column<T>) => !!col.sortable && !isServer;
+
   const processed = useMemo(() => {
+    if (isServer) return data;
     let result = [...data];
 
     if (search) {
@@ -73,9 +95,9 @@ export function DataTable<T extends Record<string, unknown>>({
     }
 
     return result;
-  }, [data, search, sortKey, sortDir]);
+  }, [data, search, sortKey, sortDir, isServer]);
 
-  const paged = processed.slice(page * pageSize, (page + 1) * pageSize);
+  const paged = isServer ? processed : processed.slice(page * pageSize, (page + 1) * pageSize);
   const totalPages = Math.ceil(processed.length / pageSize);
 
   const handleSort = (key: string) => {
@@ -98,6 +120,7 @@ export function DataTable<T extends Record<string, unknown>>({
             onChange={(e) => {
               setSearch(e.target.value);
               setPage(0);
+              serverPagination?.onSearchChange?.(e.target.value);
             }}
             className="pl-9"
           />
@@ -112,14 +135,14 @@ export function DataTable<T extends Record<string, unknown>>({
                 <TableHead
                   key={`${col.key}-${col.header}-${columnIndex}`}
                   className={cn(
-                    col.sortable && 'cursor-pointer select-none hover:bg-muted/80',
+                    canSort(col) && 'cursor-pointer select-none hover:bg-muted/80',
                     col.className
                   )}
-                  onClick={() => col.sortable && handleSort(col.key)}
+                  onClick={() => canSort(col) && handleSort(col.key)}
                 >
                   <span className="flex items-center gap-1">
                     {col.header}
-                    {col.sortable && sortKey === col.key && (
+                    {canSort(col) && sortKey === col.key && (
                       sortDir === 'asc' ? (
                         <ChevronUp className="w-3 h-3" />
                       ) : (
@@ -209,7 +232,15 @@ export function DataTable<T extends Record<string, unknown>>({
         )}
       </div>
 
-      {totalPages > 1 && (
+      {serverPagination ? (
+        <Paginator
+          page={serverPagination.page}
+          totalPages={serverPagination.totalPages}
+          total={serverPagination.total}
+          pageSize={serverPagination.pageSize}
+          onPageChange={serverPagination.onPageChange}
+        />
+      ) : totalPages > 1 && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
             Showing {page * pageSize + 1}-
