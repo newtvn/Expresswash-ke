@@ -176,6 +176,46 @@ export const getDriverRoutes = async (
   return routes.map((r) => mapRoute(r, stopsByRoute[r.id] ?? []));
 };
 
+/**
+ * Return every unfinished route for a driver, including routes created on a
+ * previous day. Delivery work can legitimately cross midnight and must remain
+ * actionable until its final stop is completed.
+ */
+export const getDriverActiveRoutes = async (driverId: string): Promise<DriverRoute[]> => {
+  const { data: routes, error } = await retrySupabaseQuery(
+    () => supabase
+      .from('driver_routes')
+      .select('*')
+      .eq('driver_id', driverId)
+      .neq('status', 'completed')
+      .order('date', { ascending: false }),
+    { maxRetries: 2 }
+  );
+
+  if (error || !routes || routes.length === 0) return [];
+
+  const routeIds = routes.map((route) => route.id);
+  const { data: pendingStops } = await retrySupabaseQuery(
+    () => supabase
+      .from('route_stops')
+      .select('*')
+      .in('route_id', routeIds)
+      .eq('status', 'pending'),
+    { maxRetries: 2 }
+  );
+
+  const stopsByRoute = (pendingStops ?? []).reduce<Record<string, Record<string, unknown>[]>>((acc, stop) => {
+    const routeId = stop.route_id as string;
+    if (!acc[routeId]) acc[routeId] = [];
+    acc[routeId].push(stop);
+    return acc;
+  }, {});
+
+  return routes
+    .map((route) => mapRoute(route, stopsByRoute[route.id] ?? []))
+    .filter((route) => route.stops.length > 0);
+};
+
 export const updateDriverStatus = async (
   id: string,
   status: DriverStatus,

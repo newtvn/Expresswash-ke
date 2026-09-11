@@ -1,12 +1,72 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockRpc } = vi.hoisted(() => ({ mockRpc: vi.fn() }));
-
-vi.mock('@/lib/supabase', () => ({
-  supabase: { rpc: mockRpc },
+const { mockRpc, mockFrom } = vi.hoisted(() => ({
+  mockRpc: vi.fn(),
+  mockFrom: vi.fn(),
 }));
 
-import { completeRouteStop, transitionOwnDeliveryStop } from '@/services/driverService';
+vi.mock('@/lib/supabase', () => ({
+  supabase: { rpc: mockRpc, from: mockFrom },
+}));
+
+import { completeRouteStop, getDriverActiveRoutes, transitionOwnDeliveryStop } from '@/services/driverService';
+
+describe('driverService.getDriverActiveRoutes', () => {
+  beforeEach(() => {
+    mockFrom.mockReset();
+  });
+
+  it('loads pending stops from unfinished routes without restricting them to today', async () => {
+    const routeOrder = vi.fn().mockResolvedValue({
+      data: [{
+        id: 'route-yesterday',
+        driver_id: 'driver-1',
+        date: '2026-09-10',
+        zone: 'Kitengela',
+        status: 'in_progress',
+      }],
+      error: null,
+    });
+    const routeQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      order: routeOrder,
+    };
+
+    const stopEq = vi.fn().mockResolvedValue({
+      data: [{
+        id: 'stop-1',
+        route_id: 'route-yesterday',
+        order_id: 'order-1',
+        customer_name: 'QA Customer',
+        address: 'QA Address',
+        type: 'delivery',
+        scheduled_time: '2026-09-10T18:00:00Z',
+        status: 'pending',
+      }],
+      error: null,
+    });
+    const stopQuery = {
+      select: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      eq: stopEq,
+    };
+
+    mockFrom.mockImplementation((table: string) => (
+      table === 'driver_routes' ? routeQuery : stopQuery
+    ));
+
+    const routes = await getDriverActiveRoutes('driver-1');
+
+    expect(routeQuery.eq).toHaveBeenCalledWith('driver_id', 'driver-1');
+    expect(routeQuery.neq).toHaveBeenCalledWith('status', 'completed');
+    expect(stopQuery.in).toHaveBeenCalledWith('route_id', ['route-yesterday']);
+    expect(stopEq).toHaveBeenCalledWith('status', 'pending');
+    expect(routes).toHaveLength(1);
+    expect(routes[0].stops[0]).toMatchObject({ id: 'stop-1', orderId: 'order-1' });
+  });
+});
 
 describe('driverService.completeRouteStop', () => {
   beforeEach(() => {

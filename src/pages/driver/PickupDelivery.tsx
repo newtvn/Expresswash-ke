@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { MapPin, Clock, CheckCircle, Package, Navigation, Ruler, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { getDriverRoutes, completeRouteStop, transitionOwnDeliveryStop } from '@/services/driverService';
+import { getDriverActiveRoutes, completeRouteStop, transitionOwnDeliveryStop } from '@/services/driverService';
 import { advanceOrderToStatus, getOrderByUUID, calculateItemPrice, updateOrderItems, PRICING, getDriverAssignedOrders } from '@/services/orderService';
 import { ORDER_STATUS, getOrderStatusLabel } from '@/constants/orderStatus';
 import { Order } from '@/types';
@@ -35,14 +35,12 @@ interface MeasurementDialogData {
 export const PickupDelivery = () => {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const today = new Date().toISOString().split('T')[0];
-
   const [measurementDialog, setMeasurementDialog] = useState<MeasurementDialogData | null>(null);
   const [submittingMeasurements, setSubmittingMeasurements] = useState(false);
 
   const { data: routes = [], isLoading: routesLoading } = useQuery({
-    queryKey: ['driver', 'routes', user?.id, today],
-    queryFn: () => getDriverRoutes(user!.id, today),
+    queryKey: ['driver', 'routes', user?.id, 'active'],
+    queryFn: () => getDriverActiveRoutes(user!.id),
     enabled: !!user?.id,
     refetchInterval: 15000,
   });
@@ -380,7 +378,7 @@ export const PickupDelivery = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Pickups & Deliveries" description="Manage today's assignments" />
+      <PageHeader title="Pickups & Deliveries" description="Manage active assignments" />
 
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
