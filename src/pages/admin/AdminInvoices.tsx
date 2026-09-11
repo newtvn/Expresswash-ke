@@ -82,6 +82,14 @@ export interface InvoiceTemplate {
   created_at: string;
 }
 
+type DeliveredOrderCandidate = {
+  id: string;
+  trackingCode: string;
+  customerName: string;
+  total: number;
+  deliveredAt: string;
+};
+
 type InvoiceFormLine = {
   id: string;
   itemId: string;
@@ -240,56 +248,58 @@ async function recordInvoicePayment(payload: {
   }
 }
 
-async function createInvoiceFromOrder(orderId: string): Promise<{ success: boolean; invoiceNumber?: string; error?: string }> {
-  const { data: order, error: orderErr } = await supabase
+async function fetchDeliveredOrdersWithoutInvoice(): Promise<DeliveredOrderCandidate[]> {
+  const { data: orders, error } = await supabase
     .from('orders')
-    .select('*, order_items(*)')
-    .eq('id', orderId)
-    .single();
+    .select('id,tracking_code,customer_name,total,updated_at')
+    .eq('status', 12)
+    .order('updated_at', { ascending: false })
+    .limit(100);
 
-  if (orderErr || !order) return { success: false, error: 'Order not found' };
+  if (error) throw new Error(error.message);
+  if (!orders?.length) return [];
 
-  const vatRate = 0.16;
-  const items = ((order.order_items as Record<string, unknown>[]) ?? []).map((i) => ({
-    name: String(i.name ?? i.description ?? 'Service'),
-    quantity: toAmount(i.quantity || 1),
-    unit_price: toAmount(i.unit_price),
-    total: toAmount(i.total_price ?? i.total),
-  }));
+  const { data: existingInvoices, error: invoiceError } = await supabase
+    .from('invoices')
+    .select('order_id')
+    .in('order_id', orders.map((order) => order.id))
+    .neq('status', 'cancelled');
 
-  const subtotal = items.reduce((s, i) => s + i.total, 0);
-  const vatAmount = Math.round(subtotal * vatRate);
-  const total = subtotal + vatAmount + ((order.delivery_fee as number) ?? 0);
+  if (invoiceError) throw new Error(invoiceError.message);
+  const invoicedOrderIds = new Set((existingInvoices ?? []).map((invoice) => invoice.order_id as string));
 
-  const invoiceNumber = `INV-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 14);
+  return orders
+    .filter((order) => !invoicedOrderIds.has(order.id))
+    .map((order) => ({
+      id: order.id,
+      trackingCode: order.tracking_code,
+      customerName: order.customer_name,
+      total: toAmount(order.total),
+      deliveredAt: order.updated_at,
+    }));
+}
 
-  const { error } = await supabase.from('invoices').insert({
-    invoice_number: invoiceNumber,
-    order_id: orderId,
-    order_number: (order.order_number as string) ?? (order.tracking_code as string) ?? invoiceNumber,
-    order_tracking_code: order.tracking_code as string,
-    customer_id: (order.customer_id as string) ?? null,
-    customer_name: order.customer_name as string,
-    customer_email: (order.customer_email as string) ?? '',
-    customer_phone: (order.customer_phone as string) ?? null,
-    items,
-    subtotal,
-    vat_rate: vatRate,
-    vat_amount: vatAmount,
-    total,
-    paid_amount: 0,
-    balance: total,
-    status: 'pending',
-    due_date: toLocalDateString(dueDate),
-    due_at: dueDate.toISOString(),
-    issued_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
+async function createInvoiceFromOrder(
+  orderId: string,
+  dueDate: string,
+  post: boolean,
+  business?: string,
+): Promise<{ success: boolean; idempotent?: boolean; invoiceNumber?: string; error?: string }> {
+  const { data, error } = await supabase.rpc('create_invoice_from_delivered_order', {
+    p_order_id: orderId,
+    p_due_date: dueDate || null,
+    p_post: post,
+    p_business: business || null,
   });
 
   if (error) return { success: false, error: error.message };
-  return { success: true, invoiceNumber };
+  const result = data as { success?: boolean; idempotent?: boolean; invoice_number?: string; error?: string } | null;
+  return {
+    success: result?.success === true,
+    idempotent: result?.idempotent === true,
+    invoiceNumber: result?.invoice_number,
+    error: result?.error,
+  };
 }
 
 async function saveTemplate(template: Omit<InvoiceTemplate, 'id' | 'created_at'>): Promise<void> {
@@ -390,6 +400,12 @@ async function generateInvoicePdf(invoiceId: string) {
   window.open(url, '_blank');
 }
 
+const defaultInvoiceDueDate = (): string => {
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 14);
+  return toLocalDateString(dueDate);
+};
+
 // ---------- Component ----------
 
 export const AdminInvoices = () => {
@@ -405,6 +421,10 @@ export const AdminInvoices = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [creditDialogOpen, setCreditDialogOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [orderInvoiceDialogOpen, setOrderInvoiceDialogOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState('');
+  const [orderInvoiceDueDate, setOrderInvoiceDueDate] = useState(defaultInvoiceDueDate);
+  const [postOrderInvoice, setPostOrderInvoice] = useState(true);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [invoiceForm, setInvoiceForm] = useState({
     contactId: '',
@@ -429,6 +449,12 @@ export const AdminInvoices = () => {
     refetchInterval: 30000,
   });
 
+  const { data: deliveredOrders = [], isLoading: deliveredOrdersLoading } = useQuery({
+    queryKey: ['admin', 'invoices', 'delivered-orders-without-invoice'],
+    queryFn: fetchDeliveredOrdersWithoutInvoice,
+    enabled: orderInvoiceDialogOpen,
+  });
+
   const { data: templates = [] } = useQuery({
     queryKey: ['admin', 'invoice-templates'],
     queryFn: fetchTemplates,
@@ -444,6 +470,7 @@ export const AdminInvoices = () => {
   const accountingItems = accountingSetup?.items ?? [];
   const taxRates = accountingSetup?.taxRates ?? [];
   const incomeAccounts = (accountingSetup?.accounts ?? []).filter((account) => account.accountType === 'income');
+  const selectedDeliveredOrder = deliveredOrders.find((order) => order.id === selectedOrderId);
 
   const invoiceTotals = invoiceForm.lines.reduce((totals, line) => {
     const calculated = calculateInvoiceLine(line, taxRates);
@@ -496,6 +523,32 @@ export const AdminInvoices = () => {
       resetInvoiceForm();
       qc.invalidateQueries({ queryKey: ['admin', 'invoices'] });
       qc.invalidateQueries({ queryKey: ['accounting'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const orderInvoiceMutation = useMutation({
+    mutationFn: () => createInvoiceFromOrder(
+      selectedOrderId,
+      orderInvoiceDueDate,
+      postOrderInvoice,
+      isConsolidated ? undefined : selectedBusiness,
+    ),
+    onSuccess: (result) => {
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to create order invoice');
+        return;
+      }
+      toast.success(result.idempotent
+        ? `Invoice ${result.invoiceNumber ?? ''} already exists`
+        : `Invoice ${result.invoiceNumber ?? ''} created from order`);
+      setOrderInvoiceDialogOpen(false);
+      setSelectedOrderId('');
+      setOrderInvoiceDueDate(defaultInvoiceDueDate());
+      setPostOrderInvoice(true);
+      qc.invalidateQueries({ queryKey: ['admin', 'invoices'] });
+      qc.invalidateQueries({ queryKey: ['accounting'] });
+      qc.invalidateQueries({ queryKey: ['customer', 'invoices'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -675,6 +728,14 @@ export const AdminInvoices = () => {
       <PageHeader title="Invoices" description="Manage all invoices, templates, and payment tracking">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <BusinessSwitcher />
+          <Button
+            variant="outline"
+            disabled={isConsolidated}
+            title={isConsolidated ? 'Select a specific business to invoice an order' : undefined}
+            onClick={() => setOrderInvoiceDialogOpen(true)}
+          >
+            <FileText className="w-4 h-4 mr-2" /> From Delivered Order
+          </Button>
           <Button disabled={isConsolidated} title={isConsolidated ? 'Select a specific business to create an invoice' : undefined} onClick={openNewInvoiceDialog}>
             <Plus className="w-4 h-4 mr-2" /> New Invoice
           </Button>
@@ -823,6 +884,77 @@ export const AdminInvoices = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Create a linked invoice from a delivered operational order */}
+      <Dialog open={orderInvoiceDialogOpen} onOpenChange={(open) => {
+        setOrderInvoiceDialogOpen(open);
+        if (!open) {
+          setSelectedOrderId('');
+          setOrderInvoiceDueDate(defaultInvoiceDueDate());
+          setPostOrderInvoice(true);
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invoice Delivered Order</DialogTitle>
+            <DialogDescription>
+              Create one canonical, itemized invoice linked to the delivered order and customer account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Delivered order *</Label>
+              <Select value={selectedOrderId} onValueChange={setSelectedOrderId}>
+                <SelectTrigger aria-label="Delivered order">
+                  <SelectValue placeholder={deliveredOrdersLoading ? 'Loading orders...' : 'Select an uninvoiced order'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {deliveredOrders.map((order) => (
+                    <SelectItem key={order.id} value={order.id}>
+                      {order.trackingCode} · {order.customerName} · KES {order.total.toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!deliveredOrdersLoading && deliveredOrders.length === 0 && (
+                <p className="mt-2 text-xs text-muted-foreground">All delivered orders already have invoices.</p>
+              )}
+            </div>
+            {selectedDeliveredOrder && (
+              <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                <div className="flex justify-between"><span>Customer</span><span className="font-medium">{selectedDeliveredOrder.customerName}</span></div>
+                <div className="mt-2 flex justify-between"><span>Order total</span><span className="font-semibold">KES {selectedDeliveredOrder.total.toLocaleString()}</span></div>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="order-invoice-due-date">Due date *</Label>
+              <Input
+                id="order-invoice-due-date"
+                type="date"
+                value={orderInvoiceDueDate}
+                onChange={(event) => setOrderInvoiceDueDate(event.target.value)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={postOrderInvoice}
+                onChange={(event) => setPostOrderInvoice(event.target.checked)}
+              />
+              Post accounts receivable and revenue to the ledger immediately
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrderInvoiceDialogOpen(false)}>Cancel</Button>
+            <Button
+              disabled={!selectedOrderId || !orderInvoiceDueDate || orderInvoiceMutation.isPending}
+              onClick={() => orderInvoiceMutation.mutate()}
+            >
+              {orderInvoiceMutation.isPending ? 'Creating...' : 'Create Linked Invoice'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Invoice Editor Dialog */}
       <Dialog open={invoiceDialogOpen} onOpenChange={(open) => {
