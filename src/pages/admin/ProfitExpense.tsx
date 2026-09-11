@@ -311,7 +311,7 @@ export const ProfitExpense = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Profit & Expenses" description="Posted-ledger performance and expense approvals">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <Button onClick={() => setAddOpen(true)} disabled={isConsolidated} title={isConsolidated ? 'Select a business to add an expense' : undefined}>
             <Plus className="mr-2 h-4 w-4" />

@@ -173,7 +173,7 @@ export const Receipts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Receipts" description="Preserve and track supplier receipt evidence">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <Button onClick={() => setAddOpen(true)} disabled={isConsolidated} title={isConsolidated ? 'Select a business to add a receipt' : undefined}>
             <Plus className="w-4 h-4 mr-2" /> Add Receipt
@@ -215,7 +215,7 @@ export const Receipts = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="w-full pl-9 sm:w-56" placeholder="Search receipts..." value={search} onChange={(e) => setSearch(e.target.value)} />

@@ -227,7 +227,7 @@ export const BillingFinancials = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Billing & Financials" description="Manage invoices and track payments">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <ExportButton data={allRows} filename={`invoices-${selectedBusiness}`} />
         </div>

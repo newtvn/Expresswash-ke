@@ -67,9 +67,9 @@ export function BusinessSwitcher() {
   };
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
+    <div className="flex min-w-0 flex-1 items-center gap-2 lg:flex-none">
       <Select value={selectedBusiness} onValueChange={handleChange}>
-        <SelectTrigger className="min-w-0 flex-1 sm:w-[220px] sm:flex-none">
+        <SelectTrigger className="min-w-0 flex-1 lg:w-[220px] lg:flex-none">
           <Building2 className="w-4 h-4 mr-2 shrink-0" />
           <SelectValue placeholder="Select business" />
         </SelectTrigger>

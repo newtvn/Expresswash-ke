@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,60 +104,96 @@ type InvoiceFormLine = {
 
 // ---------- Service helpers ----------
 
-async function fetchInvoices(business?: string): Promise<Invoice[]> {
+const INVOICES_PAGE_SIZE = 20;
+
+interface InvoicePage {
+  rows: Invoice[];
+  total: number;
+}
+
+// Server-paginated invoice list. Line items are NOT fetched here — the list
+// rows don't render them; they're loaded lazily when a detail dialog opens.
+async function fetchInvoicesPage(params: {
+  business?: string;
+  page: number;
+  search: string;
+  status: 'all' | InvoiceStatus;
+}): Promise<InvoicePage> {
+  const scopedBusiness = toBusinessParam(params.business);
+  const from = params.page * INVOICES_PAGE_SIZE;
+  let query = supabase
+    .from('invoices')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, from + INVOICES_PAGE_SIZE - 1);
+  if (scopedBusiness) query = query.eq('business', scopedBusiness);
+  if (params.status !== 'all') query = query.eq('status', params.status);
+  const term = params.search.trim().replace(/[%,()]/g, ' ').trim();
+  if (term) {
+    query = query.or(`invoice_number.ilike.%${term}%,customer_name.ilike.%${term}%`);
+  }
+  const { data, count, error } = await query;
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []).map(mapInvoice), total: count ?? 0 };
+}
+
+// Bounded list backing the "Overdue" tab (naturally small; capped defensively).
+async function fetchOverdueInvoices(business?: string): Promise<Invoice[]> {
   const scopedBusiness = toBusinessParam(business);
-  const pageSize = 500;
-  const invoiceRows: Record<string, unknown>[] = [];
-  for (let page = 0; ; page += 1) {
-    let query = supabase
-      .from('invoices')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .range(page * pageSize, (page + 1) * pageSize - 1);
-    if (scopedBusiness) query = query.eq('business', scopedBusiness);
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    invoiceRows.push(...((data ?? []) as Record<string, unknown>[]));
-    if ((data?.length ?? 0) < pageSize) break;
-  }
+  let query = supabase
+    .from('invoices')
+    .select('*')
+    .not('status', 'in', '(draft,cancelled,paid)')
+    .gt('balance', 0)
+    .order('due_date', { ascending: true })
+    .limit(100);
+  if (scopedBusiness) query = query.eq('business', scopedBusiness);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapInvoice);
+}
 
-  const invoices = invoiceRows.map(mapInvoice);
-  const invoiceIds = invoices.map((invoice) => invoice.id);
+interface InvoiceSummary {
+  totalCount: number;
+  paidCount: number;
+  outstandingTotal: number;
+  receivedTotal: number;
+}
 
-  if (invoiceIds.length === 0) return invoices;
-
-  const lines: Record<string, unknown>[] = [];
-  for (let offset = 0; offset < invoiceIds.length; offset += 200) {
-    const { data, error } = await supabase
-      .from('invoice_lines')
-      .select('invoice_id,item_id,description_snapshot,quantity,unit_price,discount_amount,tax_rate_id,tax_amount,line_total,revenue_account_id,created_at')
-      .in('invoice_id', invoiceIds.slice(offset, offset + 200))
-      .order('created_at', { ascending: true });
-    if (error) throw new Error(error.message);
-    lines.push(...((data ?? []) as Record<string, unknown>[]));
-  }
-
-  const linesByInvoice = new Map<string, Invoice['items']>();
-  lines.forEach((row) => {
-    const invoiceId = row.invoice_id as string;
-    const current = linesByInvoice.get(invoiceId) ?? [];
-    current.push({
-      name: String(row.description_snapshot ?? ''),
-      quantity: toAmount(row.quantity || 1),
-      unit_price: toAmount(row.unit_price),
-      total: toAmount(row.line_total),
-      item_id: (row.item_id as string) ?? undefined,
-      discount_amount: toAmount(row.discount_amount),
-      tax_rate_id: (row.tax_rate_id as string) ?? undefined,
-      tax_amount: toAmount(row.tax_amount),
-      revenue_account_id: (row.revenue_account_id as string) ?? undefined,
-    });
-    linesByInvoice.set(invoiceId, current);
+// Header totals across the whole (business-scoped) set, computed in the DB so
+// the paginated list never has to load every row to show accurate KPIs.
+async function fetchInvoiceSummary(business?: string): Promise<InvoiceSummary> {
+  const { data, error } = await supabase.rpc('get_invoice_summary', {
+    p_business: toBusinessParam(business),
   });
+  if (error) throw new Error(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+  return {
+    totalCount: Number(row?.total_count ?? 0),
+    paidCount: Number(row?.paid_count ?? 0),
+    outstandingTotal: toAmount(row?.outstanding_total),
+    receivedTotal: toAmount(row?.received_total),
+  };
+}
 
-  return invoices.map((invoice) => ({
-    ...invoice,
-    items: linesByInvoice.get(invoice.id) ?? invoice.items,
+// Line items for a single invoice — loaded on demand for the detail/edit dialogs.
+async function fetchInvoiceLines(invoiceId: string): Promise<Invoice['items']> {
+  const { data, error } = await supabase
+    .from('invoice_lines')
+    .select('item_id,description_snapshot,quantity,unit_price,discount_amount,tax_rate_id,tax_amount,line_total,revenue_account_id,created_at')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    name: String(row.description_snapshot ?? ''),
+    quantity: toAmount(row.quantity || 1),
+    unit_price: toAmount(row.unit_price),
+    total: toAmount(row.line_total),
+    item_id: (row.item_id as string) ?? undefined,
+    discount_amount: toAmount(row.discount_amount),
+    tax_rate_id: (row.tax_rate_id as string) ?? undefined,
+    tax_amount: toAmount(row.tax_amount),
+    revenue_account_id: (row.revenue_account_id as string) ?? undefined,
   }));
 }
 
@@ -374,7 +410,6 @@ const invoiceCanBeEdited = (invoice: Invoice): boolean => (
   && toAmount(invoice.balance) >= 0
 );
 
-const hasOutstandingBalance = (invoice: Invoice): boolean => invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.balance > 0;
 const isPartialStatus = (status: InvoiceStatus): boolean => status === 'partial' || status === 'partially_paid';
 const isPastDue = (invoice: Invoice): boolean => {
   return isOutstandingInvoiceOverdue(invoice.due_date, invoice.balance, invoice.status);
@@ -446,10 +481,46 @@ export const AdminInvoices = () => {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateForm, setTemplateForm] = useState({ name: '', header_text: '', footer_text: '', payment_terms: 'Net 14 days', bank_details: '' });
 
-  const { data: invoices = [], isLoading, error: invoicesError } = useQuery({
-    queryKey: ['admin', 'invoices', selectedBusiness],
-    queryFn: () => fetchInvoices(selectedBusiness),
+  const [page, setPage] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce the search box so typing doesn't fire a query per keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  // Any filter change returns to the first page.
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, statusFilter, selectedBusiness]);
+
+  const { data: invoicePage, isLoading, error: invoicesError } = useQuery({
+    queryKey: ['admin', 'invoices', selectedBusiness, page, statusFilter, debouncedSearch],
+    queryFn: () => fetchInvoicesPage({ business: selectedBusiness, page, search: debouncedSearch, status: statusFilter }),
     refetchInterval: 30000,
+    placeholderData: (prev) => prev,
+  });
+  const invoices = invoicePage?.rows ?? [];
+  const invoiceTotal = invoicePage?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(invoiceTotal / INVOICES_PAGE_SIZE));
+
+  const { data: invoiceSummary } = useQuery({
+    queryKey: ['admin', 'invoices', 'summary', selectedBusiness],
+    queryFn: () => fetchInvoiceSummary(selectedBusiness),
+    refetchInterval: 30000,
+  });
+
+  const { data: overdueSource = [] } = useQuery({
+    queryKey: ['admin', 'invoices', 'overdue', selectedBusiness],
+    queryFn: () => fetchOverdueInvoices(selectedBusiness),
+    refetchInterval: 60000,
+  });
+
+  const { data: selectedInvoiceItems, isLoading: selectedItemsLoading } = useQuery({
+    queryKey: ['admin', 'invoice-lines', selectedInvoice?.id],
+    queryFn: () => fetchInvoiceLines(selectedInvoice!.id),
+    enabled: !!selectedInvoice,
   });
 
   const { data: deliveredOrders = [], isLoading: deliveredOrdersLoading } = useQuery({
@@ -639,16 +710,9 @@ export const AdminInvoices = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const filtered = invoices.filter((inv) => {
-    const matchSearch = !search || inv.customer_name.toLowerCase().includes(search.toLowerCase()) || inv.invoice_number.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || inv.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
-
-  const totals = {
-    paid: invoices.filter((i) => i.status !== 'draft' && i.status !== 'cancelled').reduce((s, i) => s + i.paid_amount, 0),
-    pending: invoices.filter(hasOutstandingBalance).reduce((s, i) => s + i.balance, 0),
-  };
+  // Rows are already filtered/paginated server-side; overdue is its own bounded query.
+  const filtered = invoices;
+  const overdueInvoices = overdueSource.filter((inv) => inv.status === 'overdue' || isPastDue(inv));
 
   function resetInvoiceForm() {
     setEditingInvoice(null);
@@ -668,11 +732,18 @@ export const AdminInvoices = () => {
     setInvoiceDialogOpen(true);
   }
 
-  function openEditInvoiceDialog(invoice: Invoice) {
+  async function openEditInvoiceDialog(invoice: Invoice) {
     const matchedContact = contacts.find((contact) => (
       contact.name.toLowerCase() === invoice.customer_name.toLowerCase()
       || (invoice.customer_phone && contact.phone === invoice.customer_phone)
     ));
+    // List rows don't carry line items (loaded on demand); fetch them for editing.
+    let items: Invoice['items'] = [];
+    try {
+      items = await fetchInvoiceLines(invoice.id);
+    } catch {
+      toast.error('Could not load invoice line items; starting from an empty line');
+    }
     setEditingInvoice(invoice);
     setInvoiceForm({
       contactId: matchedContact?.id ?? '',
@@ -681,8 +752,8 @@ export const AdminInvoices = () => {
       notes: invoice.notes ?? '',
       status: invoice.status === 'draft' ? 'draft' : 'pending',
       post: false,
-      lines: invoice.items.length
-        ? invoice.items.map((item) => ({
+      lines: items.length
+        ? items.map((item) => ({
           id: crypto.randomUUID(),
           itemId: '',
           description: item.name,
@@ -729,7 +800,7 @@ export const AdminInvoices = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Invoices" description="Manage all invoices, templates, and payment tracking">
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <Button
             variant="outline"
@@ -757,10 +828,10 @@ export const AdminInvoices = () => {
       {/* Summary */}
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {[
-          { label: 'Total Invoices', value: invoices.length, fmt: (v: number) => String(v) },
-          { label: 'Paid', value: invoices.filter((i) => i.status === 'paid').length, fmt: (v: number) => String(v) },
-          { label: 'Outstanding', value: totals.pending, fmt: (v: number) => `KES ${v.toLocaleString()}` },
-          { label: 'Total Received', value: totals.paid, fmt: (v: number) => `KES ${v.toLocaleString()}` },
+          { label: 'Total Invoices', value: invoiceSummary?.totalCount ?? 0, fmt: (v: number) => String(v) },
+          { label: 'Paid', value: invoiceSummary?.paidCount ?? 0, fmt: (v: number) => String(v) },
+          { label: 'Outstanding', value: invoiceSummary?.outstandingTotal ?? 0, fmt: (v: number) => `KES ${v.toLocaleString()}` },
+          { label: 'Total Received', value: invoiceSummary?.receivedTotal ?? 0, fmt: (v: number) => `KES ${v.toLocaleString()}` },
         ].map((s) => (
           <Card key={s.label}>
             <CardContent className="py-4">
@@ -772,10 +843,15 @@ export const AdminInvoices = () => {
       </div>
 
       <InvoiceListTabs
-        invoices={invoices}
         filtered={filtered}
+        overdueInvoices={overdueInvoices}
         templates={templates}
         isLoading={isLoading}
+        page={page}
+        totalPages={totalPages}
+        total={invoiceTotal}
+        pageSize={INVOICES_PAGE_SIZE}
+        onPageChange={setPage}
         search={search}
         statusFilter={statusFilter}
         postInvoicePending={postInvoiceMutation.isPending}
@@ -786,7 +862,6 @@ export const AdminInvoices = () => {
         formatDate={formatDate}
         invoiceCanBeEdited={invoiceCanBeEdited}
         isPartialStatus={isPartialStatus}
-        isPastDue={isPastDue}
         onSelectInvoice={setSelectedInvoice}
         onRecordPayment={(invoice, amount = '') => {
           setSelectedInvoice(invoice);
@@ -825,12 +900,16 @@ export const AdminInvoices = () => {
               </div>
               <Separator />
               <div className="space-y-2">
-                {selectedInvoice.items.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span>{item.quantity}x {item.name}</span>
-                    <span>KES {item.total.toLocaleString()}</span>
-                  </div>
-                ))}
+                {selectedItemsLoading && !selectedInvoiceItems ? (
+                  <p className="text-sm text-muted-foreground">Loading line items…</p>
+                ) : (
+                  (selectedInvoiceItems ?? []).map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span>{item.quantity}x {item.name}</span>
+                      <span>KES {item.total.toLocaleString()}</span>
+                    </div>
+                  ))
+                )}
               </div>
               <Separator />
               <div className="space-y-1 text-sm">
@@ -866,7 +945,7 @@ export const AdminInvoices = () => {
                 </div>
               )}
             </div>
-            <DialogFooter className="gap-2 sm:flex-wrap sm:gap-2 sm:space-x-0">
+            <DialogFooter className="gap-2 sm:flex-wrap sm:justify-start sm:gap-2 sm:space-x-0">
               {!selectedInvoice.posted_journal_entry_id && selectedInvoice.status !== 'draft' && selectedInvoice.status !== 'cancelled' && (
                 <Button
                   variant="outline"

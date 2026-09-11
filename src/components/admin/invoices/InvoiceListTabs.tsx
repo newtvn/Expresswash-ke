@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Paginator } from '@/components/shared';
 import type { Invoice, InvoiceStatus, InvoiceTemplate } from '@/pages/admin/AdminInvoices';
 
 const STATUS_CONFIG: Record<InvoiceStatus, { label: string; icon: React.ElementType; className: string }> = {
@@ -19,10 +20,15 @@ const STATUS_CONFIG: Record<InvoiceStatus, { label: string; icon: React.ElementT
 };
 
 interface InvoiceListTabsProps {
-  invoices: Invoice[];
   filtered: Invoice[];
+  overdueInvoices: Invoice[];
   templates: InvoiceTemplate[];
   isLoading: boolean;
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
   search: string;
   statusFilter: 'all' | InvoiceStatus;
   postInvoicePending: boolean;
@@ -33,7 +39,6 @@ interface InvoiceListTabsProps {
   formatDate: (value?: string | null) => string;
   invoiceCanBeEdited: (invoice: Invoice) => boolean;
   isPartialStatus: (status: InvoiceStatus) => boolean;
-  isPastDue: (invoice: Invoice) => boolean;
   onSelectInvoice: (invoice: Invoice) => void;
   onRecordPayment: (invoice: Invoice, amount?: string) => void;
   onEditInvoice: (invoice: Invoice) => void;
@@ -45,10 +50,15 @@ interface InvoiceListTabsProps {
 }
 
 export function InvoiceListTabs({
-  invoices,
   filtered,
+  overdueInvoices,
   templates,
   isLoading,
+  page,
+  totalPages,
+  total,
+  pageSize,
+  onPageChange,
   search,
   statusFilter,
   postInvoicePending,
@@ -59,7 +69,6 @@ export function InvoiceListTabs({
   formatDate,
   invoiceCanBeEdited,
   isPartialStatus,
-  isPastDue,
   onSelectInvoice,
   onRecordPayment,
   onEditInvoice,
@@ -69,8 +78,6 @@ export function InvoiceListTabs({
   onOpenTemplateDialog,
   onOpenWhatsAppReminder,
 }: InvoiceListTabsProps) {
-  const overdueInvoices = invoices.filter((invoice) => invoice.status === 'overdue' || isPastDue(invoice));
-
   return (
     <Tabs defaultValue="all-invoices">
       <TabsList>
@@ -190,6 +197,7 @@ export function InvoiceListTabs({
             })}
           </div>
         )}
+        <Paginator page={page} totalPages={totalPages} total={total} pageSize={pageSize} onPageChange={onPageChange} />
       </TabsContent>
 
       <TabsContent value="overdue" className="mt-4">

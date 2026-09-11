@@ -160,6 +160,14 @@ const formatDate = (value?: string | null): string => {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 };
 
+// Date + 24-hour time, e.g. "11/09/2026 14:30".
+const formatDateTime = (value?: string | null): string => {
+  if (!value) return 'No date';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return `${parsed.toLocaleDateString()} ${parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+};
+
 function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
   const escape = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const csv = [headers, ...rows].map((r) => r.map(escape).join(',')).join('\n');
@@ -920,7 +928,7 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 lg:flex lg:w-auto">
           <BusinessSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1112,7 +1120,7 @@ export const Accounts = () => {
                           {p.payer_phone_matches_intent === false && <Badge variant="destructive" className="text-xs">Phone mismatch</Badge>}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {formatPaymentMethod(p.method)} · {formatDate(p.created_at)}
+                          {formatPaymentMethod(p.method)} · {formatDateTime(p.created_at)}
                           {p.provider_status ? ` · ${formatPaymentStatus(p.provider_status)}` : ''}
                         </p>
                         {(p.external_id || p.reference) && (
