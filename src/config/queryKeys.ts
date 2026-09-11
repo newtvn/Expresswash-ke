@@ -35,7 +35,8 @@ export const queryKeys = {
   },
   communications: {
     all: ['communications'] as const,
-    history: (filters: Record<string, unknown>) => [...queryKeys.communications.all, 'history', filters] as const,
+    histories: () => [...queryKeys.communications.all, 'history'] as const,
+    history: (filters: Record<string, unknown>) => [...queryKeys.communications.histories(), filters] as const,
     stats: () => [...queryKeys.communications.all, 'stats'] as const,
   },
   invoices: {

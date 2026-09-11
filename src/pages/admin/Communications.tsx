@@ -11,15 +11,15 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { Send, Bell, History, CheckCircle, XCircle, Eye, Search } from 'lucide-react';
+import { Send, Bell, History, Eye, Search } from 'lucide-react';
 import {
   getTemplates,
   sendNotification,
-  getNotificationHistory,
   NotificationTemplate,
-  NotificationHistoryEntry,
 } from '@/services/communicationService';
 import { sanitizeHTML } from '@/utils/validation';
+import { queryKeys } from '@/config/queryKeys';
+import { CommunicationsHistory } from '@/components/admin/communications/CommunicationsHistory';
 
 const humanizeTemplateName = (name: string) => name
   .replace(/[_-]+/g, ' ')
@@ -49,11 +49,6 @@ export const Communications = () => {
     queryFn: getTemplates,
   });
 
-  const { data: history = [], isLoading: historyLoading } = useQuery({
-    queryKey: ['comm', 'history'],
-    queryFn: () => getNotificationHistory(),
-  });
-
   const selectedTemplate = templates.find((t) => t.id === sendForm.templateId);
   const filteredTemplates = templates.filter((template) => {
     const matchesChannel = channelFilter === 'all' || template.channel === channelFilter;
@@ -77,19 +72,12 @@ export const Communications = () => {
       if (data.success) {
         toast.success('Notification sent successfully');
         setSendForm({ templateId: '', recipientId: '', recipientName: '', recipientContact: '', variables: {} });
-        qc.invalidateQueries({ queryKey: ['comm', 'history'] });
+        qc.invalidateQueries({ queryKey: queryKeys.communications.all });
       } else {
         toast.error(data.error ?? 'Failed to send notification');
       }
     },
   });
-
-  const statusColor = (status: NotificationHistoryEntry['status']) => {
-    if (status === 'delivered') return 'bg-green-100 text-green-800';
-    if (status === 'sent') return 'bg-blue-100 text-blue-800';
-    if (status === 'failed') return 'bg-red-100 text-red-800';
-    return 'bg-gray-100 text-gray-600';
-  };
 
   return (
     <div className="space-y-6">
@@ -226,33 +214,7 @@ export const Communications = () => {
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
-          {historyLoading ? (
-            <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
-          ) : (
-            <div className="space-y-2">
-              {history.map((h) => (
-                <Card key={h.id}>
-                  <CardContent className="py-3 flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">{h.recipientName}</span>
-                        <Badge variant="outline" className="text-xs">{h.channel}</Badge>
-                        <Badge className={`text-xs ${statusColor(h.status)}`}>{h.status}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">{h.body}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{new Date(h.sentAt).toLocaleString()}</p>
-                    </div>
-                    {h.status === 'delivered' ? (
-                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                    ) : h.status === 'failed' ? (
-                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-                    ) : null}
-                  </CardContent>
-                </Card>
-              ))}
-              {history.length === 0 && <p className="text-center text-muted-foreground py-12">No notifications sent yet</p>}
-            </div>
-          )}
+          <CommunicationsHistory />
         </TabsContent>
       </Tabs>
 
