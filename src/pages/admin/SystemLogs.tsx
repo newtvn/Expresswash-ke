@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { PageHeader, ExportButton, DateRangePicker } from "@/components/shared";
+import { PageHeader, ExportButton, DateRangePicker, Paginator } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSystemLogs } from "@/services/auditService";
 import type { SystemLogFilters } from "@/types";
+import { queryKeys } from "@/config/queryKeys";
 
 const levelStyles: Record<string, string> = {
   info: "bg-blue-100 text-blue-700 border-blue-200",
@@ -25,6 +26,8 @@ const levelStyles: Record<string, string> = {
   error: "bg-red-100 text-red-700 border-red-200",
   debug: "bg-gray-100 text-gray-600 border-gray-200",
 };
+
+const SYSTEM_LOGS_PAGE_SIZE = 100;
 
 /**
  * Admin System Logs Page
@@ -40,6 +43,8 @@ export const SystemLogs = () => {
   });
   const [serviceFilter, setServiceFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [dateRange, setDateRange] = useState(() => {
     const end = new Date();
@@ -50,7 +55,15 @@ export const SystemLogs = () => {
       end: end.toISOString().split('T')[0],
     };
   });
-  const [page] = useState(1);
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch, serviceFilter, dateRange.start, dateRange.end, levels]);
 
   const toggleLevel = (level: string) => {
     setLevels((prev) => ({ ...prev, [level]: !prev[level as keyof typeof prev] }));
@@ -61,15 +74,19 @@ export const SystemLogs = () => {
     startDate: dateRange.start,
     endDate: dateRange.end,
     service: serviceFilter !== "all" ? serviceFilter : undefined,
-    search: search || undefined,
-    page,
-    limit: 100,
+    levels: (Object.entries(levels)
+      .filter(([, enabled]) => enabled)
+      .map(([level]) => level)) as SystemLogFilters['levels'],
+    search: debouncedSearch || undefined,
+    page: page + 1,
+    limit: SYSTEM_LOGS_PAGE_SIZE,
   };
 
   // Fetch logs with filters
   const { data: logsData, isLoading, refetch } = useQuery({
-    queryKey: ['systemLogs', filters],
+    queryKey: queryKeys.audit.systemLogs(filters),
     queryFn: () => getSystemLogs(filters),
+    placeholderData: (previous) => previous,
     staleTime: autoRefresh ? 5000 : 2 * 60 * 1000, // 5s if auto-refresh, else 2 minutes
     refetchInterval: autoRefresh ? 10000 : false, // Auto-refresh every 10s if enabled
   });
@@ -79,11 +96,7 @@ export const SystemLogs = () => {
   // Extract unique services from logs
   const services = [...new Set(logs.map((l) => l.service))];
 
-  // Client-side level filtering (since API doesn't support multiple levels)
-  const filteredLogs = logs.filter((log) => {
-    if (!levels[log.level as keyof typeof levels]) return false;
-    return true;
-  });
+  const filteredLogs = logs;
 
   if (isLoading) {
     return (
@@ -208,9 +221,13 @@ export const SystemLogs = () => {
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground text-center">
-        Showing {filteredLogs.length} of {logs.length} log entries
-      </p>
+      <Paginator
+        page={page}
+        totalPages={logsData?.totalPages ?? 0}
+        total={logsData?.total ?? 0}
+        pageSize={SYSTEM_LOGS_PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </div>
   );
 };

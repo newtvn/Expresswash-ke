@@ -41,6 +41,7 @@ export interface SystemLogFilters {
   startDate?: string;
   endDate?: string;
   level?: string;
+  levels?: SystemLogEntry['level'][];
   service?: string;
   search?: string;
   page: number;
