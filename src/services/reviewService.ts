@@ -219,6 +219,32 @@ export async function getAllReviews(status?: string): Promise<Review[]> {
   return data.map(mapReview);
 }
 
+export interface ReviewPage {
+  rows: Review[];
+  total: number;
+}
+
+/** Server-paginated reviews (admin). Search matches the review text. */
+export async function getReviewsPage(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<ReviewPage> {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('reviews')
+    .select(REVIEW_SELECT, { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, from + params.pageSize - 1);
+
+  const term = (params.search ?? '').trim();
+  if (term) query = query.ilike('review_text', `%${term}%`);
+
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error || !data) return { rows: [], total: count ?? 0 };
+  return { rows: data.map(mapReview), total: count ?? 0 };
+}
+
 /**
  * Moderate a review (approve/reject with optional admin response)
  */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -10,12 +10,14 @@ import { Star, ThumbsUp, ThumbsDown, MessageSquare, TrendingUp, CheckCircle, XCi
 import { toast } from 'sonner';
 import { queryKeys } from '@/config/queryKeys';
 import {
-  getAllReviews,
+  getReviewsPage,
   moderateReview,
   getReviewStats,
   type Review,
   type ReviewStats,
 } from '@/services/reviewService';
+
+const REVIEWS_PAGE_SIZE = 15;
 
 const StarRating = ({ rating }: { rating: number }) => (
   <div className="flex items-center gap-0.5">
@@ -39,11 +41,26 @@ const StarRating = ({ rating }: { rating: number }) => (
 export const ReviewsModeration = () => {
   const queryClient = useQueryClient();
   const [selectedReview, setSelectedReview] = useState<Review | null>(null);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: reviews = [], isLoading: reviewsLoading } = useQuery({
-    queryKey: queryKeys.reviews.pending(),
-    queryFn: () => getAllReviews(),
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  const { data: reviewPage } = useQuery({
+    queryKey: [...queryKeys.reviews.pending(), page, debouncedSearch],
+    queryFn: () => getReviewsPage({ page, pageSize: REVIEWS_PAGE_SIZE, search: debouncedSearch }),
+    placeholderData: (prev) => prev,
   });
+  const reviews = reviewPage?.rows ?? [];
+  const reviewsTotal = reviewPage?.total ?? 0;
+  const reviewsTotalPages = Math.max(1, Math.ceil(reviewsTotal / REVIEWS_PAGE_SIZE));
 
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: queryKeys.reviews.stats(),
@@ -183,8 +200,16 @@ export const ReviewsModeration = () => {
       <DataTable
         data={reviews}
         columns={reviewColumns}
-        searchPlaceholder="Search reviews..."
+        searchPlaceholder="Search review text..."
         onRowClick={(row) => setSelectedReview(row)}
+        serverPagination={{
+          page,
+          totalPages: reviewsTotalPages,
+          total: reviewsTotal,
+          pageSize: REVIEWS_PAGE_SIZE,
+          onPageChange: setPage,
+          onSearchChange: setSearch,
+        }}
       />
 
       {/* Review Detail Dialog */}
