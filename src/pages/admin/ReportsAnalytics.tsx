@@ -102,6 +102,18 @@ const expenseCategoryColumns: Column<ExpenseCategoryRow>[] = [
   { key: 'total', header: 'Total', sortable: true, render: (row) => formatCurrency(row.total) },
 ];
 
+type StatusBreakdownRow = { status_name: string; count: number };
+const statusBreakdownColumns: Column<StatusBreakdownRow>[] = [
+  { key: 'status_name', header: 'Status', sortable: true },
+  { key: 'count', header: 'Count', sortable: true },
+];
+
+type TierDistributionRow = { tier: string; count: number };
+const tierDistributionColumns: Column<TierDistributionRow>[] = [
+  { key: 'tier', header: 'Tier', sortable: true, render: (row) => <span className="capitalize">{row.tier}</span> },
+  { key: 'count', header: 'Customers', sortable: true },
+];
+
 // ── Loading Skeletons ────────────────────────────────────────────────
 
 const TableSkeleton = () => (
@@ -237,10 +249,7 @@ export const ReportsAnalytics = () => {
                 <CardContent>
                   <DataTable
                     data={orderData.status_breakdown}
-                    columns={[
-                      { key: 'status_name', header: 'Status', sortable: true },
-                      { key: 'count', header: 'Count', sortable: true },
-                    ]}
+                    columns={statusBreakdownColumns}
                     searchable={false}
                   />
                 </CardContent>
@@ -298,10 +307,7 @@ export const ReportsAnalytics = () => {
                   <CardContent>
                     <DataTable
                       data={customerData.tier_distribution}
-                      columns={[
-                        { key: 'tier', header: 'Tier', sortable: true, render: (row: { tier: string }) => <span className="capitalize">{row.tier}</span> },
-                        { key: 'count', header: 'Customers', sortable: true },
-                      ]}
+                      columns={tierDistributionColumns}
                       searchable={false}
                     />
                   </CardContent>
