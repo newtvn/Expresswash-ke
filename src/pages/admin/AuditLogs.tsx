@@ -170,7 +170,7 @@ export const AuditLogs = () => {
       </PageHeader>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <Select value={actionFilter} onValueChange={setActionFilter}>
           <SelectTrigger className="w-full sm:w-40">
             <SelectValue placeholder="Action Type" />

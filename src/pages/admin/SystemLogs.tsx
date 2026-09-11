@@ -131,7 +131,7 @@ export const SystemLogs = () => {
       </PageHeader>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-end gap-4">
         {/* Level Checkboxes */}
         <div className="flex flex-wrap items-center gap-3">
           {(["info", "warn", "error", "debug"] as const).map((level) => (

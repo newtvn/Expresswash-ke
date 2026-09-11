@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PageHeader, DataTable, StatusBadge, ExportButton } from '@/components/shared';
+import { PageHeader, DataTable, ExportButton } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,25 +19,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Mail, MessageSquare, Smartphone, Bell, Send } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
+import { queryKeys } from '@/config/queryKeys';
+import {
+  getNotificationHistoryPage,
+  getNotificationHistoryStats,
+  type NotificationHistoryEntry,
+} from '@/services/communicationService';
 
 // ── Types ───────────────────────────────────────────────────────────
 
-interface NotificationRow {
-  [key: string]: unknown;
-  id: string;
-  templateName: string;
-  channel: string;
-  recipientName: string;
-  recipientContact: string;
-  subject: string;
-  body: string;
-  status: string;
-  sentAt: string;
-  failureReason: string;
-  retryCount: number;
-}
+type NotificationRow = NotificationHistoryEntry;
+
+const NOTIFICATIONS_PAGE_SIZE = 20;
 
 // ── Channel icons ───────────────────────────────────────────────────
 
@@ -67,44 +61,40 @@ const statusColors: Record<string, string> = {
 export const NotificationCenter = () => {
   const [channelFilter, setChannelFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedNotif, setSelectedNotif] = useState<NotificationRow | null>(null);
 
-  const { data: notifications = [], isLoading } = useQuery({
-    queryKey: ['admin', 'notification-history', channelFilter, statusFilter],
-    queryFn: async () => {
-      let query = supabase
-        .from('notification_history')
-        .select('*')
-        .order('sent_at', { ascending: false, nullsFirst: false })
-        .limit(100);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
 
-      if (channelFilter !== 'all') query = query.eq('channel', channelFilter);
-      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+  useEffect(() => {
+    setPage(0);
+  }, [channelFilter, statusFilter, debouncedSearch]);
 
-      const { data, error } = await query;
-      if (error || !data) return [];
-
-      return data.map((n): NotificationRow => ({
-        id: n.id as string,
-        templateName: (n.template_name as string) || 'Unknown',
-        channel: (n.channel as string) || 'sms',
-        recipientName: (n.recipient_name as string) || 'Unknown',
-        recipientContact: (n.recipient_contact as string) || '',
-        subject: (n.subject as string) || '',
-        body: (n.body as string) || '',
-        status: (n.status as string) || 'pending',
-        sentAt: (n.sent_at as string) || '',
-        failureReason: (n.failure_reason as string) || '',
-        retryCount: (n.retry_count as number) || 0,
-      }));
-    },
+  const historyFilters = { page, search: debouncedSearch, channel: channelFilter, status: statusFilter };
+  const { data: historyPage, isLoading } = useQuery({
+    queryKey: queryKeys.communications.history(historyFilters),
+    queryFn: () => getNotificationHistoryPage({
+      page,
+      pageSize: NOTIFICATIONS_PAGE_SIZE,
+      search: debouncedSearch,
+      channel: channelFilter,
+      status: statusFilter,
+    }),
+    placeholderData: (previous) => previous,
   });
+  const notifications = historyPage?.rows ?? [];
+  const notificationTotal = historyPage?.total ?? 0;
+  const notificationTotalPages = Math.max(1, Math.ceil(notificationTotal / NOTIFICATIONS_PAGE_SIZE));
 
-  // KPI counts
-  const totalCount = notifications.length;
-  const deliveredCount = notifications.filter(n => n.status === 'delivered').length;
-  const failedCount = notifications.filter(n => n.status === 'failed').length;
-  const pendingCount = notifications.filter(n => n.status === 'pending').length;
+  const { data: stats } = useQuery({
+    queryKey: queryKeys.communications.stats(),
+    queryFn: getNotificationHistoryStats,
+  });
 
   const columns: Column<NotificationRow>[] = [
     {
@@ -161,10 +151,10 @@ export const NotificationCenter = () => {
       {/* KPI Summary */}
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-4 sm:gap-4">
         {[
-          { label: 'Total Sent', value: totalCount, color: 'text-foreground' },
-          { label: 'Delivered', value: deliveredCount, color: 'text-emerald-600' },
-          { label: 'Pending', value: pendingCount, color: 'text-amber-600' },
-          { label: 'Failed', value: failedCount, color: 'text-red-600' },
+          { label: 'Total Sent', value: stats?.total ?? 0, color: 'text-foreground' },
+          { label: 'Delivered', value: stats?.delivered ?? 0, color: 'text-emerald-600' },
+          { label: 'Pending', value: stats?.pending ?? 0, color: 'text-amber-600' },
+          { label: 'Failed', value: stats?.failed ?? 0, color: 'text-red-600' },
         ].map((kpi) => (
           <Card key={kpi.label} className="bg-card border-border/50">
             <CardContent className="p-4">
@@ -213,9 +203,17 @@ export const NotificationCenter = () => {
         <DataTable
           data={notifications}
           columns={columns}
-          searchPlaceholder="Search notifications..."
+          searchPlaceholder="Search recipient names..."
           emptyMessage="No notifications found"
           onRowClick={(row) => setSelectedNotif(row)}
+          serverPagination={{
+            page,
+            totalPages: notificationTotalPages,
+            total: notificationTotal,
+            pageSize: NOTIFICATIONS_PAGE_SIZE,
+            onPageChange: setPage,
+            onSearchChange: setSearch,
+          }}
         />
       )}
 

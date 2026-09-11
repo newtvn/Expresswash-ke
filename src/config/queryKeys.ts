@@ -33,6 +33,11 @@ export const queryKeys = {
     logs: (filters: Record<string, unknown>) => [...queryKeys.audit.all, 'logs', filters] as const,
     systemLogs: (filters: Record<string, unknown>) => [...queryKeys.audit.all, 'system', filters] as const,
   },
+  communications: {
+    all: ['communications'] as const,
+    history: (filters: Record<string, unknown>) => [...queryKeys.communications.all, 'history', filters] as const,
+    stats: () => [...queryKeys.communications.all, 'stats'] as const,
+  },
   invoices: {
     all: ['invoices'] as const,
     list: (filters: Record<string, unknown>) => [...queryKeys.invoices.all, 'list', filters] as const,
