@@ -200,25 +200,6 @@ export async function getPendingReviews(): Promise<Review[]> {
   return data.map(mapReview);
 }
 
-/**
- * Get all reviews with optional status filter (admin)
- */
-export async function getAllReviews(status?: string): Promise<Review[]> {
-  let query = supabase
-    .from('reviews')
-    .select(REVIEW_SELECT)
-    .order('created_at', { ascending: false });
-
-  if (status) {
-    query = query.eq('status', status);
-  }
-
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
-
-  if (error || !data) return [];
-  return data.map(mapReview);
-}
-
 export interface ReviewPage {
   rows: Review[];
   total: number;
