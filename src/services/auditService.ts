@@ -94,6 +94,10 @@ export const getAuditLogs = async (
 export const getSystemLogs = async (
   filters: SystemLogFilters = { page: 1, limit: 20 },
 ): Promise<PaginatedResponse<SystemLogEntry>> => {
+  if (filters.levels?.length === 0) {
+    return { data: [], total: 0, page: filters.page, limit: filters.limit, totalPages: 0 };
+  }
+
   let query = supabase.from('system_logs').select('*', { count: 'exact' });
 
   if (filters.startDate) {
@@ -104,6 +108,9 @@ export const getSystemLogs = async (
   }
   if (filters.level) {
     query = query.eq('level', filters.level);
+  }
+  if (filters.levels) {
+    query = query.in('level', filters.levels);
   }
   if (filters.service) {
     query = query.eq('service', filters.service);
