@@ -2159,6 +2159,7 @@ export const Accounts = () => {
                   disabled={isConsolidated}
                   title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => {
+                    setSelectedPayment(null);
                     setAllocationTarget(selectedPayment);
                     setAllocationRows([makeAllocationRow()]);
                   }}
@@ -2174,6 +2175,7 @@ export const Accounts = () => {
                       .filter((refund) => refund.status !== 'void' && refund.paymentId === selectedPayment.id)
                       .reduce((sum, refund) => sum + toAmount(refund.amount), 0);
                     const remainingRefundable = Math.max(toAmount(selectedPayment.amount) - alreadyRefunded, 0);
+                    setSelectedPayment(null);
                     setRefundTarget(selectedPayment);
                     setRefundForm({
                       amount: remainingRefundable > 0 ? String(remainingRefundable) : '',
@@ -2190,6 +2192,7 @@ export const Accounts = () => {
                     disabled={isConsolidated || providerRefunds.some((refund) => refund.paymentId === selectedPayment.id)}
                     title={isConsolidated ? consolidatedWriteHint : undefined}
                     onClick={() => {
+                      setSelectedPayment(null);
                       setProviderRefundTarget(selectedPayment);
                       setProviderRefundForm({
                         amount: String(selectedPayment.amount),
@@ -2385,6 +2388,11 @@ export const Accounts = () => {
                   onChange={(event) => setProviderRefundForm((current) => ({ ...current, reason: event.target.value }))}
                   rows={3}
                 />
+                {!providerRefundForm.reason.trim() && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Enter a reason to enable the refund request and preserve its audit trail.
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -2392,6 +2400,7 @@ export const Accounts = () => {
             <Button variant="outline" onClick={() => setProviderRefundTarget(null)}>Cancel</Button>
             <Button
               disabled={providerRefundMutation.isPending || !providerRefundTarget || !providerRefundForm.reason.trim()}
+              title={!providerRefundForm.reason.trim() ? 'Enter a refund reason first' : undefined}
               onClick={() => {
                 if (!providerRefundTarget) return;
                 const amount = toAmount(providerRefundForm.amount);
