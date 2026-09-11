@@ -9,7 +9,120 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { rpc: mockRpc, from: mockFrom },
 }));
 
-import { completeRouteStop, getDriverActiveRoutes, transitionOwnDeliveryStop } from '@/services/driverService';
+import {
+  completeRouteStop,
+  getDriverActiveRoutes,
+  getDriverRosterStats,
+  getDriversPage,
+  transitionOwnDeliveryStop,
+} from '@/services/driverService';
+
+describe('driverService.getDriversPage', () => {
+  beforeEach(() => {
+    mockFrom.mockReset();
+  });
+
+  it('pages and searches driver profiles before loading details for that page', async () => {
+    const profileIlike = vi.fn().mockResolvedValue({
+      data: [{
+        id: 'driver-1',
+        name: 'Jane Driver',
+        email: 'jane@example.com',
+        phone: '+254700000001',
+        zone: 'Kitengela',
+        is_active: true,
+        created_at: '2026-09-01T00:00:00Z',
+      }],
+      count: 31,
+      error: null,
+    });
+    const profileQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
+      ilike: profileIlike,
+    };
+    const driverIn = vi.fn().mockResolvedValue({
+      data: [{
+        id: 'driver-1',
+        zone: 'Kitengela',
+        status: 'available',
+        is_online: true,
+        vehicle_plate: 'KAA 123A',
+        vehicle_type: 'van',
+        total_deliveries: 42,
+        rating: 4.8,
+      }],
+      error: null,
+    });
+    const driverQuery = {
+      select: vi.fn().mockReturnThis(),
+      in: driverIn,
+    };
+
+    mockFrom.mockImplementation((table: string) => (
+      table === 'profiles' ? profileQuery : driverQuery
+    ));
+
+    const result = await getDriversPage({ page: 2, pageSize: 15, search: ' Jane ' });
+
+    expect(profileQuery.select).toHaveBeenCalledWith('*', { count: 'exact' });
+    expect(profileQuery.eq).toHaveBeenCalledWith('role', 'driver');
+    expect(profileQuery.order).toHaveBeenCalledWith('name');
+    expect(profileQuery.range).toHaveBeenCalledWith(30, 44);
+    expect(profileIlike).toHaveBeenCalledWith('name', '%Jane%');
+    expect(driverIn).toHaveBeenCalledWith('id', ['driver-1']);
+    expect(result.total).toBe(31);
+    expect(result.rows[0]).toMatchObject({
+      id: 'driver-1',
+      name: 'Jane Driver',
+      vehiclePlate: 'KAA 123A',
+      totalDeliveries: 42,
+    });
+  });
+
+  it('calculates roster-wide KPIs independently of the current page', async () => {
+    const profileEq = vi.fn().mockResolvedValue({
+      data: [
+        { id: 'driver-1', zone: 'Kitengela' },
+        { id: 'driver-2', zone: 'Athi River' },
+        { id: 'driver-3', zone: 'Syokimau' },
+      ],
+      count: 3,
+      error: null,
+    });
+    const profileQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: profileEq,
+    };
+    const driverIn = vi.fn().mockResolvedValue({
+      data: [
+        { id: 'driver-1', status: 'available', is_online: true, rating: 4.5 },
+        { id: 'driver-2', status: 'offline', is_online: false, rating: 3 },
+      ],
+      error: null,
+    });
+    const driverQuery = {
+      select: vi.fn().mockReturnThis(),
+      in: driverIn,
+    };
+
+    mockFrom.mockImplementation((table: string) => (
+      table === 'profiles' ? profileQuery : driverQuery
+    ));
+
+    await expect(getDriverRosterStats()).resolves.toEqual({
+      totalDrivers: 3,
+      activeToday: 1,
+      averageRating: 2.5,
+      zonesCovered: 3,
+    });
+    expect(profileQuery.select).toHaveBeenCalledWith('id, zone', { count: 'exact' });
+    expect(profileEq).toHaveBeenCalledWith('role', 'driver');
+    expect(driverIn).toHaveBeenCalledWith('id', ['driver-1', 'driver-2', 'driver-3']);
+  });
+});
 
 describe('driverService.getDriverActiveRoutes', () => {
   beforeEach(() => {

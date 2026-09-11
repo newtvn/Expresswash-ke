@@ -59,6 +59,18 @@ export interface DriverPerformanceStats {
   monthlyTrend: { month: string; deliveries: number; onTimeRate: number; revenue: number }[];
 }
 
+export interface DriverPage {
+  rows: Driver[];
+  total: number;
+}
+
+export interface DriverRosterStats {
+  totalDrivers: number;
+  activeToday: number;
+  averageRating: number;
+  zonesCovered: number;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function mapDriver(row: Record<string, unknown>, profile: Record<string, unknown>): Driver {
@@ -110,13 +122,50 @@ function mapRoute(row: Record<string, unknown>, stops: Record<string, unknown>[]
 
 // ── Public API ────────────────────────────────────────────────────────
 
+/** Full driver roster for small reference-data controls such as assignment dropdowns. */
 export const getDrivers = async (): Promise<Driver[]> => {
   const { data: profiles, error: pErr } = await retrySupabaseQuery(
     () => supabase.from('profiles').select('*').eq('role', 'driver').order('name'),
-    { maxRetries: 2 }
+    { maxRetries: 2 },
   );
 
-  if (pErr || !profiles) return [];
+  if (pErr || !profiles || profiles.length === 0) return [];
+
+  const ids = profiles.map((profile) => profile.id as string);
+  const { data: driverRows } = await retrySupabaseQuery(
+    () => supabase.from('drivers').select('*').in('id', ids),
+    { maxRetries: 2 },
+  );
+
+  const driverMap: Record<string, Record<string, unknown>> = {};
+  (driverRows ?? []).forEach((driver) => { driverMap[driver.id as string] = driver; });
+
+  return profiles.map((profile) => (
+    mapDriver(driverMap[profile.id as string] ?? {}, profile as Record<string, unknown>)
+  ));
+};
+
+export const getDriversPage = async (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<DriverPage> => {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('profiles')
+    .select('*', { count: 'exact' })
+    .eq('role', 'driver')
+    .order('name')
+    .range(from, from + params.pageSize - 1);
+
+  const term = (params.search ?? '').trim();
+  if (term) query = query.ilike('name', `%${term}%`);
+
+  const { data: profiles, count, error: pErr } = await query;
+
+  if (pErr || !profiles) return { rows: [], total: count ?? 0 };
+
+  if (profiles.length === 0) return { rows: [], total: count ?? 0 };
 
   const ids = profiles.map((p) => p.id as string);
   const { data: driverRows } = await retrySupabaseQuery(
@@ -127,7 +176,52 @@ export const getDrivers = async (): Promise<Driver[]> => {
   const driverMap: Record<string, Record<string, unknown>> = {};
   (driverRows ?? []).forEach((d) => { driverMap[d.id as string] = d; });
 
-  return profiles.map((p) => mapDriver(driverMap[p.id as string] ?? {}, p as Record<string, unknown>));
+  return {
+    rows: profiles.map((p) => mapDriver(driverMap[p.id as string] ?? {}, p as Record<string, unknown>)),
+    total: count ?? 0,
+  };
+};
+
+/** Lightweight whole-roster data for the KPI cards, independent of the current page. */
+export const getDriverRosterStats = async (): Promise<DriverRosterStats> => {
+  const { data: profiles, count, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, zone', { count: 'exact' })
+    .eq('role', 'driver');
+
+  if (pErr || !profiles) {
+    return { totalDrivers: 0, activeToday: 0, averageRating: 0, zonesCovered: 0 };
+  }
+
+  if (profiles.length === 0) {
+    return { totalDrivers: count ?? 0, activeToday: 0, averageRating: 0, zonesCovered: 0 };
+  }
+
+  const driverIds = profiles.map((profile) => profile.id as string);
+  const { data: driverRows } = await retrySupabaseQuery(
+    () => supabase
+      .from('drivers')
+      .select('id, status, is_online, rating')
+      .in('id', driverIds),
+    { maxRetries: 2 },
+  );
+
+  const rows = driverRows ?? [];
+  const totalDrivers = count ?? profiles.length;
+  const activeToday = rows.filter((row) => row.is_online && row.status !== 'offline').length;
+  const ratingTotal = rows.reduce((sum, row) => sum + ((row.rating as number) ?? 0), 0);
+  const zonesCovered = new Set(
+    profiles
+      .map((profile) => (profile.zone as string) || '')
+      .filter(Boolean),
+  ).size;
+
+  return {
+    totalDrivers,
+    activeToday,
+    averageRating: totalDrivers > 0 ? ratingTotal / totalDrivers : 0,
+    zonesCovered,
+  };
 };
 
 export const getDriverById = async (driverId: string): Promise<Driver | null> => {
