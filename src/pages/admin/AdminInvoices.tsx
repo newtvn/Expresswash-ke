@@ -737,13 +737,15 @@ export const AdminInvoices = () => {
       contact.name.toLowerCase() === invoice.customer_name.toLowerCase()
       || (invoice.customer_phone && contact.phone === invoice.customer_phone)
     ));
-    // List rows don't carry line items (loaded on demand); fetch them for editing.
+    // List rows don't carry ledger lines (loaded on demand); fetch them for editing,
+    // falling back to the invoice's stored items (JSONB) when there are none.
     let items: Invoice['items'] = [];
     try {
       items = await fetchInvoiceLines(invoice.id);
     } catch {
       toast.error('Could not load invoice line items; starting from an empty line');
     }
+    if (!items.length) items = invoice.items;
     setEditingInvoice(invoice);
     setInvoiceForm({
       contactId: matchedContact?.id ?? '',
@@ -903,7 +905,8 @@ export const AdminInvoices = () => {
                 {selectedItemsLoading && !selectedInvoiceItems ? (
                   <p className="text-sm text-muted-foreground">Loading line items…</p>
                 ) : (
-                  (selectedInvoiceItems ?? []).map((item, i) => (
+                  // Prefer ledger lines; fall back to the invoice's stored items (JSONB).
+                  (selectedInvoiceItems?.length ? selectedInvoiceItems : selectedInvoice.items).map((item, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span>{item.quantity}x {item.name}</span>
                       <span>KES {item.total.toLocaleString()}</span>
