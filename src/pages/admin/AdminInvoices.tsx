@@ -806,9 +806,9 @@ export const AdminInvoices = () => {
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span>{selectedInvoice.invoice_number}</span>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${STATUS_CONFIG[selectedInvoice.status].className}`}>
+              <DialogTitle className="flex items-center justify-between gap-2 pr-8">
+                <span className="truncate">{selectedInvoice.invoice_number}</span>
+                <span className={`inline-flex shrink-0 items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${STATUS_CONFIG[selectedInvoice.status].className}`}>
                   {STATUS_CONFIG[selectedInvoice.status].label}
                 </span>
               </DialogTitle>
