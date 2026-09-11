@@ -215,7 +215,7 @@ export const Receipts = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="w-full pl-9 sm:w-56" placeholder="Search receipts..." value={search} onChange={(e) => setSearch(e.target.value)} />
