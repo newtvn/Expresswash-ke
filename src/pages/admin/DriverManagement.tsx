@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, KPICard, DataTable, StatusBadge } from "@/components/shared";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserPlus, Truck, Star, MapPin, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
-import { getDrivers } from "@/services/driverService";
+import { getDriverRosterStats, getDriversPage } from "@/services/driverService";
 import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/config/queryKeys";
 
@@ -57,6 +57,7 @@ const driverColumns: Column<DriverTableRow>[] = [
  */
 const VEHICLE_TYPES = ['car', 'van', 'truck', 'motorcycle'] as const;
 const ZONES = ['Kitengela', 'Athi River', 'Syokimau', 'Mlolongo', 'Greater Nairobi'] as const;
+const DRIVERS_PAGE_SIZE = 15;
 
 const formatZone = (value?: string) => value
   ? value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
@@ -89,11 +90,32 @@ export const DriverManagement = () => {
   const [newDriver, setNewDriver] = useState(initialDriverForm);
   const [creating, setCreating] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const { data: drivers = [], isLoading } = useQuery({
-    queryKey: queryKeys.drivers.list(),
-    queryFn: getDrivers,
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearch]);
+
+  const { data: driverPage, isLoading } = useQuery({
+    queryKey: [...queryKeys.drivers.list(), page, debouncedSearch],
+    queryFn: () => getDriversPage({ page, pageSize: DRIVERS_PAGE_SIZE, search: debouncedSearch }),
+    placeholderData: (previous) => previous,
     staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+  const drivers = driverPage?.rows ?? [];
+  const driversTotal = driverPage?.total ?? 0;
+  const driversTotalPages = Math.max(1, Math.ceil(driversTotal / DRIVERS_PAGE_SIZE));
+
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: queryKeys.drivers.stats(),
+    queryFn: getDriverRosterStats,
+    staleTime: 2 * 60 * 1000,
   });
 
   const handleCreateDriver = async () => {
@@ -151,19 +173,11 @@ export const DriverManagement = () => {
     }
   };
 
-  // Calculate KPIs from driver data
-  const totalDrivers = drivers.length;
-  const activeToday = drivers.filter((d) => d.isOnline && d.status !== 'offline').length;
-  const avgRating = drivers.length > 0
-    ? drivers.reduce((sum, d) => sum + d.rating, 0) / drivers.length
-    : 0;
-  const uniqueZones = new Set(drivers.map((d) => d.zone).filter(Boolean)).size;
-
   const performanceKPIs = [
-    { label: "Total Drivers", value: totalDrivers, icon: Truck, format: "number" as const },
-    { label: "Active Today", value: activeToday, icon: CheckCircle2, format: "number" as const },
-    { label: "Avg Rating", value: avgRating, icon: Star, format: "decimal" as const },
-    { label: "Zones Covered", value: uniqueZones, icon: MapPin, format: "number" as const },
+    { label: "Total Drivers", value: stats?.totalDrivers ?? 0, icon: Truck, format: "number" as const },
+    { label: "Active Today", value: stats?.activeToday ?? 0, icon: CheckCircle2, format: "number" as const },
+    { label: "Avg Rating", value: stats?.averageRating ?? 0, icon: Star, format: "decimal" as const },
+    { label: "Zones Covered", value: stats?.zonesCovered ?? 0, icon: MapPin, format: "number" as const },
   ];
 
   // Transform drivers to table rows
@@ -180,7 +194,7 @@ export const DriverManagement = () => {
     status: driver.status,
   }));
 
-  if (isLoading) {
+  if (isLoading || statsLoading) {
     return (
       <div className="space-y-6">
         <PageHeader title="Driver Management" description="Manage your delivery fleet and track performance" />
@@ -214,8 +228,16 @@ export const DriverManagement = () => {
       <DataTable
         data={tableData}
         columns={driverColumns}
-        searchPlaceholder="Search drivers..."
+        searchPlaceholder="Search drivers by name..."
         onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
+        serverPagination={{
+          page,
+          totalPages: driversTotalPages,
+          total: driversTotal,
+          pageSize: DRIVERS_PAGE_SIZE,
+          onPageChange: setPage,
+          onSearchChange: setSearch,
+        }}
       />
 
       {/* Add Driver Dialog */}

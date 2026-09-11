@@ -60,6 +60,7 @@ export const queryKeys = {
   drivers: {
     all: ['drivers'] as const,
     list: () => [...queryKeys.drivers.all, 'list'] as const,
+    stats: () => [...queryKeys.drivers.all, 'stats'] as const,
     detail: (id: string) => [...queryKeys.drivers.all, 'detail', id] as const,
     routes: (driverId: string) => [...queryKeys.drivers.all, 'routes', driverId] as const,
   },
