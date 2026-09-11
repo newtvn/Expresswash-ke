@@ -58,6 +58,10 @@ confirm on prod before closing anything out).
 - Removed the unreferenced 2.6 MB `public/Express.pdf`, pruned ten unused Radix wrappers and
   direct dependencies, added intrinsic hero-image dimensions, and reduced payment polling
   from five to ten seconds.
+- **Audit closed (PRs #80, #81 — merged, deployed, verified live).** Final Tier-3 pass (PR #81)
+  lazy-loads recharts out of the Dashboard/Accounts route chunks and memoizes per-render table
+  columns. Only deferred-by-design follow-up: debounce the warehouse-stats trigger if write
+  volume grows (the migration-098 index keeps it cheap for now).
 
 ### Known open UI issues (raised 2026-09-11, under investigation — not yet fixed)
 1. Accounts-page tab separators show a stray left-border segment (`Accounts.tsx` tabs use
