@@ -1,11 +1,11 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, KPICard } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet, AlertCircle } from 'lucide-react';
-import { getAllInvoices, getPayments } from '@/services/invoiceService';
-import { computeBillingMetrics } from '@/services/billingMetrics';
+import { getCustomerBillingSummary, getPaymentsPage } from '@/services/invoiceService';
 import { queryKeys } from '@/config/queryKeys';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -54,20 +54,39 @@ const columns: Column<PaymentTableRow>[] = [
 
 export const PaymentHistory = () => {
   const { user } = useAuth();
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: [...queryKeys.payments.list(), 'customer', user?.id],
-    queryFn: () => getPayments(),
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 10;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
+  const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
+    queryKey: [...queryKeys.payments.list(), 'customer', user?.id, page, debouncedSearch],
+    queryFn: () => getPaymentsPage({
+      page,
+      pageSize,
+      customerId: user!.id,
+      search: debouncedSearch,
+    }),
     enabled: !!user?.id,
+    placeholderData: (previous) => previous,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['customer', 'invoices', 'billing-metrics', user?.id],
-    queryFn: () => getAllInvoices({ customerId: user!.id }),
+  const { data: summary, isLoading: summaryLoading } = useQuery({
+    queryKey: [...queryKeys.payments.all, 'customer-summary', user?.id],
+    queryFn: () => getCustomerBillingSummary(user!.id),
     enabled: !!user?.id,
     staleTime: 2 * 60 * 1000,
   });
 
-  const isLoading = paymentsLoading || invoicesLoading;
+  const payments = paymentPage?.rows ?? [];
+  const total = paymentPage?.total ?? 0;
+  const isLoading = paymentsLoading || summaryLoading;
 
   // Transform payments to table rows
   const tableData: PaymentTableRow[] = payments.map((payment) => ({
@@ -84,13 +103,8 @@ export const PaymentHistory = () => {
     reference: payment.reference || payment.mpesaReceiptNumber || payment.referenceNumber || 'N/A',
   }));
 
-  const completedPayments = payments.filter((p) => p.status === 'completed');
-  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const totalPaidThisMonth = completedPayments
-    .filter((p) => p.createdAt.startsWith(currentMonth))
-    .reduce((sum, p) => sum + p.amount, 0);
-
-  const outstanding = computeBillingMetrics(invoices).outstanding;
+  const totalPaidThisMonth = summary?.paidThisMonth ?? 0;
+  const outstanding = summary?.outstanding ?? 0;
 
   if (isLoading) {
     return (
@@ -135,7 +149,15 @@ export const PaymentHistory = () => {
         columns={columns}
         searchable
         searchPlaceholder="Search payments..."
-        pageSize={10}
+        pageSize={pageSize}
+        serverPagination={{
+          page,
+          pageSize,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
+          onPageChange: setPage,
+          onSearchChange: setSearch,
+        }}
       />
     </div>
   );

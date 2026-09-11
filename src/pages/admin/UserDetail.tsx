@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
+import { PageHeader, DataTable, Paginator, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getUserById, updateUser } from '@/services/userService';
 import { getOrders } from '@/services/orderService';
-import { getInvoices } from '@/services/invoiceService';
+import { getCustomerBillingSummary, getInvoices, getPaymentsPage } from '@/services/invoiceService';
+import { getMyReviewsPage } from '@/services/reviewService';
 import { supabase } from '@/lib/supabase';
 import { UserProfile } from '@/types';
 import { getOrderStatusLabel } from '@/constants/orderStatus';
@@ -103,6 +104,24 @@ export const UserDetail = () => {
   const [driverForm, setDriverForm] = useState({ vehiclePlate: '', vehicleType: '', licenseNumber: '' });
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState<ReviewRow | null>(null);
+  const [paymentsPage, setPaymentsPage] = useState(0);
+  const [paymentsSearch, setPaymentsSearch] = useState('');
+  const [debouncedPaymentsSearch, setDebouncedPaymentsSearch] = useState('');
+  const [reviewsPage, setReviewsPage] = useState(0);
+  const [reviewsSearch, setReviewsSearch] = useState('');
+  const [debouncedReviewsSearch, setDebouncedReviewsSearch] = useState('');
+  const detailPageSize = 10;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedPaymentsSearch(paymentsSearch), 300);
+    return () => clearTimeout(handle);
+  }, [paymentsSearch]);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedReviewsSearch(reviewsSearch), 300);
+    return () => clearTimeout(handle);
+  }, [reviewsSearch]);
+  useEffect(() => setPaymentsPage(0), [debouncedPaymentsSearch]);
+  useEffect(() => setReviewsPage(0), [debouncedReviewsSearch]);
 
   // ── Fetch user profile ───────────────────────────────────────────
   const { data: user, isLoading: userLoading } = useQuery({
@@ -126,16 +145,20 @@ export const UserDetail = () => {
   });
 
   // ── Fetch user payments ──────────────────────────────────────────
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['admin', 'user-payments', userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('customer_id', userId!)
-        .order('created_at', { ascending: false });
-      return (data ?? []) as Record<string, unknown>[];
-    },
+  const { data: paymentResult, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['admin', 'user-payments', userId, paymentsPage, debouncedPaymentsSearch],
+    queryFn: () => getPaymentsPage({
+      customerId: userId!,
+      page: paymentsPage,
+      pageSize: detailPageSize,
+      search: debouncedPaymentsSearch,
+    }),
+    enabled: !!userId,
+    placeholderData: (previous) => previous,
+  });
+  const { data: customerBillingSummary } = useQuery({
+    queryKey: ['admin', 'user-payment-summary', userId],
+    queryFn: () => getCustomerBillingSummary(userId!),
     enabled: !!userId,
   });
 
@@ -169,26 +192,29 @@ export const UserDetail = () => {
   });
 
   // ── Fetch reviews ────────────────────────────────────────────────
-  const { data: reviews = [], isLoading: reviewsLoading } = useQuery({
-    queryKey: ['admin', 'user-reviews', userId],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('reviews')
-        .select('*, orders(tracking_code)')
-        .eq('customer_id', userId!)
-        .order('created_at', { ascending: false });
-      return (data ?? []).map((r: Record<string, unknown>) => ({
-        id: r.id as string,
-        rating: (r.overall_rating as number) ?? 0,
-        comment: (r.review_text as string) ?? '',
-        status: (r.status as string) ?? 'pending',
-        created_at: r.created_at as string,
-        order_tracking_code:
-          (r.orders as Record<string, unknown> | null)?.tracking_code as string ?? 'N/A',
-      })) as ReviewRow[];
-    },
+  const { data: reviewResult, isLoading: reviewsLoading } = useQuery({
+    queryKey: ['admin', 'user-reviews', userId, reviewsPage, debouncedReviewsSearch],
+    queryFn: () => getMyReviewsPage({
+      customerId: userId!,
+      page: reviewsPage,
+      pageSize: detailPageSize,
+      search: debouncedReviewsSearch,
+    }),
     enabled: !!userId,
+    placeholderData: (previous) => previous,
   });
+
+  const payments = paymentResult?.rows ?? [];
+  const paymentTotal = paymentResult?.total ?? 0;
+  const reviews: ReviewRow[] = (reviewResult?.rows ?? []).map((review) => ({
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment,
+    status: review.status,
+    created_at: review.createdAt,
+    order_tracking_code: review.orderNumber || 'N/A',
+  }));
+  const reviewTotal = reviewResult?.total ?? 0;
 
   // ── Fetch driver info (if driver) ────────────────────────────────
   const { data: driverInfo, isLoading: driverLoading } = useQuery({
@@ -521,9 +547,9 @@ export const UserDetail = () => {
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="orders">Orders ({orderTableData.length})</TabsTrigger>
           <TabsTrigger value="invoices">Invoices ({invoiceTableData.length})</TabsTrigger>
-          <TabsTrigger value="payments">Payments ({payments.length})</TabsTrigger>
+          <TabsTrigger value="payments">Payments ({paymentTotal})</TabsTrigger>
           <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews ({reviews.length})</TabsTrigger>
+          <TabsTrigger value="reviews">Reviews ({reviewTotal})</TabsTrigger>
           {user.role === 'driver' && <TabsTrigger value="driver">Driver Info</TabsTrigger>}
         </TabsList>
 
@@ -785,29 +811,44 @@ export const UserDetail = () => {
         <TabsContent value="payments">
           {paymentsLoading ? (
             <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
-          ) : payments.length === 0 ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground"><DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No payments recorded</p></CardContent></Card>
           ) : (
-            <div className="space-y-2">
-              {payments.map((p) => (
-                <div key={p.id as string} className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="space-y-4">
+              <Input
+                className="max-w-sm"
+                placeholder="Search payments..."
+                value={paymentsSearch}
+                onChange={(event) => setPaymentsSearch(event.target.value)}
+              />
+              {payments.length === 0 ? (
+                <Card><CardContent className="py-12 text-center text-muted-foreground"><DollarSign className="h-10 w-10 mx-auto mb-3 opacity-30" /><p>No payments recorded</p></CardContent></Card>
+              ) : payments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
-                    <p className="text-sm font-medium">{((p.method as string) ?? 'mpesa').replace('_', ' ')}</p>
+                    <p className="text-sm font-medium">{(p.method ?? 'mpesa').replace('_', ' ')}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(p.created_at as string).toLocaleDateString()}
-                      {p.mpesa_receipt_number && ` · Ref: ${p.mpesa_receipt_number as string}`}
+                      {new Date(p.createdAt).toLocaleDateString()}
+                      {p.mpesaReceiptNumber && ` · Ref: ${p.mpesaReceiptNumber}`}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-green-600">KES {Number(p.amount).toLocaleString()}</p>
-                    <p className={`text-xs ${p.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}`}>{p.status as string}</p>
+                    <p className={`text-xs ${p.status === 'completed' ? 'text-green-600' : 'text-muted-foreground'}`}>{p.status}</p>
                   </div>
                 </div>
               ))}
-              <div className="flex justify-between p-3 border-t font-semibold">
-                <span>Total Paid</span>
-                <span className="text-green-600">KES {payments.filter((p) => p.status === 'completed').reduce((s, p) => s + Number(p.amount), 0).toLocaleString()}</span>
-              </div>
+              {payments.length > 0 && (
+                <div className="flex justify-between p-3 border-t font-semibold">
+                  <span>Total Paid</span>
+                  <span className="text-green-600">KES {(customerBillingSummary?.totalPaid ?? 0).toLocaleString()}</span>
+                </div>
+              )}
+              <Paginator
+                page={paymentsPage}
+                pageSize={detailPageSize}
+                total={paymentTotal}
+                totalPages={Math.max(1, Math.ceil(paymentTotal / detailPageSize))}
+                onPageChange={setPaymentsPage}
+              />
             </div>
           )}
         </TabsContent>
@@ -896,6 +937,15 @@ export const UserDetail = () => {
               searchPlaceholder="Search reviews..."
               emptyMessage="No reviews found for this user"
               onRowClick={(row) => setSelectedReview(row)}
+              pageSize={detailPageSize}
+              serverPagination={{
+                page: reviewsPage,
+                pageSize: detailPageSize,
+                total: reviewTotal,
+                totalPages: Math.max(1, Math.ceil(reviewTotal / detailPageSize)),
+                onPageChange: setReviewsPage,
+                onSearchChange: setReviewsSearch,
+              }}
             />
           )}
         </TabsContent>

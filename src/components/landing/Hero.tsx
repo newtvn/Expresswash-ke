@@ -9,6 +9,9 @@ const Hero = () => {
         alt=""
         aria-hidden="true"
         decoding="async"
+        fetchPriority="high"
+        width={1448}
+        height={1086}
         className="absolute inset-0 z-0 h-full w-full object-contain object-[center_54%] lg:object-cover lg:object-center"
       />
       <div

@@ -863,25 +863,23 @@ export const getOrderStats = async (): Promise<{
   cancelled: number;
   byStatus: Record<number, number>;
 }> => {
-  const { data, error } = await supabase.from('orders').select('status');
-  if (error || !data) {
+  const { data, error } = await supabase.rpc('get_order_stats');
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) {
     return { total: 0, pending: 0, inProgress: 0, delivered: 0, cancelled: 0, byStatus: {} };
   }
 
-  const byStatus: Record<number, number> = {};
-  data.forEach((o) => {
-    const s = o.status as number;
-    byStatus[s] = (byStatus[s] ?? 0) + 1;
-  });
+  const rawByStatus = (row.by_status ?? {}) as Record<string, number>;
+  const byStatus = Object.fromEntries(
+    Object.entries(rawByStatus).map(([status, count]) => [Number(status), Number(count)]),
+  ) as Record<number, number>;
 
   return {
-    total: data.length,
-    pending: byStatus[1] ?? 0,
-    inProgress: Object.entries(byStatus)
-      .filter(([k]) => Number(k) >= 2 && Number(k) <= 11)
-      .reduce((sum, [, v]) => sum + v, 0),
-    delivered: byStatus[12] ?? 0,
-    cancelled: byStatus[0] ?? 0,
+    total: Number(row.total) || 0,
+    pending: Number(row.pending) || 0,
+    inProgress: Number(row.in_progress) || 0,
+    delivered: Number(row.delivered) || 0,
+    cancelled: Number(row.cancelled) || 0,
     byStatus,
   };
 };

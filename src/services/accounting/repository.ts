@@ -310,15 +310,34 @@ function mapCustomerCreditBalance(row: Record<string, unknown>): CustomerCreditB
   };
 }
 
-export async function listContacts(): Promise<Contact[]> {
+export async function listContacts(limit = 100): Promise<Contact[]> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.from('contacts').select('*').eq('active', true).order('name'),
+    () => supabase.from('contacts').select('*').eq('active', true).order('name').limit(limit),
     { maxRetries: 2 },
   );
 
   if (error) throw new Error(error.message);
   if (!data) return [];
   return data.map(mapContact);
+}
+
+export async function listContactsPage(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<{ rows: Contact[]; total: number }> {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('contacts')
+    .select('*', { count: 'exact' })
+    .eq('active', true)
+    .order('name')
+    .range(from, from + params.pageSize - 1);
+  const term = params.search?.trim();
+  if (term) query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%,phone.ilike.%${term}%`);
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []).map(mapContact), total: count ?? 0 };
 }
 
 export async function saveContact(input: Partial<Contact> & { name: string; contactType: Contact['contactType'] }): Promise<{ success: boolean; error?: string }> {

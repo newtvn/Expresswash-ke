@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { Package, Clock, ClipboardList, Plus, Loader2, Camera, X, Search, MapPin, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { getIntakeQueue } from '@/services/warehouseService';
+import { getIntakeQueuePage, getIntakeQueueStats } from '@/services/warehouseService';
 import { supabase } from '@/lib/supabase';
 import { IntakeItem } from '@/types';
 
@@ -55,11 +55,32 @@ export const ItemIntake = () => {
   const [searching, setSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderResult | null>(null);
+  const [queuePage, setQueuePage] = useState(0);
+  const [queueSearch, setQueueSearch] = useState('');
+  const [debouncedQueueSearch, setDebouncedQueueSearch] = useState('');
+  const queuePageSize = 8;
 
-  const { data: intakes = [], isLoading } = useQuery({
-    queryKey: ['warehouse', 'intake'],
-    queryFn: getIntakeQueue,
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQueueSearch(queueSearch), 300);
+    return () => clearTimeout(handle);
+  }, [queueSearch]);
+  useEffect(() => setQueuePage(0), [debouncedQueueSearch]);
+
+  const { data: intakePage, isLoading } = useQuery({
+    queryKey: ['warehouse', 'intake', queuePage, debouncedQueueSearch],
+    queryFn: () => getIntakeQueuePage({
+      page: queuePage,
+      pageSize: queuePageSize,
+      search: debouncedQueueSearch,
+    }),
+    placeholderData: (previous) => previous,
   });
+  const { data: intakeStats } = useQuery({
+    queryKey: ['warehouse', 'intake', 'stats'],
+    queryFn: getIntakeQueueStats,
+  });
+  const intakes = intakePage?.rows ?? [];
+  const intakeTotal = intakePage?.total ?? 0;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -254,10 +275,10 @@ export const ItemIntake = () => {
       <PageHeader title="Item Intake" description="Receive and log incoming items" />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <KPICard label="Total Intake Records" value={intakes.length} icon={Package} />
+        <KPICard label="Total Intake Records" value={intakeStats?.total ?? 0} icon={Package} />
         <KPICard
           label="Received Today"
-          value={intakes.filter((i) => new Date(i.receivedAt).toDateString() === new Date().toDateString()).length}
+          value={intakeStats?.today ?? 0}
           icon={Clock}
         />
       </div>
@@ -436,7 +457,21 @@ export const ItemIntake = () => {
               {isLoading ? (
                 <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
               ) : (
-                <DataTable data={intakes} columns={intakeColumns} searchable searchPlaceholder="Search items..." pageSize={8} />
+                <DataTable
+                  data={intakes}
+                  columns={intakeColumns}
+                  searchable
+                  searchPlaceholder="Search items..."
+                  pageSize={queuePageSize}
+                  serverPagination={{
+                    page: queuePage,
+                    pageSize: queuePageSize,
+                    total: intakeTotal,
+                    totalPages: Math.max(1, Math.ceil(intakeTotal / queuePageSize)),
+                    onPageChange: setQueuePage,
+                    onSearchChange: setQueueSearch,
+                  }}
+                />
               )}
             </CardContent>
           </Card>

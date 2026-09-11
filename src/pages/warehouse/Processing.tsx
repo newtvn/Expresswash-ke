@@ -1,15 +1,16 @@
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, Paginator } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Droplets, Wind, CheckCircle, Clock, Play, ArrowRight, Timer, User } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Droplets, Wind, CheckCircle, Clock, ArrowRight, Timer, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProcessingItems, updateItemStage } from '@/services/warehouseService';
-import { updateOrderStatus } from '@/services/orderService';
+import { getProcessingItemsPage, getWarehouseStats, updateItemStage } from '@/services/warehouseService';
 import { ProcessingItem } from '@/types';
 import { supabase } from '@/lib/supabase';
 
@@ -31,12 +32,31 @@ const NEXT_STAGE: Record<ProcessingItem['stage'], ProcessingItem['stage'] | null
 
 export const Processing = () => {
   const qc = useQueryClient();
+  const [stage, setStage] = useState<ProcessingItem['stage']>('intake');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 20;
 
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ['warehouse', 'processing'],
-    queryFn: () => getProcessingItems(),
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [stage, debouncedSearch]);
+
+  const { data: processingPage, isLoading } = useQuery({
+    queryKey: ['warehouse', 'processing', stage, page, debouncedSearch],
+    queryFn: () => getProcessingItemsPage({ stage, page, pageSize, search: debouncedSearch }),
+    refetchInterval: 30000,
+    placeholderData: (previous) => previous,
+  });
+  const { data: stats } = useQuery({
+    queryKey: ['warehouse', 'stats'],
+    queryFn: getWarehouseStats,
     refetchInterval: 30000,
   });
+  const items = processingPage?.rows ?? [];
+  const itemTotal = processingPage?.total ?? 0;
 
   const moveMutation = useMutation({
     mutationFn: async ({ itemId, currentStage, orderNumber }: { itemId: string; currentStage: ProcessingItem['stage']; orderNumber: string }) => {
@@ -50,15 +70,14 @@ export const Processing = () => {
     onSuccess: () => {
       toast.success('Item moved to next stage');
       qc.invalidateQueries({ queryKey: ['warehouse', 'processing'] });
+      qc.invalidateQueries({ queryKey: ['warehouse', 'stats'] });
     },
     onError: (e) => toast.error(String(e)),
   });
 
-  const byStage = (stage: ProcessingItem['stage']) => items.filter((i) => i.stage === stage);
-
-  function ProcessingTable({ stage }: { stage: ProcessingItem['stage'] }) {
-    const stageItems = byStage(stage);
-    const nextStage = NEXT_STAGE[stage];
+  function ProcessingTable({ stage: tableStage }: { stage: ProcessingItem['stage'] }) {
+    const stageItems = items;
+    const nextStage = NEXT_STAGE[tableStage];
     return (
       <div className="rounded-lg border overflow-hidden">
         <Table>
@@ -119,11 +138,11 @@ export const Processing = () => {
   }
 
   const stageCounts = {
-    intake: byStage('intake').length,
-    washing: byStage('washing').length,
-    drying: byStage('drying').length,
-    quality_check: byStage('quality_check').length,
-    ready: byStage('ready_for_dispatch').length,
+    intake: stats ? Math.max(stats.totalItems - stats.inWashing - stats.inDrying - stats.inQualityCheck - stats.readyForDispatch, 0) : 0,
+    washing: stats?.inWashing ?? 0,
+    drying: stats?.inDrying ?? 0,
+    quality_check: stats?.inQualityCheck ?? 0,
+    ready: stats?.readyForDispatch ?? 0,
   };
 
   return (
@@ -151,7 +170,7 @@ export const Processing = () => {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
       ) : (
-        <Tabs defaultValue="intake">
+        <Tabs value={stage === 'ready_for_dispatch' ? 'ready' : stage} onValueChange={(value) => setStage(value === 'ready' ? 'ready_for_dispatch' : value as ProcessingItem['stage'])}>
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="intake">Intake ({stageCounts.intake})</TabsTrigger>
             <TabsTrigger value="washing">Washing ({stageCounts.washing})</TabsTrigger>
@@ -159,11 +178,20 @@ export const Processing = () => {
             <TabsTrigger value="quality_check">QC ({stageCounts.quality_check})</TabsTrigger>
             <TabsTrigger value="ready">Ready ({stageCounts.ready})</TabsTrigger>
           </TabsList>
-          {(['intake', 'washing', 'drying', 'quality_check', 'ready_for_dispatch'] as ProcessingItem['stage'][]).map((stage, i) => (
-            <TabsContent key={stage} value={stage === 'ready_for_dispatch' ? 'ready' : stage} className="mt-4">
-              <ProcessingTable stage={stage} />
-            </TabsContent>
-          ))}
+          <div className="relative mt-4 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search processing items..." className="pl-9" />
+          </div>
+          <TabsContent value={stage === 'ready_for_dispatch' ? 'ready' : stage} className="mt-4 space-y-4">
+            <ProcessingTable stage={stage} />
+            <Paginator
+              page={page}
+              pageSize={pageSize}
+              total={itemTotal}
+              totalPages={Math.max(1, Math.ceil(itemTotal / pageSize))}
+              onPageChange={setPage}
+            />
+          </TabsContent>
         </Tabs>
       )}
     </div>

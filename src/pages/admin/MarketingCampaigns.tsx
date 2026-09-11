@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { PageHeader, KPICard, DataTable } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -6,6 +7,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { StatusBadge } from '@/components/shared';
 import { Send, Megaphone, CheckCircle, XCircle, Gift, Bell } from 'lucide-react';
 import { getNotificationStats } from '@/services/marketingService';
+import { getNotificationHistoryPage } from '@/services/communicationService';
+import { queryKeys } from '@/config/queryKeys';
 
 type NotifRow = {
   id: string;
@@ -60,10 +63,35 @@ const reminderColumns: Column<ReminderRow>[] = [
 ];
 
 export const MarketingCampaigns = () => {
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 10;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['admin', 'marketing', 'stats'],
     queryFn: getNotificationStats,
   });
+  const { data: notificationPage, isLoading: notificationsLoading } = useQuery({
+    queryKey: queryKeys.communications.history({ surface: 'marketing', page, search: debouncedSearch }),
+    queryFn: () => getNotificationHistoryPage({ page, pageSize, search: debouncedSearch }),
+    placeholderData: (previous) => previous,
+  });
+  const recentNotifications: NotifRow[] = (notificationPage?.rows ?? []).map((row) => ({
+    id: row.id,
+    templateName: row.templateName,
+    channel: row.channel,
+    recipientName: row.recipientName,
+    status: row.status,
+    sentAt: row.sentAt,
+  }));
+  const notificationTotal = notificationPage?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -99,7 +127,7 @@ export const MarketingCampaigns = () => {
       )}
 
       {/* Recent Notifications */}
-      {!isLoading && stats && (
+      {!notificationsLoading && (
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -109,11 +137,19 @@ export const MarketingCampaigns = () => {
           </CardHeader>
           <CardContent>
             <DataTable
-              data={stats.recentNotifications}
+              data={recentNotifications}
               columns={notifColumns}
               searchable
               searchPlaceholder="Search notifications..."
-              pageSize={10}
+              pageSize={pageSize}
+              serverPagination={{
+                page,
+                pageSize,
+                total: notificationTotal,
+                totalPages: Math.max(1, Math.ceil(notificationTotal / pageSize)),
+                onPageChange: setPage,
+                onSearchChange: setSearch,
+              }}
             />
           </CardContent>
         </Card>

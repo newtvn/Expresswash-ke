@@ -136,10 +136,10 @@ export const Dashboard = () => {
     queryFn: () => getOrders({ page: 1, limit: 4 }),
   });
 
-  const recentOrders = (recentOrdersResult?.data ?? []).map((o) => ({
+  const recentOrders = useMemo(() => (recentOrdersResult?.data ?? []).map((o) => ({
     ...o,
     amount: o.total ?? 0,
-  }));
+  })), [recentOrdersResult?.data]);
 
   // Map status counts to pipeline stages
   const stageCounts = useMemo(() => {

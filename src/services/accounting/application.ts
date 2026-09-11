@@ -30,6 +30,14 @@ export async function getAccountingSetup() {
   };
 }
 
+export async function getAccountingContactsPage(params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}) {
+  return repository.listContactsPage(params);
+}
+
 export async function postBalancedJournalEntry(input: JournalEntryInput) {
   const validation = validateJournalEntry(input);
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, SearchInput } from '@/components/shared';
@@ -101,13 +101,17 @@ export const UserManagement = () => {
     }
   };
 
-  const all = allResult?.data ?? [];
+  const all = useMemo(() => allResult?.data ?? [], [allResult?.data]);
   const formatJoinedDate = (value?: string) => {
     if (!value) return '—';
     return new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' });
   };
-  const getByRole = (role?: string) =>
-    role ? all.filter((u) => u.role === role) : all;
+  const customers = useMemo(() => all.filter((userProfile) => userProfile.role === 'customer'), [all]);
+  const drivers = useMemo(() => all.filter((userProfile) => userProfile.role === 'driver'), [all]);
+  const staff = useMemo(
+    () => all.filter((userProfile) => ['warehouse_staff', 'admin', 'super_admin'].includes(userProfile.role)),
+    [all],
+  );
 
   const handleCreateUser = async () => {
     if (!newUser.email || !newUser.password || !newUser.name) {
@@ -247,11 +251,11 @@ export const UserManagement = () => {
             <TabsTrigger value="staff">Staff</TabsTrigger>
           </TabsList>
           <TabsContent value="all"><DataTable data={all} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
-          <TabsContent value="customers"><DataTable data={getByRole('customer')} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
-          <TabsContent value="drivers"><DataTable data={getByRole('driver')} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="customers"><DataTable data={customers} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
+          <TabsContent value="drivers"><DataTable data={drivers} columns={columns} searchable={false} pageSize={USERS_PER_PAGE} onRowClick={(row) => navigate(`/admin/users/${row.id}`)} /></TabsContent>
           <TabsContent value="staff">
             <DataTable
-              data={[...getByRole('warehouse_staff'), ...getByRole('admin'), ...getByRole('super_admin')]}
+              data={staff}
               columns={columns}
               searchable={false}
               pageSize={USERS_PER_PAGE}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -8,111 +8,56 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageCheck, Truck, MapPin, Clock, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { dispatchWarehouseOrder, getProcessingItems, getDispatchQueue, getWarehouseStats } from '@/services/warehouseService';
+import {
+  dispatchWarehouseOrder,
+  getDispatchQueuePage,
+  getDispatchQueueStats,
+  getWarehouseStats,
+  type WarehouseDispatchPageRow,
+} from '@/services/warehouseService';
 import { getDrivers } from '@/services/driverService';
 import { supabase } from '@/lib/supabase';
 
-interface DispatchRow {
-  id: string;
-  orderId: string;
-  orderNumber: string;
-  customerName: string;
-  itemName: string;
-  itemType: string;
-  quantity: number;
-  zone: string;
-  assignedDriver: string | null;
-  scheduledDelivery: string | null;
-  readySince: string;
-  dispatchId: string | null;
-}
+type DispatchRow = WarehouseDispatchPageRow & Record<string, unknown>;
 
 const DispatchQueue = () => {
   const qc = useQueryClient();
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [selectedDriver, setSelectedDriver] = useState<string>('');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 20;
 
-  const { data: processingItems = [], isLoading: loadingProcessing } = useQuery({
-    queryKey: ['warehouse', 'processing', 'ready_for_dispatch'],
-    queryFn: () => getProcessingItems('ready_for_dispatch'),
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
+  const { data: dispatchPage, isLoading } = useQuery({
+    queryKey: ['warehouse', 'dispatch', page, debouncedSearch],
+    queryFn: () => getDispatchQueuePage({ page, pageSize, search: debouncedSearch }),
     refetchInterval: 30000,
+    placeholderData: (previous) => previous,
   });
-
-  const { data: dispatchRecords = [], isLoading: loadingDispatch } = useQuery({
-    queryKey: ['warehouse', 'dispatch'],
-    queryFn: getDispatchQueue,
-    refetchInterval: 30000,
-  });
-
-  // Fetch zones from orders for processing items
-  const orderIds = [...new Set(processingItems.map((p) => p.orderId))];
-  const { data: orderZones = [] } = useQuery({
-    queryKey: ['orders', 'zones', orderIds],
-    queryFn: async () => {
-      if (orderIds.length === 0) return [];
-      const { data } = await supabase
-        .from('orders')
-        .select('id, zone')
-        .in('id', orderIds);
-      return (data ?? []) as { id: string; zone: string | null }[];
-    },
-    enabled: orderIds.length > 0,
-  });
+  const mergedRows = (dispatchPage?.rows ?? []) as DispatchRow[];
+  const dispatchTotal = dispatchPage?.total ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: ['warehouse', 'stats'],
     queryFn: getWarehouseStats,
+  });
+  const { data: dispatchStats } = useQuery({
+    queryKey: ['warehouse', 'dispatch', 'stats'],
+    queryFn: getDispatchQueueStats,
+    refetchInterval: 30000,
   });
 
   const { data: drivers = [] } = useQuery({
     queryKey: ['drivers'],
     queryFn: getDrivers,
   });
-
-  const mergedRows: DispatchRow[] = (() => {
-    const zoneMap = new Map(orderZones.map((o) => [o.id, o.zone ?? '']));
-    const dispatchByOrder = new Map(dispatchRecords.map((d) => [d.orderId, d]));
-
-    const fromProcessing: DispatchRow[] = processingItems.map((p) => {
-      const d = dispatchByOrder.get(p.orderId);
-      return {
-        id: p.id,
-        orderId: p.orderId,
-        orderNumber: p.orderNumber,
-        customerName: p.customerName,
-        itemName: p.itemName,
-        itemType: p.itemType,
-        quantity: p.quantity,
-        zone: d?.zone || zoneMap.get(p.orderId) || '',
-        assignedDriver: d?.assignedDriver ?? null,
-        scheduledDelivery: d?.scheduledDelivery ?? null,
-        readySince: d?.readySince ?? p.startedAt ?? new Date().toISOString(),
-        dispatchId: d?.id ?? null,
-      };
-    });
-
-    const processingOrderIds = new Set(processingItems.map((p) => p.orderId));
-    const orphanDispatches: DispatchRow[] = dispatchRecords
-      .filter((d) => !processingOrderIds.has(d.orderId))
-      .map((d) => ({
-        id: d.id,
-        orderId: d.orderId,
-        orderNumber: d.orderNumber,
-        customerName: d.customerName,
-        itemName: d.items.join(', ') || 'Items',
-        itemType: '',
-        quantity: d.totalItems,
-        zone: d.zone,
-        assignedDriver: d.assignedDriver ?? null,
-        scheduledDelivery: d.scheduledDelivery ?? null,
-        readySince: d.readySince,
-        dispatchId: d.id,
-      }));
-
-    return [...fromProcessing, ...orphanDispatches];
-  })();
-
-  const isLoading = loadingProcessing || loadingDispatch;
 
   const assignMutation = useMutation({
     mutationFn: async ({ row, driverId }: { row: DispatchRow; driverId: string }) => {
@@ -171,9 +116,9 @@ const DispatchQueue = () => {
     onError: (e) => toast.error('Dispatch failed: ' + e.message),
   });
 
-  const readyCount = mergedRows.filter((i) => !i.scheduledDelivery).length;
-  const awaitingDriver = mergedRows.filter((i) => !i.assignedDriver && !i.scheduledDelivery).length;
-  const dispatchedCount = mergedRows.filter((i) => i.scheduledDelivery).length;
+  const readyCount = dispatchStats?.ready ?? 0;
+  const awaitingDriver = dispatchStats?.awaitingDriver ?? 0;
+  const dispatchedCount = dispatchStats?.dispatched ?? 0;
 
   const statCards = [
     { label: 'Ready to Dispatch', value: readyCount, icon: PackageCheck, color: 'bg-primary/10 text-primary' },
@@ -324,7 +269,15 @@ const DispatchQueue = () => {
           columns={dispatchColumns}
           searchable
           searchPlaceholder="Search dispatch items..."
-          pageSize={10}
+          pageSize={pageSize}
+          serverPagination={{
+            page,
+            pageSize,
+            total: dispatchTotal,
+            totalPages: Math.max(1, Math.ceil(dispatchTotal / pageSize)),
+            onPageChange: setPage,
+            onSearchChange: setSearch,
+          }}
         />
       )}
     </div>

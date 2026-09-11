@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -26,7 +26,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/config/queryKeys';
 import {
-  getMyReviews,
+  getMyReviewsPage,
   getDeliveredOrdersWithoutReview,
   submitReview,
   type Review,
@@ -109,12 +109,30 @@ export const Reviews = () => {
   const [newComment, setNewComment] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [selectedOrderNumber, setSelectedOrderNumber] = useState('');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 10;
 
-  const { data: myReviews = [], isLoading: reviewsLoading } = useQuery({
-    queryKey: queryKeys.reviews.myReviews(),
-    queryFn: () => getMyReviews(user?.id ?? ''),
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
+  const { data: reviewsPage, isLoading: reviewsLoading } = useQuery({
+    queryKey: [...queryKeys.reviews.myReviews(), user?.id, page, debouncedSearch],
+    queryFn: () => getMyReviewsPage({
+      customerId: user!.id,
+      page,
+      pageSize,
+      search: debouncedSearch,
+    }),
     enabled: !!user?.id,
+    placeholderData: (previous) => previous,
   });
+  const myReviews = reviewsPage?.rows ?? [];
+  const reviewTotal = reviewsPage?.total ?? 0;
 
   const { data: pendingOrders = [] } = useQuery({
     queryKey: ['reviews', 'unreviewed', user?.id],
@@ -198,8 +216,16 @@ export const Reviews = () => {
         columns={columns}
         searchable
         searchPlaceholder="Search reviews..."
-        pageSize={10}
+        pageSize={pageSize}
         onRowClick={(row) => setSelectedReview(row)}
+        serverPagination={{
+          page,
+          pageSize,
+          total: reviewTotal,
+          totalPages: Math.max(1, Math.ceil(reviewTotal / pageSize)),
+          onPageChange: setPage,
+          onSearchChange: setSearch,
+        }}
       />
 
       {/* Review Detail Dialog */}

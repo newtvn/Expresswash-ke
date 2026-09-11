@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, StatusBadge, KPICard } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,8 +8,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Package, Droplets, Wind, Sparkles, PackageCheck, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { getWarehouseStats, getProcessingItems } from '@/services/warehouseService';
-import type { WarehouseStats, ProcessingItem } from '@/types';
+import { getWarehouseStats, getProcessingItemsPage } from '@/services/warehouseService';
+import type { ProcessingItem } from '@/types';
 
 const humanizeValue = (value?: string) => value
   ? value.replace(/[-_]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
@@ -76,39 +77,29 @@ function TableSkeleton({ rows = 5 }: { rows?: number }) {
  * KPIs and warehouse pipeline items are fetched from Supabase.
  */
 export const Inventory = () => {
-  const [stats, setStats] = useState<WarehouseStats | null>(null);
-  const [items, setItems] = useState<ProcessingItem[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [itemsLoading, setItemsLoading] = useState(true);
-
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
-      const data = await getWarehouseStats();
-      setStats(data);
-    } catch {
-      toast.error('Failed to load warehouse stats');
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  const fetchItems = useCallback(async () => {
-    setItemsLoading(true);
-    try {
-      const data = await getProcessingItems();
-      setItems(data);
-    } catch {
-      toast.error('Failed to load warehouse items');
-    } finally {
-      setItemsLoading(false);
-    }
-  }, []);
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 20;
 
   useEffect(() => {
-    fetchStats();
-    fetchItems();
-  }, [fetchStats, fetchItems]);
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['warehouse', 'stats'],
+    queryFn: getWarehouseStats,
+  });
+  const { data: itemPage, isLoading: itemsLoading } = useQuery({
+    queryKey: ['warehouse', 'processing', 'inventory', page, debouncedSearch],
+    queryFn: () => getProcessingItemsPage({ page, pageSize, search: debouncedSearch }),
+    placeholderData: (previous) => previous,
+  });
+  const items = itemPage?.rows ?? [];
+  const itemTotal = itemPage?.total ?? 0;
 
   // Build KPI cards from live stats
   const warehouseKPIs = stats
@@ -173,8 +164,7 @@ export const Inventory = () => {
               variant="outline"
               size="sm"
               onClick={() => {
-                fetchItems();
-                fetchStats();
+                queryClient.invalidateQueries({ queryKey: ['warehouse'] });
                 toast.success('Refreshing warehouse data...');
               }}
             >
@@ -184,13 +174,22 @@ export const Inventory = () => {
           </div>
           {itemsLoading ? (
             <TableSkeleton rows={6} />
-          ) : items.length === 0 ? (
-            <div className="text-center py-10">
-              <Package className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">No items in the warehouse pipeline</p>
-            </div>
           ) : (
-            <DataTable data={items} columns={itemColumns} searchPlaceholder="Search items..." />
+            <DataTable
+              data={items}
+              columns={itemColumns}
+              searchPlaceholder="Search items..."
+              emptyMessage="No items in the warehouse pipeline"
+              pageSize={pageSize}
+              serverPagination={{
+                page,
+                pageSize,
+                total: itemTotal,
+                totalPages: Math.max(1, Math.ceil(itemTotal / pageSize)),
+                onPageChange: setPage,
+                onSearchChange: setSearch,
+              }}
+            />
           )}
         </CardContent>
       </Card>

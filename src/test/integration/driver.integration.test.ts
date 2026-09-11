@@ -532,4 +532,20 @@ describe('Driver › Cash payment', () => {
 
     trackForCleanup('payments', payment.id);
   });
+
+  it('can summarize only the signed-in driver cash for the local day', async () => {
+    const own = await driverClient.rpc('get_driver_cash_summary', {
+      p_driver_id: driverId,
+      p_day: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi' }).format(new Date()),
+    });
+    expect(own.error).toBeNull();
+    expect(Number(own.data?.[0]?.total_collected ?? 0)).toBeGreaterThan(0);
+
+    const other = await driverClient.rpc('get_driver_cash_summary', {
+      p_driver_id: TEST_ACCOUNTS.admin.id,
+      p_day: new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi' }).format(new Date()),
+    });
+    expect(other.error).toBeNull();
+    expect(Number(other.data?.[0]?.total_collected ?? 0)).toBe(0);
+  });
 });

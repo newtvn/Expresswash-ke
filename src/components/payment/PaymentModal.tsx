@@ -32,10 +32,10 @@ export function PaymentModal({
   const [status, setStatus] = useState<PaymentStatus>('processing');
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
-  // Poll payment status every 5 seconds
+  // Poll often enough for responsive feedback without doubling provider traffic.
   const { data: paymentStatus, isLoading } = usePaymentStatus(checkoutRequestId, {
     enabled: isOpen && !!checkoutRequestId,
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   // Update status when payment status changes

@@ -97,22 +97,25 @@ export async function submitReview(
   return { success: true };
 }
 
-/**
- * Get current customer's reviews
- */
-export async function getMyReviews(customerId: string): Promise<Review[]> {
-  const { data, error } = await retrySupabaseQuery(
-    () =>
-      supabase
-        .from('reviews')
-        .select(REVIEW_SELECT)
-        .eq('customer_id', customerId)
-        .order('created_at', { ascending: false }),
-    { maxRetries: 2 },
-  );
+/** Server-paginated reviews belonging to one customer. */
+export async function getMyReviewsPage(params: {
+  customerId: string;
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<ReviewPage> {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('reviews')
+    .select(REVIEW_SELECT, { count: 'exact' })
+    .eq('customer_id', params.customerId)
+    .order('created_at', { ascending: false })
+    .range(from, from + params.pageSize - 1);
+  if (params.search?.trim()) query = query.ilike('review_text', `%${params.search.trim()}%`);
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
 
-  if (error || !data) return [];
-  return data.map(mapReview);
+  if (error || !data) return { rows: [], total: count ?? 0 };
+  return { rows: data.map(mapReview), total: count ?? 0 };
 }
 
 /**
@@ -256,27 +259,18 @@ export async function moderateReview(
  */
 export async function getReviewStats(): Promise<ReviewStats> {
   const { data, error } = await retrySupabaseQuery(
-    () => supabase.from('reviews').select('overall_rating, status, created_at'),
+    () => supabase.rpc('get_review_stats'),
     { maxRetries: 2 },
   );
-
-  if (error || !data || data.length === 0) {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) {
     return { averageRating: 0, totalReviews: 0, pendingCount: 0, thisMonthCount: 0 };
   }
 
-  const totalReviews = data.length;
-  const avgRating =
-    data.reduce((sum, r) => sum + (r.overall_rating as number), 0) / totalReviews;
-  const pendingCount = data.filter((r) => r.status === 'pending').length;
-
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const thisMonthCount = data.filter((r) => (r.created_at as string) >= monthStart).length;
-
   return {
-    averageRating: Math.round(avgRating * 10) / 10,
-    totalReviews,
-    pendingCount,
-    thisMonthCount,
+    averageRating: Number(row.average_rating) || 0,
+    totalReviews: Number(row.total_reviews) || 0,
+    pendingCount: Number(row.pending_count) || 0,
+    thisMonthCount: Number(row.this_month_count) || 0,
   };
 }

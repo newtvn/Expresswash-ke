@@ -76,7 +76,7 @@ export function usePaymentStatus(checkoutRequestId: string | null, options?: {
       return queryPaymentStatus({ checkoutRequestId });
     },
     enabled: !!checkoutRequestId && (options?.enabled ?? true),
-    refetchInterval: options?.refetchInterval || 5000, // Poll every 5 seconds
+    refetchInterval: options?.refetchInterval ?? 10000,
     refetchIntervalInBackground: false,
   });
 }
@@ -121,7 +121,7 @@ export function usePayment() {
   const stkPush = useSTKPush();
   const paymentStatus = usePaymentStatus(checkoutRequestId, {
     enabled: isPolling,
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
 
   /**

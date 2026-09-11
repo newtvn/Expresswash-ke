@@ -1,19 +1,26 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { PageHeader, KPICard, DataTable, StatusBadge, ExportButton } from '@/components/shared';
+import { PageHeader, KPICard, DataTable, StatusBadge } from '@/components/shared';
 import type { Column } from '@/components/shared';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, CheckCircle2, Clock, AlertTriangle } from 'lucide-react';
-import { getAllInvoices } from '@/services/invoiceService';
+import { AlertTriangle, CheckCircle2, Clock, DollarSign, Download, Loader2 } from 'lucide-react';
+import {
+  getAllInvoices,
+  getBillingFinancialSummary,
+  getBillingInvoicesPage,
+  type BillingInvoiceView,
+} from '@/services/invoiceService';
 import { toast } from 'sonner';
 import type { Invoice } from '@/types';
 import { InvoiceDownloadButton } from '@/components/shared';
-import { computeBillingMetrics, invoiceIsOverdue } from '@/services/billingMetrics';
 import { BusinessSwitcher } from '@/components/admin/accounts/BusinessSwitcher';
 import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore } from '@/stores/businessStore';
+import { exportToCSV } from '@/utils/exportUtils';
 
 // ── Row shape used by DataTable ──────────────────────────────────────
 
@@ -137,7 +144,7 @@ function TableSkeleton() {
 
 /**
  * Admin Billing & Financials Page
- * Fetches invoices from Supabase, computes KPIs, and provides
+ * Fetches server-paginated invoices and database-computed KPIs, and provides
  * tabbed views: All Invoices, Pending, Paid, Overdue.
  */
 export const BillingFinancials = () => {
@@ -146,51 +153,61 @@ export const BillingFinancials = () => {
   const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
   const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') || 'all';
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchInvoices = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setInvoices(await getAllInvoices({ business: selectedBusiness }));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load invoices';
-      setError(message);
-      toast.error(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedBusiness]);
+  const tabParam = searchParams.get('tab');
+  const initialTab: BillingInvoiceView = ['all', 'pending', 'paid', 'overdue'].includes(tabParam ?? '')
+    ? tabParam as BillingInvoiceView
+    : 'all';
+  const [activeTab, setActiveTab] = useState<BillingInvoiceView>(initialTab);
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const pageSize = 20;
 
   useEffect(() => {
-    fetchInvoices();
-  }, [fetchInvoices]);
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [activeTab, selectedBusiness, debouncedSearch]);
 
-  // Derived data
-  const kpiData = useMemo(() => computeBillingMetrics(invoices), [invoices]);
+  const { data: invoicePage, isLoading: invoicesLoading, error: invoicesError } = useQuery({
+    queryKey: ['admin', 'billing-financials', selectedBusiness, activeTab, page, debouncedSearch],
+    queryFn: () => getBillingInvoicesPage({
+      business: selectedBusiness,
+      view: activeTab,
+      page,
+      pageSize,
+      search: debouncedSearch,
+    }),
+    placeholderData: (previous) => previous,
+  });
+  const { data: summary, isLoading: summaryLoading, error: summaryError } = useQuery({
+    queryKey: ['admin', 'billing-financials', 'summary', selectedBusiness],
+    queryFn: () => getBillingFinancialSummary(selectedBusiness),
+  });
 
-  const allRows = useMemo(() => invoices.map(toRow), [invoices]);
-  const pendingRows = useMemo(
-    () => invoices.filter((i) => ['draft', 'pending', 'sent', 'partial', 'partially_paid'].includes(i.status) && !invoiceIsOverdue(i)).map(toRow),
-    [invoices],
-  );
-  const paidRows = useMemo(
-    () => invoices.filter((i) => i.status === 'paid').map(toRow),
-    [invoices],
-  );
-  const overdueRows = useMemo(
-    () => invoices.filter((i) => invoiceIsOverdue(i)).map(toRow),
-    [invoices],
-  );
+  const rows = useMemo(() => (invoicePage?.rows ?? []).map(toRow), [invoicePage?.rows]);
+  const total = invoicePage?.total ?? 0;
+  const loading = invoicesLoading || summaryLoading;
+  const error = invoicesError || summaryError;
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const invoices = await getAllInvoices({ business: selectedBusiness });
+      exportToCSV(invoices.map(toRow), `invoices-${selectedBusiness}`);
+    } catch (exportError) {
+      toast.error(exportError instanceof Error ? exportError.message : 'Failed to export invoices');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const kpis = useMemo(
     () => [
       {
         label: 'Total Invoiced',
-        value: kpiData.totalInvoiced,
+        value: summary?.totalInvoiced ?? 0,
         change: 0,
         changeDirection: 'flat' as const,
         icon: DollarSign,
@@ -198,7 +215,7 @@ export const BillingFinancials = () => {
       },
       {
         label: 'Received',
-        value: kpiData.received,
+        value: summary?.received ?? 0,
         change: 0,
         changeDirection: 'flat' as const,
         icon: CheckCircle2,
@@ -206,7 +223,7 @@ export const BillingFinancials = () => {
       },
       {
         label: 'Outstanding',
-        value: kpiData.outstanding,
+        value: summary?.outstanding ?? 0,
         change: 0,
         changeDirection: 'flat' as const,
         icon: Clock,
@@ -214,14 +231,14 @@ export const BillingFinancials = () => {
       },
       {
         label: 'Overdue',
-        value: kpiData.overdue,
+        value: summary?.overdue ?? 0,
         change: 0,
         changeDirection: 'flat' as const,
         icon: AlertTriangle,
         format: 'currency' as const,
       },
     ],
-    [kpiData],
+    [summary],
   );
 
   return (
@@ -229,7 +246,10 @@ export const BillingFinancials = () => {
       <PageHeader title="Billing & Financials" description="Manage invoices and track payments">
         <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
-          <ExportButton data={allRows} filename={`invoices-${selectedBusiness}`} />
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || (summary?.totalCount ?? 0) === 0}>
+            {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Export CSV
+          </Button>
         </div>
       </PageHeader>
 
@@ -247,7 +267,7 @@ export const BillingFinancials = () => {
       {/* Error state */}
       {error && !loading && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}. Please try refreshing the page.
+          {error instanceof Error ? error.message : 'Failed to load invoices'}. Please try refreshing the page.
         </div>
       )}
 
@@ -255,28 +275,30 @@ export const BillingFinancials = () => {
       {loading ? (
         <TableSkeleton />
       ) : (
-        <Tabs defaultValue={initialTab} className="min-w-0 space-y-4">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as BillingInvoiceView)} className="min-w-0 space-y-4">
           <TabsList className="h-auto max-w-full justify-start overflow-x-auto">
-            <TabsTrigger value="all">All Invoices ({allRows.length})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({pendingRows.length})</TabsTrigger>
-            <TabsTrigger value="paid">Paid ({paidRows.length})</TabsTrigger>
-            <TabsTrigger value="overdue">Overdue ({overdueRows.length})</TabsTrigger>
+            <TabsTrigger value="all">All Invoices ({summary?.totalCount ?? 0})</TabsTrigger>
+            <TabsTrigger value="pending">Pending ({summary?.pendingCount ?? 0})</TabsTrigger>
+            <TabsTrigger value="paid">Paid ({summary?.paidCount ?? 0})</TabsTrigger>
+            <TabsTrigger value="overdue">Overdue ({summary?.overdueCount ?? 0})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="all">
-            <DataTable data={allRows} columns={invoiceColumns} searchPlaceholder="Search invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
-          </TabsContent>
-
-          <TabsContent value="pending">
-            <DataTable data={pendingRows} columns={invoiceColumns} searchPlaceholder="Search pending invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
-          </TabsContent>
-
-          <TabsContent value="paid">
-            <DataTable data={paidRows} columns={invoiceColumns} searchPlaceholder="Search paid invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
-          </TabsContent>
-
-          <TabsContent value="overdue">
-            <DataTable data={overdueRows} columns={invoiceColumns} searchPlaceholder="Search overdue invoices..." onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)} />
+          <TabsContent value={activeTab}>
+            <DataTable
+              data={rows}
+              columns={invoiceColumns}
+              searchPlaceholder={`Search ${activeTab === 'all' ? '' : `${activeTab} `}invoices...`}
+              onRowClick={(row) => row.orderNumber !== '--' && navigate(`/admin/orders/${row.orderNumber}`)}
+              pageSize={pageSize}
+              serverPagination={{
+                page,
+                pageSize,
+                total,
+                totalPages: Math.max(1, Math.ceil(total / pageSize)),
+                onPageChange: setPage,
+                onSearchChange: setSearch,
+              }}
+            />
           </TabsContent>
         </Tabs>
       )}

@@ -66,6 +66,11 @@ function mapDispatch(row: Record<string, unknown>): DispatchItem {
   };
 }
 
+export interface WarehousePage<T> {
+  rows: T[];
+  total: number;
+}
+
 function mapQualityCheck(row: Record<string, unknown>): QualityCheckResult {
   return {
     id: row.id as string,
@@ -81,41 +86,126 @@ function mapQualityCheck(row: Record<string, unknown>): QualityCheckResult {
 
 // ── Public API ────────────────────────────────────────────────────────
 
-export const getIntakeQueue = async (): Promise<IntakeItem[]> => {
-  const { data, error } = await retrySupabaseQuery(
-    () => supabase.from('warehouse_intake').select('*').order('received_at', { ascending: false }),
-    { maxRetries: 2 }
-  );
+export const getIntakeQueuePage = async (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<WarehousePage<IntakeItem>> => {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('warehouse_intake')
+    .select('*', { count: 'exact' })
+    .order('received_at', { ascending: false })
+    .range(from, from + params.pageSize - 1);
+  const term = params.search?.trim();
+  if (term) query = query.or(`order_number.ilike.%${term}%,customer_name.ilike.%${term}%,item_name.ilike.%${term}%`);
 
-  if (error || !data) return [];
-  return data.map(mapIntake);
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []).map(mapIntake), total: count ?? 0 };
 };
 
-export const getProcessingItems = async (
-  stage?: ProcessingItem['stage'],
-): Promise<ProcessingItem[]> => {
+export const getIntakeQueueStats = async (): Promise<{ total: number; today: number }> => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  const countRows = async (todayOnly: boolean) => {
+    let query = supabase.from('warehouse_intake').select('id', { count: 'exact', head: true });
+    if (todayOnly) query = query.gte('received_at', start.toISOString()).lt('received_at', end.toISOString());
+    const { count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+    return error ? 0 : (count ?? 0);
+  };
+  const [total, today] = await Promise.all([countRows(false), countRows(true)]);
+  return { total, today };
+};
+
+export const getProcessingItemsPage = async (params: {
+  page: number;
+  pageSize: number;
+  stage?: ProcessingItem['stage'];
+  search?: string;
+}): Promise<WarehousePage<ProcessingItem>> => {
+  const from = params.page * params.pageSize;
   let query = supabase
     .from('warehouse_processing')
-    .select('*')
-    .order('started_at', { ascending: false });
+    .select('*', { count: 'exact' })
+    .order('started_at', { ascending: false })
+    .range(from, from + params.pageSize - 1);
+  if (params.stage) query = query.eq('stage', params.stage);
+  const term = params.search?.trim();
+  if (term) query = query.or(`order_number.ilike.%${term}%,customer_name.ilike.%${term}%,item_name.ilike.%${term}%`);
 
-  if (stage) {
-    query = query.eq('stage', stage);
-  }
-
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
-  if (error || !data) return [];
-  return data.map(mapProcessing);
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []).map(mapProcessing), total: count ?? 0 };
 };
 
-export const getDispatchQueue = async (): Promise<DispatchItem[]> => {
-  const { data, error } = await retrySupabaseQuery(
-    () => supabase.from('warehouse_dispatch').select('*').order('ready_since', { ascending: false }),
-    { maxRetries: 2 }
-  );
+export interface WarehouseDispatchPageRow {
+  id: string;
+  orderId: string;
+  orderNumber: string;
+  customerName: string;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  zone: string;
+  assignedDriver: string | null;
+  scheduledDelivery: string | null;
+  readySince: string;
+  dispatchId: string | null;
+}
 
-  if (error || !data) return [];
-  return data.map(mapDispatch);
+export const getDispatchQueuePage = async (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<WarehousePage<WarehouseDispatchPageRow>> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_warehouse_dispatch_page', {
+      p_offset: params.page * params.pageSize,
+      p_limit: params.pageSize,
+      p_search: params.search?.trim() || null,
+    }),
+    { maxRetries: 2 },
+  );
+  if (error) throw new Error(error.message);
+  const result = (data ?? {}) as { rows?: Record<string, unknown>[]; total?: number };
+  return {
+    rows: (result.rows ?? []).map((row) => ({
+      id: String(row.id),
+      orderId: String(row.order_id),
+      orderNumber: String(row.order_number),
+      customerName: String(row.customer_name),
+      itemName: String(row.item_name),
+      itemType: String(row.item_type ?? ''),
+      quantity: Number(row.quantity) || 0,
+      zone: String(row.zone ?? ''),
+      assignedDriver: row.assigned_driver ? String(row.assigned_driver) : null,
+      scheduledDelivery: row.scheduled_delivery ? String(row.scheduled_delivery) : null,
+      readySince: String(row.ready_since),
+      dispatchId: row.dispatch_id ? String(row.dispatch_id) : null,
+    })),
+    total: Number(result.total) || 0,
+  };
+};
+
+export const getDispatchQueueStats = async (): Promise<{
+  ready: number;
+  awaitingDriver: number;
+  dispatched: number;
+}> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_warehouse_dispatch_stats'),
+    { maxRetries: 2 },
+  );
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) return { ready: 0, awaitingDriver: 0, dispatched: 0 };
+  return {
+    ready: Number(row.ready_count) || 0,
+    awaitingDriver: Number(row.awaiting_driver) || 0,
+    dispatched: Number(row.dispatched_count) || 0,
+  };
 };
 
 export const dispatchWarehouseOrder = async (

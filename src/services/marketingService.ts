@@ -5,14 +5,6 @@ export interface NotificationStats {
   totalFailed: number;
   deliveryRate: number;
   channelBreakdown: { channel: string; sent: number; failed: number }[];
-  recentNotifications: {
-    id: string;
-    templateName: string;
-    channel: string;
-    recipientName: string;
-    status: string;
-    sentAt: string;
-  }[];
   activePromos: number;
   birthdayPromos: { id: string; name: string; code: string; timesUsed: number }[];
   paymentReminders: { id: string; invoiceId: string; channel: string; sentAt: string }[];
@@ -20,19 +12,15 @@ export interface NotificationStats {
 
 export async function getNotificationStats(): Promise<NotificationStats> {
   const [
-    notificationsResult,
+    channelsResult,
     promosResult,
     birthdayPromosResult,
     remindersResult,
   ] = await Promise.all([
-    supabase
-      .from('notification_history')
-      .select('id, template_name, channel, recipient_name, status, sent_at')
-      .order('sent_at', { ascending: false })
-      .limit(200),
+    supabase.rpc('get_notification_channel_stats'),
     supabase
       .from('promotions')
-      .select('id')
+      .select('id', { count: 'exact', head: true })
       .eq('is_active', true),
     supabase
       .from('promotions')
@@ -47,44 +35,22 @@ export async function getNotificationStats(): Promise<NotificationStats> {
       .limit(20),
   ]);
 
-  const notifications = notificationsResult.data ?? [];
-
-  // Compute aggregations
-  const totalSent = notifications.filter((n) => n.status === 'sent' || n.status === 'delivered').length;
-  const totalFailed = notifications.filter((n) => n.status === 'failed').length;
+  const channelBreakdown = (channelsResult.data ?? []).map((row) => ({
+    channel: String(row.channel ?? ''),
+    sent: Number(row.sent) || 0,
+    failed: Number(row.failed) || 0,
+  }));
+  const totalSent = channelBreakdown.reduce((sum, row) => sum + row.sent, 0);
+  const totalFailed = channelBreakdown.reduce((sum, row) => sum + row.failed, 0);
   const total = totalSent + totalFailed;
   const deliveryRate = total > 0 ? Math.round((totalSent / total) * 100) : 0;
-
-  // Channel breakdown
-  const channelMap = new Map<string, { sent: number; failed: number }>();
-  for (const n of notifications) {
-    const entry = channelMap.get(n.channel) ?? { sent: 0, failed: 0 };
-    if (n.status === 'sent' || n.status === 'delivered') entry.sent++;
-    else if (n.status === 'failed') entry.failed++;
-    channelMap.set(n.channel, entry);
-  }
-  const channelBreakdown = Array.from(channelMap.entries()).map(([channel, stats]) => ({
-    channel,
-    ...stats,
-  }));
-
-  // Recent (last 50)
-  const recentNotifications = notifications.slice(0, 50).map((n) => ({
-    id: n.id,
-    templateName: n.template_name ?? '',
-    channel: n.channel ?? '',
-    recipientName: n.recipient_name ?? '',
-    status: n.status ?? '',
-    sentAt: n.sent_at ?? '',
-  }));
 
   return {
     totalSent,
     totalFailed,
     deliveryRate,
     channelBreakdown,
-    recentNotifications,
-    activePromos: promosResult.data?.length ?? 0,
+    activePromos: promosResult.count ?? 0,
     birthdayPromos: (birthdayPromosResult.data ?? []).map((p) => ({
       id: p.id,
       name: p.name,
