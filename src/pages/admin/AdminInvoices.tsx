@@ -738,7 +738,12 @@ export const AdminInvoices = () => {
       || (invoice.customer_phone && contact.phone === invoice.customer_phone)
     ));
     // List rows don't carry line items (loaded on demand); fetch them for editing.
-    const items = await fetchInvoiceLines(invoice.id);
+    let items: Invoice['items'] = [];
+    try {
+      items = await fetchInvoiceLines(invoice.id);
+    } catch {
+      toast.error('Could not load invoice line items; starting from an empty line');
+    }
     setEditingInvoice(invoice);
     setInvoiceForm({
       contactId: matchedContact?.id ?? '',
