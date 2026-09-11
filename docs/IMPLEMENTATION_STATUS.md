@@ -1,7 +1,68 @@
 # Implementation Status — Accounting Hub & Render Migration
 
-Resume/handoff note. Snapshot as of **2026-08-31**. Read this first in a fresh session,
-then the approved plan at `~/.claude/plans/so-before-we-do-splendid-cray.md`.
+Resume/handoff note. Latest update **2026-09-11** (see "September 2026 update" below);
+the multi-business hub sign-off snapshot from **2026-08-31** follows it, still accurate for
+that milestone. Read this first in a fresh session, then the approved plan at
+`~/.claude/plans/so-before-we-do-splendid-cray.md`.
+
+## September 2026 update (2026-09-11)
+
+Since the 2026-08-31 sign-off, a wave of accounting-correctness, operational (driver/
+warehouse), and UX work landed on `main` (all migrations 083–096, plus several UI PRs).
+The multi-business hub itself is unchanged; these are fixes/hardening on top of it. The one
+strategic open item is **still A2 — the Goalhub → Render cutover** (blocked on the user:
+Render GitHub App auth for the private `newtvn/Goalhub` repo + Goalhub Supabase source URL
+and secrets). Everything below is merged to `main`; the Expresswash frontend + Supabase
+migrations auto-deploy, so treat as live-pending-spot-verification (per "done = deployed+verified",
+confirm on prod before closing anything out).
+
+### Accounting correctness & audit hardening
+- **083 journal reversal integrity** + **086 security-invoker views** — closed accounting
+  audit-review gaps (PRs #67 `fix/accounting-audit-integrity`, #68 `accounting-review-followups`);
+  `docs/ACCOUNTING_AUDIT_TRACKER.md` / `ACCOUNTING_AUDIT_RESEARCH.md` completed.
+- **084 PesaPal provider refunds** + **085 Goalhub provider-refund mapping** — full provider
+  (gateway) refund workflow end-to-end, incl. Goalhub-sourced refunds mapped into the shared
+  ledger (PRs #69, #71). Server-owned submission state (`mark_provider_refund_submission`).
+- **092 create invoice from delivered order** — canonical invoices are now generated from
+  delivered operational orders (the order → invoice bridge).
+- **093 auto-reconcile order payments** + **094 harden automatic payment accounting** —
+  completed order payments reconcile automatically; reconciliation failures no longer drop
+  payments (they're preserved for retry).
+- **096 refund revenue & VAT reversal** (latest commit `f7ff972`) — cash refunds tied to an
+  invoice now create/apply a **credit note** that reverses revenue + output VAT and nets A/R
+  to zero, so a refunded paid invoice stays settled and P&L/VAT/A/R/cash stay reconcilable.
+  Regression test `supabase/tests/refund_revenue_accounting.sql`.
+- ⚠️ **095 is a TEMPORARY KES 10 PesaPal QA/canary order** (`20260911000005`... commit
+  `69ea22b`) — intentionally left in place for now; remove when live-payment QA is done.
+
+### Operations: driver & warehouse flow (migrations 087–091)
+- **087** driver completes only their own route stop; **088** customer status notifications
+  delivered from the DB (in-app); **089** warehouse intake can read order items; **090** atomic
+  warehouse dispatch (creates delivery stop, preserves picked-up status); **091** atomic driver
+  delivery transitions + pickup guarded by order stage. (Commits `cf79722`, `0e1f190`, etc.)
+
+### UX / frontend (merged, not migrations)
+- Admin UX refinements (PR #63): responsive admin dashboard, **invoice actions stack on
+  phones** (`f5cd5af`), clarified mobile accounting controls, "explain consolidated accounting
+  actions" (`46028ec`) and "avoid stacked accounting dialogs" (`3f4ea81`).
+- Landing/hero revamp (PR #64) + homepage metadata/brand previews; CSP now allows Google Maps
+  embed + JS API (PR #66); accounting infra docs split (PR #65).
+
+### Known open UI issues (raised 2026-09-11, under investigation — not yet fixed)
+1. Accounts-page tab separators show a stray left-border segment (`Accounts.tsx` tabs use
+   `border-l` on grouped `TabsTrigger`s).
+2. Invoice detail dialog (`AdminInvoices.tsx`) overflows horizontally on narrow viewports —
+   the non-wrapping `DialogFooter` button row forces the dialog wider than the viewport.
+3. Invoice action buttons (Post to Ledger / Update Payment / Credit Note) are correctly
+   disabled in **consolidated** view (`isConsolidated`, needs a specific business selected) —
+   working as designed, but UX to explain the disabled state may need extending here.
+4. **Inventory Management KPIs are backed by a static `warehouse_stats` table** with no trigger/
+   cron aggregating from `warehouse_processing` — the card numbers (47/12/8/5/14/3) are frozen
+   seed values, and `days_in_warehouse` is a stored integer, not computed. Needs wiring to real
+   counts if accuracy matters.
+
+---
+
 
 ## Big picture
 Making **Expresswash the group's single source of truth for finances** (Zoho/Odoo-style hub)

@@ -411,9 +411,12 @@ const defaultInvoiceDueDate = (): string => {
 export const AdminInvoices = () => {
   const { user } = useAuthStore();
   const rawSelectedBusiness = useBusinessStore((state) => state.selectedBusiness);
+  const setSelectedBusiness = useBusinessStore((state) => state.setSelectedBusiness);
   const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin());
   const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
+  // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
   const isConsolidated = selectedBusiness === BUSINESS_ALL;
+  const consolidatedWriteHint = 'Select a specific business to act on this invoice';
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | InvoiceStatus>('all');
@@ -803,9 +806,9 @@ export const AdminInvoices = () => {
         <Dialog open={!!selectedInvoice} onOpenChange={() => setSelectedInvoice(null)}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="flex items-center justify-between">
-                <span>{selectedInvoice.invoice_number}</span>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${STATUS_CONFIG[selectedInvoice.status].className}`}>
+              <DialogTitle className="flex items-center justify-between gap-2 pr-8">
+                <span className="truncate">{selectedInvoice.invoice_number}</span>
+                <span className={`inline-flex shrink-0 items-center gap-1 px-2 py-0.5 rounded text-sm font-medium ${STATUS_CONFIG[selectedInvoice.status].className}`}>
                   {STATUS_CONFIG[selectedInvoice.status].label}
                 </span>
               </DialogTitle>
@@ -844,27 +847,46 @@ export const AdminInvoices = () => {
                   <div className="flex justify-between text-blue-600"><span>Ledger</span><span>Posted</span></div>
                 )}
               </div>
+              {isConsolidated && (
+                <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>Consolidated view is read-only. Select this invoice&apos;s business to post, record payment, or credit it.</p>
+                  </div>
+                  {selectedInvoice.business && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setSelectedBusiness(selectedInvoice.business!)}
+                    >
+                      Switch to {selectedInvoice.business === 'expresswash' ? 'Expresswash' : selectedInvoice.business}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-            <DialogFooter className="gap-2">
+            <DialogFooter className="gap-2 sm:flex-wrap sm:gap-2 sm:space-x-0">
               {!selectedInvoice.posted_journal_entry_id && selectedInvoice.status !== 'draft' && selectedInvoice.status !== 'cancelled' && (
                 <Button
                   variant="outline"
                   disabled={isConsolidated || postInvoiceMutation.isPending}
+                  title={isConsolidated ? consolidatedWriteHint : undefined}
                   onClick={() => postInvoiceMutation.mutate(selectedInvoice.id)}
                 >
                   Post to Ledger
                 </Button>
               )}
-              <Button variant="outline" disabled={isConsolidated} onClick={() => { setPaymentAmount(''); setPaymentDialogOpen(true); }}>
+              <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => { setPaymentAmount(''); setPaymentDialogOpen(true); }}>
                 <Edit2 className="h-4 w-4 mr-2" /> Update Payment
               </Button>
               {invoiceCanBeEdited(selectedInvoice) && (
-                <Button variant="outline" disabled={isConsolidated} onClick={() => openEditInvoiceDialog(selectedInvoice)}>
+                <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => openEditInvoiceDialog(selectedInvoice)}>
                   Edit Invoice
                 </Button>
               )}
               {selectedInvoice.balance > 0 && selectedInvoice.status !== 'cancelled' && (
-                <Button variant="outline" disabled={isConsolidated} onClick={() => { setCreditAmount(String(selectedInvoice.balance)); setCreditDialogOpen(true); }}>
+                <Button variant="outline" disabled={isConsolidated} title={isConsolidated ? consolidatedWriteHint : undefined} onClick={() => { setCreditAmount(String(selectedInvoice.balance)); setCreditDialogOpen(true); }}>
                   Credit Note
                 </Button>
               )}

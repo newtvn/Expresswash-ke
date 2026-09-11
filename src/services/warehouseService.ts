@@ -28,6 +28,12 @@ function mapIntake(row: Record<string, unknown>): IntakeItem {
 }
 
 function mapProcessing(row: Record<string, unknown>): ProcessingItem {
+  const startedAt = (row.started_at as string) ?? undefined;
+  // Derive days-in-warehouse from the actual start timestamp instead of the
+  // stored (and easily stale) days_in_warehouse column.
+  const daysInWarehouse = startedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 86_400_000))
+    : (row.days_in_warehouse as number) ?? 0;
   return {
     id: row.id as string,
     orderId: row.order_id as string,
@@ -38,10 +44,10 @@ function mapProcessing(row: Record<string, unknown>): ProcessingItem {
     quantity: row.quantity as number,
     stage: row.stage as ProcessingItem['stage'],
     assignedTo: (row.assigned_to as string) ?? undefined,
-    startedAt: (row.started_at as string) ?? undefined,
+    startedAt,
     estimatedCompletion: (row.estimated_completion as string) ?? undefined,
     warehouseLocation: (row.warehouse_location as string) ?? '',
-    daysInWarehouse: (row.days_in_warehouse as number) ?? 0,
+    daysInWarehouse,
   };
 }
 
