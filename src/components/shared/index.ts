@@ -6,6 +6,7 @@ export { DataTable } from './DataTable';
 export type { Column } from './DataTable';
 export { StatusBadge } from './StatusBadge';
 export { PageHeader } from './PageHeader';
+export { Paginator } from './Paginator';
 export { EmptyState } from './EmptyState';
 export { ExportButton } from './ExportButton';
 export { SearchInput } from './SearchInput';
