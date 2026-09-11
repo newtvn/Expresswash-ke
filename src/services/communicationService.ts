@@ -13,6 +13,7 @@ export interface NotificationTemplate {
 }
 
 export interface NotificationHistoryEntry {
+  [key: string]: unknown;
   id: string;
   templateId?: string;
   templateName: string;
@@ -26,6 +27,19 @@ export interface NotificationHistoryEntry {
   sentAt: string;
   deliveredAt?: string;
   failureReason?: string;
+  retryCount: number;
+}
+
+export interface NotificationHistoryPage {
+  rows: NotificationHistoryEntry[];
+  total: number;
+}
+
+export interface NotificationHistoryStats {
+  total: number;
+  delivered: number;
+  pending: number;
+  failed: number;
 }
 
 export interface SendNotificationPayload {
@@ -65,6 +79,7 @@ function mapHistory(row: Record<string, unknown>): NotificationHistoryEntry {
     sentAt: row.sent_at as string,
     deliveredAt: (row.delivered_at as string) ?? undefined,
     failureReason: (row.failure_reason as string) ?? undefined,
+    retryCount: (row.retry_count as number) ?? 0,
   };
 }
 
@@ -160,4 +175,51 @@ export const getNotificationHistory = async (
   const { data, error } = await query;
   if (error || !data) return [];
   return data.map(mapHistory);
+};
+
+/** Server-paginated notification history for the admin notification center. */
+export const getNotificationHistoryPage = async (params: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  channel?: string;
+  status?: string;
+}): Promise<NotificationHistoryPage> => {
+  const from = params.page * params.pageSize;
+  let query = supabase
+    .from('notification_history')
+    .select('*', { count: 'exact' })
+    .order('sent_at', { ascending: false, nullsFirst: false })
+    .range(from, from + params.pageSize - 1);
+
+  if (params.channel && params.channel !== 'all') query = query.eq('channel', params.channel);
+  if (params.status && params.status !== 'all') query = query.eq('status', params.status);
+
+  const term = (params.search ?? '').trim();
+  if (term) query = query.ilike('recipient_name', `%${term}%`);
+
+  const { data, count, error } = await query;
+  if (error || !data) return { rows: [], total: count ?? 0 };
+  return { rows: data.map(mapHistory), total: count ?? 0 };
+};
+
+/** Whole-history KPI counts, independent of the currently displayed page. */
+export const getNotificationHistoryStats = async (): Promise<NotificationHistoryStats> => {
+  const countRows = async (status?: NotificationHistoryEntry['status']): Promise<number> => {
+    let query = supabase
+      .from('notification_history')
+      .select('id', { count: 'exact', head: true });
+    if (status) query = query.eq('status', status);
+    const { count, error } = await query;
+    return error ? 0 : (count ?? 0);
+  };
+
+  const [total, delivered, pending, failed] = await Promise.all([
+    countRows(),
+    countRows('delivered'),
+    countRows('pending'),
+    countRows('failed'),
+  ]);
+
+  return { total, delivered, pending, failed };
 };
