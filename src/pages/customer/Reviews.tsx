@@ -32,20 +32,40 @@ import {
   type Review,
 } from '@/services/reviewService';
 
-function StarRating({ rating, onRate, interactive = false }: { rating: number; onRate?: (r: number) => void; interactive?: boolean }) {
+export function StarRating({ rating, onRate, interactive = false }: { rating: number; onRate?: (r: number) => void; interactive?: boolean }) {
   return (
-    <div className="flex gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={cn(
-            'h-4 w-4',
-            star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground',
-            interactive && 'cursor-pointer h-6 w-6 hover:text-yellow-400'
-          )}
-          onClick={() => interactive && onRate?.(star)}
-        />
-      ))}
+    <div
+      className="flex gap-1"
+      role={interactive ? 'radiogroup' : 'img'}
+      aria-label={interactive ? 'Rating' : `${rating} out of 5 stars`}
+    >
+      {[1, 2, 3, 4, 5].map((star) => {
+        const icon = (
+          <Star
+            aria-hidden="true"
+            className={cn(
+              interactive ? 'h-6 w-6' : 'h-4 w-4',
+              star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-muted-foreground'
+            )}
+          />
+        );
+
+        return interactive ? (
+          <button
+            key={star}
+            type="button"
+            role="radio"
+            aria-checked={rating === star}
+            aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
+            className="rounded-sm p-0.5 hover:text-yellow-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={() => onRate?.(star)}
+          >
+            {icon}
+          </button>
+        ) : (
+          <span key={star}>{icon}</span>
+        );
+      })}
     </div>
   );
 }

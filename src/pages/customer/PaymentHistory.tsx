@@ -4,8 +4,10 @@ import type { Column } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Wallet, AlertCircle } from 'lucide-react';
-import { getPayments } from '@/services/invoiceService';
+import { getAllInvoices, getPayments } from '@/services/invoiceService';
+import { computeBillingMetrics } from '@/services/billingMetrics';
 import { queryKeys } from '@/config/queryKeys';
+import { useAuth } from '@/hooks/useAuth';
 
 type PaymentTableRow = {
   id: string;
@@ -51,11 +53,21 @@ const columns: Column<PaymentTableRow>[] = [
 ];
 
 export const PaymentHistory = () => {
-  const { data: payments = [], isLoading } = useQuery({
-    queryKey: queryKeys.payments.list(),
+  const { user } = useAuth();
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
+    queryKey: [...queryKeys.payments.list(), 'customer', user?.id],
     queryFn: () => getPayments(),
+    enabled: !!user?.id,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ['customer', 'invoices', 'billing-metrics', user?.id],
+    queryFn: () => getAllInvoices({ customerId: user!.id }),
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const isLoading = paymentsLoading || invoicesLoading;
 
   // Transform payments to table rows
   const tableData: PaymentTableRow[] = payments.map((payment) => ({
@@ -78,8 +90,7 @@ export const PaymentHistory = () => {
     .filter((p) => p.createdAt.startsWith(currentMonth))
     .reduce((sum, p) => sum + p.amount, 0);
 
-  const pendingPayments = payments.filter((p) => p.status === 'pending');
-  const outstanding = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+  const outstanding = computeBillingMetrics(invoices).outstanding;
 
   if (isLoading) {
     return (
