@@ -48,6 +48,17 @@ confirm on prod before closing anything out).
 - Landing/hero revamp (PR #64) + homepage metadata/brand previews; CSP now allows Google Maps
   embed + JS API (PR #66); accounting infra docs split (PR #65).
 
+### Efficiency audit completion (September 2026)
+- Migrations **097–099** and the admin pagination sweep now keep warehouse statistics,
+  invoices, drivers, logs, notifications, and communications bounded and indexed.
+- Migration **100** completes database-side order/review/expense summaries, accounting and
+  dispatch page RPCs, and the remaining report/list indexes. Payments, customer reviews,
+  warehouse queues, accounting lists, and Marketing Campaign history now use server paging
+  with separate aggregate queries for KPI totals.
+- Removed the unreferenced 2.6 MB `public/Express.pdf`, pruned ten unused Radix wrappers and
+  direct dependencies, added intrinsic hero-image dimensions, and reduced payment polling
+  from five to ten seconds.
+
 ### Known open UI issues (raised 2026-09-11, under investigation — not yet fixed)
 1. Accounts-page tab separators show a stray left-border segment (`Accounts.tsx` tabs use
    `border-l` on grouped `TabsTrigger`s).
@@ -56,10 +67,8 @@ confirm on prod before closing anything out).
 3. Invoice action buttons (Post to Ledger / Update Payment / Credit Note) are correctly
    disabled in **consolidated** view (`isConsolidated`, needs a specific business selected) —
    working as designed, but UX to explain the disabled state may need extending here.
-4. **Inventory Management KPIs are backed by a static `warehouse_stats` table** with no trigger/
-   cron aggregating from `warehouse_processing` — the card numbers (47/12/8/5/14/3) are frozen
-   seed values, and `days_in_warehouse` is a stored integer, not computed. Needs wiring to real
-   counts if accuracy matters.
+4. `days_in_warehouse` is still a stored integer rather than a computed interval. The Inventory
+   KPI snapshot itself is now refreshed from `warehouse_processing` by migration 097.
 
 ---
 

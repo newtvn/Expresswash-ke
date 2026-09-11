@@ -7,6 +7,7 @@ import {
   InvoiceFilters,
   PaginatedResponse,
 } from '@/types';
+import { toLocalDateString } from '@/lib/localDate';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -68,6 +69,41 @@ function mapPayment(row: Record<string, unknown>): Payment {
     updatedAt: (row.updated_at as string) ?? undefined,
     completedAt: (row.completed_at as string) ?? undefined,
   };
+}
+
+export interface PaymentPage {
+  rows: Payment[];
+  total: number;
+}
+
+export interface CustomerBillingSummary {
+  paidThisMonth: number;
+  outstanding: number;
+  totalPaid: number;
+}
+
+export interface DriverCashSummary {
+  totalCollected: number;
+  remitted: number;
+  toRemit: number;
+}
+
+export type BillingInvoiceView = 'all' | 'pending' | 'paid' | 'overdue';
+
+export interface BillingInvoicePage {
+  rows: Invoice[];
+  total: number;
+}
+
+export interface BillingFinancialSummary {
+  totalCount: number;
+  pendingCount: number;
+  paidCount: number;
+  overdueCount: number;
+  totalInvoiced: number;
+  received: number;
+  outstanding: number;
+  overdue: number;
 }
 
 // ── Public API ────────────────────────────────────────────────────────
@@ -148,6 +184,52 @@ export const getAllInvoices = async (filters: Omit<InvoiceFilters, 'page' | 'lim
   return [first, ...remaining].flatMap((page) => page.data);
 };
 
+export const getBillingInvoicesPage = async (params: {
+  business?: string;
+  view: BillingInvoiceView;
+  page: number;
+  pageSize: number;
+  search?: string;
+}): Promise<BillingInvoicePage> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_billing_invoices_page', {
+      p_business: params.business && params.business !== 'all' ? params.business : null,
+      p_view: params.view,
+      p_offset: params.page * params.pageSize,
+      p_limit: params.pageSize,
+      p_search: params.search?.trim() || null,
+    }),
+    { maxRetries: 2 },
+  );
+  if (error) throw new Error(error.message);
+  const value = typeof data === 'string' ? JSON.parse(data) : data;
+  return {
+    rows: (value?.rows ?? []).map((row: Record<string, unknown>) => mapInvoice(row, [])),
+    total: Number(value?.total ?? 0),
+  };
+};
+
+export const getBillingFinancialSummary = async (business?: string): Promise<BillingFinancialSummary> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_billing_financial_summary', {
+      p_business: business && business !== 'all' ? business : null,
+    }),
+    { maxRetries: 2 },
+  );
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    totalCount: Number(row?.total_count) || 0,
+    pendingCount: Number(row?.pending_count) || 0,
+    paidCount: Number(row?.paid_count) || 0,
+    overdueCount: Number(row?.overdue_count) || 0,
+    totalInvoiced: Number(row?.total_invoiced) || 0,
+    received: Number(row?.received_total) || 0,
+    outstanding: Number(row?.outstanding_total) || 0,
+    overdue: Number(row?.overdue_total) || 0,
+  };
+};
+
 export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null> => {
   const { data: invoice } = await retrySupabaseQuery(
     () => supabase.from('invoices').select('*').eq('id', invoiceId).single(),
@@ -164,18 +246,69 @@ export const getInvoiceById = async (invoiceId: string): Promise<Invoice | null>
   return mapInvoice(invoice, items ?? []);
 };
 
-export const getPayments = async (
-  invoiceId?: string,
-): Promise<Payment[]> => {
-  let query = supabase.from('payments').select('*, orders:order_id(tracking_code)').order('created_at', { ascending: false });
+/** Server-paginated payment history for customer, driver, or invoice views. */
+export const getPaymentsPage = async (params: {
+  page: number;
+  pageSize: number;
+  customerId?: string;
+  recordedBy?: string;
+  invoiceId?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+}): Promise<PaymentPage> => {
+  const fromRow = params.page * params.pageSize;
+  let query = supabase
+    .from('payments')
+    .select('*, orders:order_id(tracking_code)', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(fromRow, fromRow + params.pageSize - 1);
 
-  if (invoiceId) {
-    query = query.eq('invoice_id', invoiceId);
-  }
+  if (params.customerId) query = query.eq('customer_id', params.customerId);
+  if (params.recordedBy) query = query.eq('recorded_by', params.recordedBy);
+  if (params.invoiceId) query = query.eq('invoice_id', params.invoiceId);
+  if (params.from) query = query.gte('created_at', params.from);
+  if (params.to) query = query.lt('created_at', params.to);
 
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
-  if (error || !data) return [];
-  return data.map(mapPayment);
+  const term = params.search?.trim();
+  if (term) query = query.or(
+    `invoice_number.ilike.%${term}%,reference.ilike.%${term}%,reference_number.ilike.%${term}%,mpesa_receipt_number.ilike.%${term}%`,
+  );
+
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []).map(mapPayment), total: count ?? 0 };
+};
+
+export const getCustomerBillingSummary = async (customerId: string): Promise<CustomerBillingSummary> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_customer_billing_summary', { p_customer_id: customerId }),
+    { maxRetries: 2 },
+  );
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) return { paidThisMonth: 0, outstanding: 0, totalPaid: 0 };
+  return {
+    paidThisMonth: Number(row.paid_this_month) || 0,
+    outstanding: Number(row.outstanding) || 0,
+    totalPaid: Number(row.total_paid) || 0,
+  };
+};
+
+export const getDriverCashSummary = async (driverId: string): Promise<DriverCashSummary> => {
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_driver_cash_summary', {
+      p_driver_id: driverId,
+      p_day: toLocalDateString(new Date()),
+    }),
+    { maxRetries: 2 },
+  );
+  const row = Array.isArray(data) ? data[0] : data;
+  if (error || !row) return { totalCollected: 0, remitted: 0, toRemit: 0 };
+  return {
+    totalCollected: Number(row.total_collected) || 0,
+    remitted: Number(row.remitted) || 0,
+    toRemit: Number(row.to_remit) || 0,
+  };
 };
 
 export const createInvoice = async (

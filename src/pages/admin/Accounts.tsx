@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, Paginator } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,7 @@ import {
   completeProviderRefund,
   createSupplierBill,
   getAccountingSetup,
+  getAccountingContactsPage,
   getCustomerPaymentAllocationOptions,
   getLedgerOverview,
   getOperationalAccounting,
@@ -243,22 +244,33 @@ const formatStatusTrigger = (value?: string | null): string => {
 // ---------- Service helpers ----------
 
 async function fetchAccountSummary(from?: string, to?: string) {
-  const payments = (await fetchPaymentsReceived(from, to, 'expresswash'))
-    .filter((payment) => payment.source_kind === 'native');
-  const byCustomer = payments.reduce<Record<string, number>>((totals, payment) => {
-    const customer = payment.customer_name?.trim() || 'Customer';
-    totals[customer] = (totals[customer] ?? 0) + toAmount(payment.amount);
-    return totals;
-  }, {});
-  const orders: AccountOrder[] = Object.entries(byCustomer)
-    .map(([customer_name, total]) => ({ customer_name, total }))
-    .sort((a, b) => toAmount(b.total) - toAmount(a.total));
-  return { payments, orders };
+  const { data, error } = await supabase.rpc('get_accounting_sales_overview', {
+    p_from: from ?? null,
+    p_to: to ?? null,
+    p_business: 'expresswash',
+  });
+  if (error) throw new Error(error.message);
+  const value = typeof data === 'string' ? JSON.parse(data) : data;
+  return {
+    orders: (value?.orders ?? []) as AccountOrder[],
+    salesByPerson: (value?.sales_by_person ?? []) as { name: string; total: number | string }[],
+  };
 }
 
-async function fetchExpenses(business?: string) {
+async function fetchExpensesPage(business: string | undefined, page: number, pageSize: number, search?: string) {
   const biz = toBusinessParam(business);
-  let q = supabase.from('expenses').select('*').order('expense_date', { ascending: false });
+  const from = page * pageSize;
+  let q = supabase.from('expenses').select('*', { count: 'exact' }).order('expense_date', { ascending: false }).range(from, from + pageSize - 1);
+  if (biz) q = q.eq('business', biz);
+  if (search?.trim()) q = q.ilike('description', `%${search.trim()}%`);
+  const { data, count, error } = await q;
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []) as AccountExpense[], total: count ?? 0 };
+}
+
+async function fetchUnpostedExpenses(business?: string) {
+  const biz = toBusinessParam(business);
+  let q = supabase.from('expenses').select('*').eq('status', 'approved').is('posted_journal_entry_id', null).order('expense_date', { ascending: false }).limit(100);
   if (biz) q = q.eq('business', biz);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
@@ -274,6 +286,46 @@ async function fetchPaymentsReceived(from?: string, to?: string, business?: stri
   if (error) throw new Error(error.message);
   const rows = typeof data === 'string' ? JSON.parse(data) : data;
   return (Array.isArray(rows) ? rows : []) as AccountPayment[];
+}
+
+async function fetchPaymentsReceivedPage(params: {
+  from?: string;
+  to?: string;
+  business?: string;
+  page: number;
+  pageSize: number;
+  search?: string;
+}) {
+  const { data, error } = await supabase.rpc('get_accounting_payments_received_page', {
+    p_from: params.from ?? null,
+    p_to: params.to ?? null,
+    p_business: toBusinessParam(params.business),
+    p_offset: params.page * params.pageSize,
+    p_limit: params.pageSize,
+    p_search: params.search?.trim() || null,
+  });
+  if (error) throw new Error(error.message);
+  const value = typeof data === 'string' ? JSON.parse(data) : data;
+  return {
+    rows: (value?.rows ?? []) as AccountPayment[],
+    total: Number(value?.total ?? 0),
+    totalAmount: Number(value?.total_amount ?? 0),
+  };
+}
+
+async function fetchUnpostedPayments(business?: string) {
+  const biz = toBusinessParam(business);
+  let query = supabase
+    .from('payments')
+    .select('*')
+    .eq('status', 'completed')
+    .is('posted_journal_entry_id', null)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (biz) query = query.eq('business', biz);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({ ...row, source_kind: 'native' as const })) as AccountPayment[];
 }
 
 async function fetchPaymentEvents(paymentId: string): Promise<PaymentStatusEvent[]> {
@@ -301,13 +353,33 @@ async function fetchSalesByItem(from?: string, to?: string): Promise<SalesByItem
   }));
 }
 
-async function fetchAgingSummary(business?: string) {
+async function fetchAgingPage(business: string | undefined, page: number, pageSize: number, search?: string) {
+  const biz = toBusinessParam(business);
+  const from = page * pageSize;
+  let q = supabase
+    .from('invoices')
+    .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id', { count: 'exact' })
+    .not('status', 'in', '(draft,cancelled,paid)')
+    .not('posted_journal_entry_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .range(from, from + pageSize - 1);
+  if (biz) q = q.eq('business', biz);
+  if (search?.trim()) q = q.or(`invoice_number.ilike.%${search.trim()}%,customer_name.ilike.%${search.trim()}%`);
+  const { data, count, error } = await q;
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []) as AgingInvoice[], total: count ?? 0 };
+}
+
+async function fetchOpenUnpostedInvoices(business?: string) {
   const biz = toBusinessParam(business);
   let q = supabase
     .from('invoices')
     .select('id, invoice_number, customer_name, total, paid_amount, balance, due_date, due_at, status, created_at, posted_journal_entry_id')
-    .not('status', 'in', '(draft,cancelled,paid)')
-    .not('posted_journal_entry_id', 'is', null);
+    .not('status', 'in', '(draft,cancelled)')
+    .is('posted_journal_entry_id', null)
+    .gt('total', 0)
+    .order('created_at', { ascending: false })
+    .limit(100);
   if (biz) q = q.eq('business', biz);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
@@ -394,6 +466,19 @@ export const Accounts = () => {
   const [providerRefundTarget, setProviderRefundTarget] = useState<AccountPayment | null>(null);
   const [providerCompletionTarget, setProviderCompletionTarget] = useState<ProviderRefundRequest | null>(null);
   const [allocationTarget, setAllocationTarget] = useState<AccountPayment | null>(null);
+  const [expensePage, setExpensePage] = useState(0);
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [debouncedExpenseSearch, setDebouncedExpenseSearch] = useState('');
+  const [paymentPage, setPaymentPage] = useState(0);
+  const [paymentSearch, setPaymentSearch] = useState('');
+  const [debouncedPaymentSearch, setDebouncedPaymentSearch] = useState('');
+  const [agingPage, setAgingPage] = useState(0);
+  const [agingSearch, setAgingSearch] = useState('');
+  const [debouncedAgingSearch, setDebouncedAgingSearch] = useState('');
+  const [contactPage, setContactPage] = useState(0);
+  const [contactSearch, setContactSearch] = useState('');
+  const [debouncedContactSearch, setDebouncedContactSearch] = useState('');
+  const listPageSize = 20;
   const [contactForm, setContactForm] = useState<{
     name: string;
     contactType: Contact['contactType'];
@@ -466,6 +551,27 @@ export const Accounts = () => {
   const reportFrom = toLocalDateString(dateRange.from);
   const reportTo = toLocalDateString(dateRange.to);
 
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedExpenseSearch(expenseSearch), 300);
+    return () => clearTimeout(handle);
+  }, [expenseSearch]);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedPaymentSearch(paymentSearch), 300);
+    return () => clearTimeout(handle);
+  }, [paymentSearch]);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedAgingSearch(agingSearch), 300);
+    return () => clearTimeout(handle);
+  }, [agingSearch]);
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedContactSearch(contactSearch), 300);
+    return () => clearTimeout(handle);
+  }, [contactSearch]);
+  useEffect(() => setExpensePage(0), [selectedBusiness, debouncedExpenseSearch]);
+  useEffect(() => setPaymentPage(0), [selectedBusiness, reportFrom, reportTo, debouncedPaymentSearch]);
+  useEffect(() => setAgingPage(0), [selectedBusiness, debouncedAgingSearch]);
+  useEffect(() => setContactPage(0), [debouncedContactSearch]);
+
   const { data: summary, error: summaryError } = useQuery({
     queryKey: ['accounts', 'summary', reportFrom, reportTo],
     queryFn: () => fetchAccountSummary(reportFrom, reportTo),
@@ -473,23 +579,49 @@ export const Accounts = () => {
     refetchInterval: 60000,
   });
 
-  const { data: expenses = [], error: expensesError } = useQuery({
-    queryKey: ['accounts', 'expenses', selectedBusiness],
-    queryFn: () => fetchExpenses(selectedBusiness),
+  const { data: expenseResult, error: expensesError } = useQuery({
+    queryKey: ['accounts', 'expenses', selectedBusiness, expensePage, debouncedExpenseSearch],
+    queryFn: () => fetchExpensesPage(selectedBusiness, expensePage, listPageSize, debouncedExpenseSearch),
+    placeholderData: (previous) => previous,
+  });
+  const expenses = expenseResult?.rows ?? [];
+  const expenseTotal = expenseResult?.total ?? 0;
+
+  const { data: unpostedExpenseOptions = [] } = useQuery({
+    queryKey: ['accounts', 'expenses', 'unposted', selectedBusiness],
+    queryFn: () => fetchUnpostedExpenses(selectedBusiness),
   });
 
-  const { data: paymentsReceived = [], error: paymentsError } = useQuery({
-    queryKey: ['accounts', 'payments', selectedBusiness, reportFrom, reportTo],
-    queryFn: () => fetchPaymentsReceived(
-      reportFrom,
-      reportTo,
-      selectedBusiness,
-    ),
+  const { data: paymentResult, error: paymentsError } = useQuery({
+    queryKey: ['accounts', 'payments', selectedBusiness, reportFrom, reportTo, paymentPage, debouncedPaymentSearch],
+    queryFn: () => fetchPaymentsReceivedPage({
+      from: reportFrom,
+      to: reportTo,
+      business: selectedBusiness,
+      page: paymentPage,
+      pageSize: listPageSize,
+      search: debouncedPaymentSearch,
+    }),
+    placeholderData: (previous) => previous,
+  });
+  const paymentsReceived = paymentResult?.rows ?? [];
+  const paymentTotal = paymentResult?.total ?? 0;
+  const paymentTotalAmount = paymentResult?.totalAmount ?? 0;
+  const { data: unpostedPaymentOptions = [] } = useQuery({
+    queryKey: ['accounts', 'payments', 'unposted', selectedBusiness],
+    queryFn: () => fetchUnpostedPayments(selectedBusiness),
   });
 
-  const { data: agingData = [], error: agingDataError } = useQuery({
-    queryKey: ['accounts', 'aging', selectedBusiness],
-    queryFn: () => fetchAgingSummary(selectedBusiness),
+  const { data: agingResult, error: agingDataError } = useQuery({
+    queryKey: ['accounts', 'aging', selectedBusiness, agingPage, debouncedAgingSearch],
+    queryFn: () => fetchAgingPage(selectedBusiness, agingPage, listPageSize, debouncedAgingSearch),
+    placeholderData: (previous) => previous,
+  });
+  const agingData = agingResult?.rows ?? [];
+  const agingTotal = agingResult?.total ?? 0;
+  const { data: openUnpostedInvoices = [] } = useQuery({
+    queryKey: ['accounts', 'aging', 'unposted', selectedBusiness],
+    queryFn: () => fetchOpenUnpostedInvoices(selectedBusiness),
   });
 
   const { data: accountingSetup, error: accountingSetupError } = useQuery({
@@ -498,8 +630,15 @@ export const Accounts = () => {
   });
 
   const chartAccounts = accountingSetup?.accounts ?? [];
-  const contacts = accountingSetup?.contacts ?? [];
-  const suppliers = contacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
+  const setupContacts = accountingSetup?.contacts ?? [];
+  const suppliers = setupContacts.filter((contact) => contact.contactType === 'supplier' || contact.contactType === 'both');
+  const { data: contactResult } = useQuery({
+    queryKey: ['accounting', 'contacts', contactPage, debouncedContactSearch],
+    queryFn: () => getAccountingContactsPage({ page: contactPage, pageSize: listPageSize, search: debouncedContactSearch }),
+    placeholderData: (previous) => previous,
+  });
+  const contacts = contactResult?.rows ?? [];
+  const contactTotal = contactResult?.total ?? 0;
 
   const { data: ledgerOverview, error: ledgerError } = useQuery({
     queryKey: ['accounting', 'ledger-overview', selectedBusiness],
@@ -648,7 +787,7 @@ export const Accounts = () => {
       toast.success('Contact saved');
       setAddContactOpen(false);
       setContactForm({ name: '', contactType: 'supplier', phone: '', email: '', taxPin: '' });
-      qc.invalidateQueries({ queryKey: ['accounting', 'setup'] });
+      qc.invalidateQueries({ queryKey: ['accounting'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -853,25 +992,13 @@ export const Accounts = () => {
     }),
   };
 
-  // Sales by person chart data (from payments)
-  const salesByPerson = (summary?.payments ?? [])
-    .filter((p) => p.status === 'completed' && p.recorded_by)
-    .reduce((acc: Record<string, number>, p) => {
-      const key = p.recorded_by ?? 'Unknown';
-      acc[key] = (acc[key] ?? 0) + toAmount(p.amount);
-      return acc;
-    }, {});
-
-  const salesByPersonData = Object.entries(salesByPerson).map(([name, total]) => ({ name, total }));
+  const salesByPersonData = (summary?.salesByPerson ?? []).map((row) => ({
+    name: row.name,
+    total: toAmount(row.total),
+  }));
   const expenseAccounts = chartAccounts.filter((account) => account.accountType === 'expense');
-  const openUnpostedInvoices = agingData.filter((invoice) => (
-    invoice.status !== 'draft'
-    && invoice.status !== 'cancelled'
-    && !invoice.posted_journal_entry_id
-    && toAmount(invoice.total) > 0
-  ));
-  const unpostedPayments = paymentsReceived.filter((payment) => !payment.posted_journal_entry_id && toAmount(payment.amount) > 0);
-  const unpostedExpenses = expenses.filter((expense) => expense.status === 'approved' && !expense.posted_journal_entry_id && toAmount(expense.amount) > 0);
+  const unpostedPayments = unpostedPaymentOptions.filter((payment) => toAmount(payment.amount) > 0);
+  const unpostedExpenses = unpostedExpenseOptions.filter((expense) => toAmount(expense.amount) > 0);
 
   const formatCurrency = (value: number | undefined) => `KES ${(value ?? 0).toLocaleString()}`;
   const formatAccount = (account: ChartAccount) => `${account.code} · ${account.name}`;
@@ -1046,6 +1173,12 @@ export const Accounts = () => {
               </Button>
             </CardHeader>
             <CardContent>
+              <Input
+                className="mb-4 max-w-sm"
+                placeholder="Search expenses..."
+                value={expenseSearch}
+                onChange={(event) => setExpenseSearch(event.target.value)}
+              />
               {expenses.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-12">No expenses recorded yet</p>
               ) : (
@@ -1068,6 +1201,13 @@ export const Accounts = () => {
                       </div>
                     </div>
                   ))}
+                  <Paginator
+                    page={expensePage}
+                    pageSize={listPageSize}
+                    total={expenseTotal}
+                    totalPages={Math.max(1, Math.ceil(expenseTotal / listPageSize))}
+                    onPageChange={setExpensePage}
+                  />
                 </div>
               )}
             </CardContent>
@@ -1084,19 +1224,26 @@ export const Accounts = () => {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={paymentsReceived.length === 0}
-                onClick={() => downloadCsv(
-                  `payments-${selectedBusiness}-${toLocalDateString(new Date())}.csv`,
-                  ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
-                  paymentsReceived.map((p) => [
-                    formatDate(p.created_at),
-                    p.customer_name ?? '',
-                    toAmount(p.amount),
-                    p.method ?? '',
-                    p.mpesa_receipt_number ?? p.reference ?? p.checkout_request_id ?? '',
-                    p.status ?? '',
-                  ]),
-                )}
+                disabled={paymentTotal === 0}
+                onClick={async () => {
+                  try {
+                    const exportRows = await fetchPaymentsReceived(reportFrom, reportTo, selectedBusiness);
+                    downloadCsv(
+                      `payments-${selectedBusiness}-${toLocalDateString(new Date())}.csv`,
+                      ['Date', 'Customer', 'Amount', 'Method', 'Reference', 'Status'],
+                      exportRows.map((p) => [
+                        formatDate(p.created_at),
+                        p.customer_name ?? '',
+                        toAmount(p.amount),
+                        p.method ?? '',
+                        p.mpesa_receipt_number ?? p.reference ?? p.checkout_request_id ?? '',
+                        p.status ?? '',
+                      ]),
+                    );
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : 'Could not export payments');
+                  }
+                }}
               >
                 <Download className="mr-1 h-4 w-4" /> Export
               </Button>
@@ -1104,6 +1251,12 @@ export const Accounts = () => {
           />
           <Card>
             <CardContent className="pt-4">
+              <Input
+                className="mb-4 max-w-sm"
+                placeholder="Search customer, reference, or provider..."
+                value={paymentSearch}
+                onChange={(event) => setPaymentSearch(event.target.value)}
+              />
               {paymentsReceived.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-12">No payments received in this period. Adjust the date range, or record a payment from an invoice.</p>
               ) : (
@@ -1156,8 +1309,15 @@ export const Accounts = () => {
                   ))}
                   <div className="flex justify-between pt-3 border-t font-semibold">
                     <span>Total Received</span>
-                    <span className="text-green-600">KES {paymentsReceived.reduce((s, p) => s + toAmount(p.amount), 0).toLocaleString()}</span>
+                    <span className="text-green-600">KES {paymentTotalAmount.toLocaleString()}</span>
                   </div>
+                  <Paginator
+                    page={paymentPage}
+                    pageSize={listPageSize}
+                    total={paymentTotal}
+                    totalPages={Math.max(1, Math.ceil(paymentTotal / listPageSize))}
+                    onPageChange={setPaymentPage}
+                  />
                 </div>
               )}
             </CardContent>
@@ -1198,20 +1358,14 @@ export const Accounts = () => {
           <Card>
             <CardHeader><CardTitle className="text-base">Open Invoices</CardTitle></CardHeader>
             <CardContent>
-              {(receivablesAging?.items.length ?? 0) === 0 && agingData.length === 0 ? (
+              <Input
+                className="mb-4 max-w-sm"
+                placeholder="Search open invoices..."
+                value={agingSearch}
+                onChange={(event) => setAgingSearch(event.target.value)}
+              />
+              {agingData.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-8">No open invoices — all receivables are settled.</p>
-              ) : (receivablesAging?.items.length ?? 0) > 0 ? (
-                <div className="space-y-2">
-                  {receivablesAging!.items.map((inv) => (
-                    <div key={inv.invoiceId ?? inv.invoiceNumber} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{inv.invoiceNumber} — {inv.customerName ?? 'Customer'}</p>
-                        <p className="text-xs text-muted-foreground">Due: {formatDate(inv.dueDate)} · {Math.max(0, inv.daysOverdue)} days overdue</p>
-                      </div>
-                      <span className="font-semibold text-red-600">{formatCurrency(inv.balanceDue)}</span>
-                    </div>
-                  ))}
-                </div>
               ) : (
                 <div className="space-y-2">
                   {agingData.map((inv) => {
@@ -1228,6 +1382,13 @@ export const Accounts = () => {
                       </div>
                     );
                   })}
+                  <Paginator
+                    page={agingPage}
+                    pageSize={listPageSize}
+                    total={agingTotal}
+                    totalPages={Math.max(1, Math.ceil(agingTotal / listPageSize))}
+                    onPageChange={setAgingPage}
+                  />
                 </div>
               )}
             </CardContent>
@@ -1609,6 +1770,12 @@ export const Accounts = () => {
               </Button>
             </CardHeader>
             <CardContent>
+              <Input
+                className="mb-4 max-w-sm"
+                placeholder="Search contacts..."
+                value={contactSearch}
+                onChange={(event) => setContactSearch(event.target.value)}
+              />
               {contacts.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-12">No contacts recorded yet</p>
               ) : (
@@ -1627,6 +1794,15 @@ export const Accounts = () => {
                       </div>
                     </div>
                   ))}
+                  <div className="lg:col-span-2">
+                    <Paginator
+                      page={contactPage}
+                      pageSize={listPageSize}
+                      total={contactTotal}
+                      totalPages={Math.max(1, Math.ceil(contactTotal / listPageSize))}
+                      onPageChange={setContactPage}
+                    />
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -101,6 +101,73 @@ describe('Admin › Access verification', () => {
   });
 });
 
+describe('Admin › Efficiency audit RPCs', () => {
+  it('returns database-side operational summaries', async () => {
+    const [orders, reviews, expenses, notifications] = await Promise.all([
+      client.rpc('get_order_stats'),
+      client.rpc('get_review_stats'),
+      client.rpc('get_expense_summary', { p_business: 'expresswash', p_from: null, p_to: null }),
+      client.rpc('get_notification_channel_stats'),
+    ]);
+
+    expect(orders.error).toBeNull();
+    expect(Number(orders.data?.[0]?.total ?? 0)).toBeGreaterThanOrEqual(0);
+    expect(reviews.error).toBeNull();
+    expect(Number(reviews.data?.[0]?.total_reviews ?? 0)).toBeGreaterThanOrEqual(0);
+    expect(expenses.error).toBeNull();
+    expect(Array.isArray(expenses.data)).toBe(true);
+    expect(notifications.error).toBeNull();
+    expect(Array.isArray(notifications.data)).toBe(true);
+  });
+
+  it('returns stable page envelopes for union and accounting feeds', async () => {
+    const [payments, dispatch, billing] = await Promise.all([
+      client.rpc('get_accounting_payments_received_page', {
+        p_business: 'expresswash', p_from: null, p_to: null,
+        p_offset: 0, p_limit: 5, p_search: null,
+      }),
+      client.rpc('get_warehouse_dispatch_page', {
+        p_offset: 0, p_limit: 5, p_search: null,
+      }),
+      client.rpc('get_billing_invoices_page', {
+        p_business: 'expresswash', p_view: 'all',
+        p_offset: 0, p_limit: 5, p_search: null,
+      }),
+    ]);
+
+    expect(payments.error).toBeNull();
+    expect(Array.isArray(payments.data?.rows)).toBe(true);
+    expect(payments.data.rows.length).toBeLessThanOrEqual(5);
+    expect(Number(payments.data.total)).toBeGreaterThanOrEqual(payments.data.rows.length);
+    expect(Number(payments.data.total_amount)).toBeGreaterThanOrEqual(0);
+
+    expect(dispatch.error).toBeNull();
+    expect(Array.isArray(dispatch.data?.rows)).toBe(true);
+    expect(dispatch.data.rows.length).toBeLessThanOrEqual(5);
+    expect(Number(dispatch.data.total)).toBeGreaterThanOrEqual(dispatch.data.rows.length);
+
+    expect(billing.error).toBeNull();
+    expect(Array.isArray(billing.data?.rows)).toBe(true);
+    expect(billing.data.rows.length).toBeLessThanOrEqual(5);
+    expect(Number(billing.data.total)).toBeGreaterThanOrEqual(billing.data.rows.length);
+  });
+
+  it('returns database-side accounting chart aggregates', async () => {
+    const [sales, billing] = await Promise.all([
+      client.rpc('get_accounting_sales_overview', {
+        p_business: 'expresswash', p_from: null, p_to: null,
+      }),
+      client.rpc('get_billing_financial_summary', { p_business: 'expresswash' }),
+    ]);
+
+    expect(sales.error).toBeNull();
+    expect(Array.isArray(sales.data?.orders)).toBe(true);
+    expect(Array.isArray(sales.data?.sales_by_person)).toBe(true);
+    expect(billing.error).toBeNull();
+    expect(Number(billing.data?.[0]?.total_count ?? 0)).toBeGreaterThanOrEqual(0);
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // 2. ORDER MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────

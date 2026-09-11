@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { PageHeader, DataTable } from "@/components/shared";
@@ -166,12 +167,12 @@ export const LoyaltyManagement = () => {
   });
 
   // ── Derived tier overview ──────────────────────────────────────────
-  const tierOverview = tierMeta.map((meta) => ({
+  const tierOverview = useMemo(() => tierMeta.map((meta) => ({
     ...meta,
     members: tierCounts?.[meta.tier] ?? 0,
-  }));
+  })), [tierCounts]);
 
-  const totalMembers = tierOverview.reduce((sum, t) => sum + t.members, 0);
+  const totalMembers = useMemo(() => tierOverview.reduce((sum, t) => sum + t.members, 0), [tierOverview]);
 
   // ── Stat skeleton helper ───────────────────────────────────────────
   const StatSkeleton = () => (

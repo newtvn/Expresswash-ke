@@ -41,11 +41,9 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-popover',
             '@radix-ui/react-checkbox',
             '@radix-ui/react-switch',
-            '@radix-ui/react-slider',
             '@radix-ui/react-label',
             '@radix-ui/react-avatar',
             '@radix-ui/react-separator',
-            '@radix-ui/react-scroll-area',
           ],
 
           // Charts chunk: Charting library (heavy)

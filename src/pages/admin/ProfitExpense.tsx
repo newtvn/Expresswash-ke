@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, KPICard, DataTable, StatusBadge, ConfirmDialog } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -27,7 +27,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/config/queryKeys';
 import {
-  getExpenses,
+  getExpensesPage,
   createExpense,
   approveExpense,
   rejectExpense,
@@ -135,15 +135,35 @@ export const ProfitExpense = () => {
   const [formAmount, setFormAmount] = useState('');
   const [formMethod, setFormMethod] = useState('');
   const [formDate, setFormDate] = useState(toLocalDateString(new Date()));
+  const [expensePage, setExpensePage] = useState(0);
+  const [expenseSearch, setExpenseSearch] = useState('');
+  const [debouncedExpenseSearch, setDebouncedExpenseSearch] = useState('');
+  const expensePageSize = 10;
 
   const reportFrom = toLocalDateString(dateRange.from);
   const reportTo = toLocalDateString(dateRange.to);
 
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedExpenseSearch(expenseSearch), 300);
+    return () => clearTimeout(handle);
+  }, [expenseSearch]);
+  useEffect(() => setExpensePage(0), [selectedBusiness, reportFrom, reportTo, debouncedExpenseSearch]);
+
   // Queries
-  const { data: expenses = [], isLoading: expensesLoading, error: expensesError } = useQuery({
-    queryKey: queryKeys.expenses.list({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness }),
-    queryFn: () => getExpenses({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness }),
+  const { data: expensesPage, isLoading: expensesLoading, error: expensesError } = useQuery({
+    queryKey: queryKeys.expenses.list({ startDate: reportFrom, endDate: reportTo, business: selectedBusiness, page: expensePage, search: debouncedExpenseSearch }),
+    queryFn: () => getExpensesPage({
+      startDate: reportFrom,
+      endDate: reportTo,
+      business: selectedBusiness,
+      page: expensePage,
+      pageSize: expensePageSize,
+      search: debouncedExpenseSearch,
+    }),
+    placeholderData: (previous) => previous,
   });
+  const expenses = expensesPage?.rows ?? [];
+  const expenseTotal = expensesPage?.total ?? 0;
 
   const { data: profitAndLoss, isLoading: kpisLoading, error: profitLossError } = useQuery({
     queryKey: ['accounting', 'reports', 'profit-loss', selectedBusiness, reportFrom, reportTo],
@@ -408,7 +428,15 @@ export const ProfitExpense = () => {
               columns={columnsWithActions}
               searchable
               searchPlaceholder="Search expenses..."
-              pageSize={10}
+              pageSize={expensePageSize}
+              serverPagination={{
+                page: expensePage,
+                pageSize: expensePageSize,
+                total: expenseTotal,
+                totalPages: Math.max(1, Math.ceil(expenseTotal / expensePageSize)),
+                onPageChange: setExpensePage,
+                onSearchChange: setExpenseSearch,
+              }}
             />
           )}
         </CardContent>

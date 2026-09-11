@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeader, EmptyState } from '@/components/shared';
+import { PageHeader, EmptyState, Paginator } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Sparkles,
   CheckCircle2,
@@ -16,9 +17,10 @@ import {
   Package,
   Loader2,
   Timer,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getProcessingItems, performQualityCheck, updateItemStage } from '@/services/warehouseService';
+import { getProcessingItemsPage, performQualityCheck, updateItemStage } from '@/services/warehouseService';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { ProcessingItem } from '@/types';
@@ -40,12 +42,28 @@ const QualityControl = () => {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
   const [notes, setNotes] = useState('');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 20;
 
-  const { data: qcItems = [], isLoading } = useQuery({
-    queryKey: ['warehouse', 'processing', 'quality_check'],
-    queryFn: () => getProcessingItems('quality_check'),
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => {
+    setPage(0);
+    setSelectedItem(null);
+  }, [debouncedSearch]);
+
+  const { data: qcPage, isLoading } = useQuery({
+    queryKey: ['warehouse', 'processing', 'quality_check', page, debouncedSearch],
+    queryFn: () => getProcessingItemsPage({ stage: 'quality_check', page, pageSize, search: debouncedSearch }),
     refetchInterval: 30000,
+    placeholderData: (previous) => previous,
   });
+  const qcItems = qcPage?.rows ?? [];
+  const qcTotal = qcPage?.total ?? 0;
 
   // Auto-select first item if none selected
   const effectiveSelected = selectedItem && qcItems.find((i) => i.id === selectedItem)
@@ -129,6 +147,11 @@ const QualityControl = () => {
         description="Inspect cleaned items before dispatch"
       />
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search QC queue..." className="pl-9" />
+      </div>
+
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
       ) : qcItems.length === 0 ? (
@@ -144,7 +167,7 @@ const QualityControl = () => {
             <CardHeader>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Package className="w-5 h-5 text-primary" />
-                QC Queue ({qcItems.length})
+                QC Queue ({qcTotal})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -308,6 +331,16 @@ const QualityControl = () => {
           </div>
         </div>
       )}
+      <Paginator
+        page={page}
+        pageSize={pageSize}
+        total={qcTotal}
+        totalPages={Math.max(1, Math.ceil(qcTotal / pageSize))}
+        onPageChange={(nextPage) => {
+          setPage(nextPage);
+          setSelectedItem(null);
+        }}
+      />
     </div>
   );
 };

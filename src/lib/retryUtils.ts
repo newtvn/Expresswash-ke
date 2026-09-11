@@ -139,20 +139,23 @@ export async function retryWithBackoff<T>(
  *   () => supabase.from('orders').select('*')
  * );
  */
-export async function retrySupabaseQuery<T>(
-  queryFn: () => Promise<{ data: T | null; error: Error | null }>,
+export async function retrySupabaseQuery<
+  TResult extends { data: unknown; error: Error | null },
+>(
+  queryFn: () => PromiseLike<TResult>,
   options: RetryOptions = {},
-): Promise<{ data: T | null; error: Error | null }> {
+): Promise<TResult> {
   try {
     const result = await retryWithBackoff(async () => {
-      const { data, error } = await queryFn();
+      const queryResult = await queryFn();
 
       // Throw error to trigger retry if query failed
-      if (error) {
-        throw error;
+      if (queryResult.error) {
+        throw queryResult.error;
       }
 
-      return { data, error: null };
+      // Preserve metadata such as exact count, status, and statusText.
+      return queryResult;
     }, options);
 
     return result;
@@ -161,7 +164,7 @@ export async function retrySupabaseQuery<T>(
     return {
       data: null,
       error: error instanceof Error ? error : new Error(String(error)),
-    };
+    } as TResult;
   }
 }
 

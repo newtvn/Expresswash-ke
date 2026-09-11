@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { PageHeader, DataTable, KPICard, StatusBadge, ConfirmDialog } from '@/components/shared';
 import type { Column } from '@/components/shared';
@@ -18,7 +18,7 @@ import { Wallet, Banknote, ArrowUpRight, CheckCircle, Loader2 } from 'lucide-rea
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from '@/config/queryKeys';
-import { getPayments, recordPayment } from '@/services/invoiceService';
+import { getDriverCashSummary, getPaymentsPage, recordPayment } from '@/services/invoiceService';
 import { getOrders } from '@/services/orderService';
 import type { Payment } from '@/types';
 
@@ -78,17 +78,43 @@ export const CashCollection = () => {
   const [collectAmount, setCollectAmount] = useState('');
   const [collectInvoiceId, setCollectInvoiceId] = useState('');
   const [collectInvoiceNumber, setCollectInvoiceNumber] = useState('');
+  const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const pageSize = 10;
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [debouncedSearch]);
+
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
   // Fetch today's payments recorded by this driver
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: [...queryKeys.payments.list(), 'driver', user?.id],
-    queryFn: async () => {
-      const allPayments = await getPayments();
-      // Filter to payments recorded by this driver
-      return allPayments.filter((p) => p.recordedBy === user?.id);
-    },
+  const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
+    queryKey: [...queryKeys.payments.list(), 'driver', user?.id, page, debouncedSearch],
+    queryFn: () => getPaymentsPage({
+      page,
+      pageSize,
+      recordedBy: user!.id,
+      search: debouncedSearch,
+      from: todayStart.toISOString(),
+      to: tomorrowStart.toISOString(),
+    }),
+    enabled: !!user?.id,
+    placeholderData: (previous) => previous,
+  });
+  const { data: cashSummary } = useQuery({
+    queryKey: [...queryKeys.payments.all, 'driver-cash-summary', user?.id],
+    queryFn: () => getDriverCashSummary(user!.id),
     enabled: !!user?.id,
   });
+  const payments = paymentPage?.rows ?? [];
+  const paymentTotal = paymentPage?.total ?? 0;
 
   // Fetch orders assigned to this driver that are in delivery status
   const { data: driverOrders } = useQuery({
@@ -117,12 +143,9 @@ export const CashCollection = () => {
     invoiceNumber: p.invoiceNumber || '',
   }));
 
-  const cashOnlyEntries = cashEntries.filter((e) => e.method === 'cash');
-  const totalCollected = cashOnlyEntries.reduce((sum, e) => sum + e.amount, 0);
-  const remitted = cashOnlyEntries
-    .filter((e) => e.status === 'remitted')
-    .reduce((sum, e) => sum + e.amount, 0);
-  const toRemit = totalCollected - remitted;
+  const totalCollected = cashSummary?.totalCollected ?? 0;
+  const remitted = cashSummary?.remitted ?? 0;
+  const toRemit = cashSummary?.toRemit ?? 0;
 
   // Record cash payment mutation
   const collectMutation = useMutation({
@@ -202,7 +225,15 @@ export const CashCollection = () => {
             columns={columns}
             searchable
             searchPlaceholder="Search collections..."
-            pageSize={10}
+            pageSize={pageSize}
+            serverPagination={{
+              page,
+              pageSize,
+              total: paymentTotal,
+              totalPages: Math.max(1, Math.ceil(paymentTotal / pageSize)),
+              onPageChange: setPage,
+              onSearchChange: setSearch,
+            }}
           />
         </CardContent>
       </Card>

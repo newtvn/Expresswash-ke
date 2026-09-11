@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeader } from '@/components/shared';
+import { PageHeader, Paginator } from '@/components/shared';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,17 +42,21 @@ interface ReceiptRecord {
 
 // ---------- Service helpers ----------
 
-async function fetchReceipts(filters: { from?: string; to?: string; category?: string; tag?: string; search?: string; business?: string }): Promise<ReceiptRecord[]> {
-  let q = supabase.from('receipts').select('*').order('date', { ascending: false });
+interface ReceiptPage { rows: ReceiptRecord[]; total: number }
+interface ReceiptSummary { activeCount: number; activeAmount: number; categoryCount: number; currentMonthAmount: number }
+
+async function fetchReceipts(filters: { from?: string; to?: string; category?: string; tag?: string; search?: string; business?: string; page: number; pageSize: number }): Promise<ReceiptPage> {
+  const fromRow = filters.page * filters.pageSize;
+  let q = supabase.from('receipts').select('*', { count: 'exact' }).order('date', { ascending: false }).range(fromRow, fromRow + filters.pageSize - 1);
   if (filters.from) q = q.gte('date', filters.from);
   if (filters.to) q = q.lte('date', filters.to);
   if (filters.category && filters.category !== 'all') q = q.eq('category', filters.category);
   if (filters.tag) q = q.contains('tags', [filters.tag]);
   if (filters.business && filters.business !== BUSINESS_ALL) q = q.eq('business', filters.business);
   if (filters.search) q = q.ilike('description', `%${filters.search}%`);
-  const { data, error } = await q;
+  const { data, count, error } = await q;
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => ({
+  return { rows: (data ?? []).map((r) => ({
     id: r.id as string,
     vendor: r.vendor as string,
     description: r.description as string,
@@ -66,7 +70,34 @@ async function fetchReceipts(filters: { from?: string; to?: string; category?: s
     business: String(r.business ?? 'expresswash'),
     status: (r.status as ReceiptRecord['status']) ?? 'active',
     void_reason: (r.void_reason as string) ?? undefined,
-  }));
+  })), total: count ?? 0 };
+}
+
+async function fetchReceiptSummary(filters: { from?: string; to?: string; category?: string; tag?: string; search?: string; business?: string }): Promise<ReceiptSummary> {
+  const { data, error } = await supabase.rpc('get_receipt_summary', {
+    p_from: filters.from ?? null,
+    p_to: filters.to ?? null,
+    p_category: filters.category && filters.category !== 'all' ? filters.category : null,
+    p_tag: filters.tag ?? null,
+    p_search: filters.search ?? null,
+    p_business: filters.business && filters.business !== BUSINESS_ALL ? filters.business : null,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    activeCount: Number(row?.active_count) || 0,
+    activeAmount: Number(row?.active_amount) || 0,
+    categoryCount: Number(row?.category_count) || 0,
+    currentMonthAmount: Number(row?.current_month_amount) || 0,
+  };
+}
+
+async function fetchReceiptTags(business: string): Promise<string[]> {
+  const { data, error } = await supabase.rpc('get_receipt_tags', {
+    p_business: business === BUSINESS_ALL ? null : business,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => String(row.tag));
 }
 
 async function createReceipt(payload: Omit<ReceiptRecord, 'id' | 'created_at' | 'status' | 'void_reason'>): Promise<void> {
@@ -107,12 +138,15 @@ export const Receipts = () => {
   const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
   const isConsolidated = selectedBusiness === BUSINESS_ALL;
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [tagFilter, setTagFilter] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [voidTarget, setVoidTarget] = useState<ReceiptRecord | null>(null);
   const [voidReason, setVoidReason] = useState('');
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
   const [form, setForm] = useState({
     vendor: '',
     description: '',
@@ -124,20 +158,38 @@ export const Receipts = () => {
     reference_number: '',
   });
 
-  const queryFilters = {
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handle);
+  }, [search]);
+  useEffect(() => setPage(0), [selectedBusiness, categoryFilter, tagFilter, dateRange.from, dateRange.to, debouncedSearch]);
+
+  const summaryFilters = {
     from: toLocalDateString(dateRange.from),
     to: toLocalDateString(dateRange.to),
     category: categoryFilter,
     tag: tagFilter || undefined,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     business: selectedBusiness,
   };
+  const queryFilters = { ...summaryFilters, page, pageSize };
 
-  const { data: receipts = [], isLoading, error: receiptsError } = useQuery({
+  const { data: receiptPage, isLoading, error: receiptsError } = useQuery({
     queryKey: ['admin', 'receipts', queryFilters],
     queryFn: () => fetchReceipts(queryFilters),
     refetchInterval: 60000,
+    placeholderData: (previous) => previous,
   });
+  const { data: receiptSummary } = useQuery({
+    queryKey: ['admin', 'receipts', 'summary', summaryFilters],
+    queryFn: () => fetchReceiptSummary(summaryFilters),
+  });
+  const { data: allTags = [] } = useQuery({
+    queryKey: ['admin', 'receipts', 'tags', selectedBusiness],
+    queryFn: () => fetchReceiptTags(selectedBusiness),
+  });
+  const receipts = receiptPage?.rows ?? [];
+  const receiptTotal = receiptPage?.total ?? 0;
 
   const createMutation = useMutation({
     mutationFn: createReceipt,
@@ -163,13 +215,6 @@ export const Receipts = () => {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const activeReceipts = receipts.filter((receipt) => receipt.status === 'active');
-  const totalAmount = activeReceipts.reduce((sum, receipt) => sum + receipt.amount, 0);
-  const currentMonth = toLocalDateString(new Date()).slice(0, 7);
-
-  // Collect all unique tags for quick filter
-  const allTags = Array.from(new Set(receipts.flatMap((r) => r.tags)));
-
   return (
     <div className="space-y-6">
       <PageHeader title="Receipts" description="Preserve and track supplier receipt evidence">
@@ -186,29 +231,26 @@ export const Receipts = () => {
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-muted-foreground">Active Results</p>
-            <p className="text-2xl font-bold">{activeReceipts.length}</p>
+            <p className="text-2xl font-bold">{receiptSummary?.activeCount ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-muted-foreground">Active Result Amount</p>
-            <p className="text-2xl font-bold">KES {totalAmount.toLocaleString()}</p>
+            <p className="text-2xl font-bold">KES {(receiptSummary?.activeAmount ?? 0).toLocaleString()}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-muted-foreground">Categories</p>
-            <p className="text-2xl font-bold">{new Set(activeReceipts.map((r) => r.category)).size}</p>
+            <p className="text-2xl font-bold">{receiptSummary?.categoryCount ?? 0}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4 text-center">
             <p className="text-xs text-muted-foreground">This Month in Results</p>
             <p className="text-2xl font-bold">
-              KES {activeReceipts
-                .filter((r) => r.date.startsWith(currentMonth))
-                .reduce((s, r) => s + r.amount, 0)
-                .toLocaleString()}
+              KES {(receiptSummary?.currentMonthAmount ?? 0).toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -300,9 +342,16 @@ export const Receipts = () => {
             </Card>
           ))}
           <div className="flex flex-col gap-1 border-t p-3 font-semibold min-[420px]:flex-row min-[420px]:justify-between">
-            <span>{activeReceipts.length} active receipts shown</span>
-            <span>Active total KES {totalAmount.toLocaleString()}</span>
+            <span>{receiptSummary?.activeCount ?? 0} active receipts match</span>
+            <span>Active total KES {(receiptSummary?.activeAmount ?? 0).toLocaleString()}</span>
           </div>
+          <Paginator
+            page={page}
+            pageSize={pageSize}
+            total={receiptTotal}
+            totalPages={Math.max(1, Math.ceil(receiptTotal / pageSize))}
+            onPageChange={setPage}
+          />
         </div>
       )}
 

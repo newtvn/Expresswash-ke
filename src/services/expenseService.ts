@@ -35,6 +35,7 @@ export interface ExpenseFilters {
   endDate?: string;
   business?: string;
   postedOnly?: boolean;
+  search?: string;
 }
 
 export interface ExpenseSummary {
@@ -42,6 +43,11 @@ export interface ExpenseSummary {
   total: number;
   count: number;
   percentage: number;
+}
+
+export interface ExpensePage {
+  rows: Expense[];
+  total: number;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -105,39 +111,28 @@ export async function createExpense(
   return { success: true, expense: mapExpense(data) };
 }
 
-/**
- * Get expenses with optional filters
- */
-export async function getExpenses(filters: ExpenseFilters = {}): Promise<Expense[]> {
+/** Server-paginated expense list. */
+export async function getExpensesPage(
+  filters: ExpenseFilters & { page: number; pageSize: number },
+): Promise<ExpensePage> {
+  const from = filters.page * filters.pageSize;
   let query = supabase
     .from('expenses')
-    .select('*')
-    .order('expense_date', { ascending: false });
+    .select('*', { count: 'exact' })
+    .order('expense_date', { ascending: false })
+    .range(from, from + filters.pageSize - 1);
 
-  if (filters.category) {
-    query = query.eq('category', filters.category);
-  }
-  if (filters.status) {
-    query = query.eq('status', filters.status);
-  }
-  if (filters.startDate) {
-    query = query.gte('expense_date', filters.startDate);
-  }
-  if (filters.endDate) {
-    query = query.lte('expense_date', filters.endDate);
-  }
-  if (filters.business && filters.business !== 'all') {
-    query = query.eq('business', filters.business);
-  }
-  if (filters.postedOnly) {
-    query = query.not('posted_journal_entry_id', 'is', null);
-  }
+  if (filters.category && filters.category !== 'all') query = query.eq('category', filters.category);
+  if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
+  if (filters.startDate) query = query.gte('expense_date', filters.startDate);
+  if (filters.endDate) query = query.lte('expense_date', filters.endDate);
+  if (filters.business && filters.business !== 'all') query = query.eq('business', filters.business);
+  if (filters.postedOnly) query = query.not('posted_journal_entry_id', 'is', null);
+  if (filters.search?.trim()) query = query.ilike('description', `%${filters.search.trim()}%`);
 
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
-
+  const { data, count, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
   if (error) throw new Error(error.message);
-  if (!data) return [];
-  return data.map(mapExpense);
+  return { rows: (data ?? []).map(mapExpense), total: count ?? 0 };
 }
 
 /**
@@ -183,42 +178,20 @@ export async function rejectExpense(
  * Get expense breakdown by category for a given month
  */
 export async function getExpenseSummary(filters: ExpenseFilters = {}): Promise<ExpenseSummary[]> {
-  let query = supabase
-    .from('expenses')
-    .select('category, amount')
-    .eq('status', 'approved')
-    .not('posted_journal_entry_id', 'is', null);
-
-  if (filters.startDate) query = query.gte('expense_date', filters.startDate);
-  if (filters.endDate) query = query.lte('expense_date', filters.endDate);
-  if (filters.business && filters.business !== 'all') query = query.eq('business', filters.business);
-
-  const { data, error } = await retrySupabaseQuery(() => query, { maxRetries: 2 });
+  const { data, error } = await retrySupabaseQuery(
+    () => supabase.rpc('get_expense_summary', {
+      p_from: filters.startDate ?? null,
+      p_to: filters.endDate ?? null,
+      p_business: filters.business && filters.business !== 'all' ? filters.business : null,
+    }),
+    { maxRetries: 2 },
+  );
 
   if (error) throw new Error(error.message);
-  if (!data || data.length === 0) return [];
-
-  // Aggregate by category
-  const byCategory: Record<string, { total: number; count: number }> = {};
-  let grandTotal = 0;
-
-  for (const row of data) {
-    const cat = row.category as string;
-    const amt = row.amount as number;
-    if (!byCategory[cat]) {
-      byCategory[cat] = { total: 0, count: 0 };
-    }
-    byCategory[cat].total += amt;
-    byCategory[cat].count += 1;
-    grandTotal += amt;
-  }
-
-  return Object.entries(byCategory)
-    .map(([category, { total, count }]) => ({
-      category,
-      total,
-      count,
-      percentage: grandTotal > 0 ? Math.round((total / grandTotal) * 1000) / 10 : 0,
-    }))
-    .sort((a, b) => b.total - a.total);
+  return (data ?? []).map((row) => ({
+    category: String(row.category),
+    total: Number(row.total) || 0,
+    count: Number(row.count) || 0,
+    percentage: Number(row.percentage) || 0,
+  }));
 }
