@@ -27,19 +27,20 @@ BEGIN
   INTO v_total, v_washing, v_drying, v_qc, v_ready, v_overdue
   FROM public.warehouse_processing;
 
-  -- Maintain a single canonical stats row; keep the configured capacity_total.
-  IF EXISTS (SELECT 1 FROM public.warehouse_stats) THEN
-    UPDATE public.warehouse_stats
-    SET total_items = v_total,
-        in_washing = v_washing,
-        in_drying = v_drying,
-        in_quality_check = v_qc,
-        ready_for_dispatch = v_ready,
-        overdue_items = v_overdue,
-        capacity_used = v_total,
-        updated_at = now()
-    WHERE id = (SELECT id FROM public.warehouse_stats ORDER BY updated_at ASC LIMIT 1);
-  ELSE
+  -- Refresh every stats row (there should only be one) so whichever row the
+  -- client reads is fresh; keep the operator-configured capacity_total. Seed a
+  -- row only when the table is empty.
+  UPDATE public.warehouse_stats
+  SET total_items = v_total,
+      in_washing = v_washing,
+      in_drying = v_drying,
+      in_quality_check = v_qc,
+      ready_for_dispatch = v_ready,
+      overdue_items = v_overdue,
+      capacity_used = v_total,
+      updated_at = now();
+
+  IF NOT FOUND THEN
     INSERT INTO public.warehouse_stats (
       total_items, in_washing, in_drying, in_quality_check,
       ready_for_dispatch, overdue_items, capacity_used, capacity_total
@@ -59,6 +60,8 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+REVOKE ALL ON FUNCTION public.trg_refresh_warehouse_stats() FROM PUBLIC, anon;
 
 DROP TRIGGER IF EXISTS warehouse_processing_stats_refresh ON public.warehouse_processing;
 CREATE TRIGGER warehouse_processing_stats_refresh
