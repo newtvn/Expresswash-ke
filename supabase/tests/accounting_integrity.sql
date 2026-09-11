@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
 BEGIN;
-SELECT set_config('request.jwt.claim.role', 'service_role', true);
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 DO $$
 DECLARE
@@ -274,8 +274,11 @@ BEGIN
   IF NOT v_expected_failure THEN RAISE EXCEPTION 'Second provider refund request unexpectedly succeeded'; END IF;
 
   -- Provider submission state is server-owned, even for a super admin.
-  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
-  PERFORM set_config('request.jwt.claim.sub', v_actor::TEXT, true);
+  PERFORM set_config(
+    'request.jwt.claims',
+    json_build_object('role', 'authenticated', 'sub', v_actor)::TEXT,
+    true
+  );
   v_expected_failure := FALSE;
   BEGIN
     PERFORM mark_provider_refund_submission(
