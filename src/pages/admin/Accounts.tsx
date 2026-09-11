@@ -448,6 +448,7 @@ export const Accounts = () => {
   // (e.g. left over from a super_admin session on this browser) — force expresswash so a
   // regular admin can't send an unauthorized scope that the backend would reject.
   const rawSelectedBusiness = useBusinessStore((s) => s.selectedBusiness);
+  const setSelectedBusiness = useBusinessStore((s) => s.setSelectedBusiness);
   const isSuperAdmin = useAuthStore((s) => s.isSuperAdmin());
   const selectedBusiness = isSuperAdmin ? rawSelectedBusiness : 'expresswash';
   // Consolidated view spans all businesses, so writes (which need one concrete business) are disabled.
@@ -2151,6 +2152,27 @@ export const Accounts = () => {
                   <p><span className="text-muted-foreground">Result:</span> {selectedPayment.result_desc ?? selectedPayment.status}</p>
                 </div>
               </div>
+
+              {isConsolidated && (
+                <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>
+                      Consolidated view is read-only. Select this payment&apos;s business to allocate or refund it.
+                    </p>
+                  </div>
+                  {selectedPayment.business && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => setSelectedBusiness(selectedPayment.business!)}
+                    >
+                      Switch to {selectedPayment.business === 'expresswash' ? 'Expresswash' : selectedPayment.business}
+                    </Button>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <Button
