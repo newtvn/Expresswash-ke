@@ -795,7 +795,7 @@ export const AdminInvoices = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Invoices" description="Manage all invoices, templates, and payment tracking">
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <Button
             variant="outline"

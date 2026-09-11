@@ -928,7 +928,7 @@ export const Accounts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts" description="Financial overview, reports, and expense management">
-        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:w-auto">
+        <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 lg:flex lg:w-auto">
           <BusinessSwitcher />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

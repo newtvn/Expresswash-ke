@@ -15,6 +15,10 @@ export const PageHeader = ({ title, description, children, className }: PageHead
         <p className="mt-1 text-sm text-muted-foreground sm:text-base">{description}</p>
       )}
     </div>
-    {children && <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end lg:gap-3">{children}</div>}
+    {children && (
+      <div className="flex w-full flex-col gap-2 [&>*]:w-full lg:w-auto lg:flex-row lg:flex-wrap lg:items-center lg:justify-end lg:gap-3 lg:[&>*]:w-auto">
+        {children}
+      </div>
+    )}
   </div>
 );

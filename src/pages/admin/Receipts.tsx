@@ -173,7 +173,7 @@ export const Receipts = () => {
   return (
     <div className="space-y-6">
       <PageHeader title="Receipts" description="Preserve and track supplier receipt evidence">
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
           <BusinessSwitcher />
           <Button onClick={() => setAddOpen(true)} disabled={isConsolidated} title={isConsolidated ? 'Select a business to add a receipt' : undefined}>
             <Plus className="w-4 h-4 mr-2" /> Add Receipt
