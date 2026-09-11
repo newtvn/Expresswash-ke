@@ -985,12 +985,15 @@ export const Accounts = () => {
         <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto" aria-label="Accounting sections">
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="expenses" className="ml-2 border-l pl-4">Purchases & Expenses</TabsTrigger>
+          <div aria-hidden className="mx-1 h-5 w-px shrink-0 self-center bg-border" />
+          <TabsTrigger value="expenses">Purchases & Expenses</TabsTrigger>
           <TabsTrigger value="payments">Payments Received</TabsTrigger>
           <TabsTrigger value="aging">Aging Summary</TabsTrigger>
-          <TabsTrigger value="payables" className="ml-2 border-l pl-4">Payables & Bills</TabsTrigger>
+          <div aria-hidden className="mx-1 h-5 w-px shrink-0 self-center bg-border" />
+          <TabsTrigger value="payables">Payables & Bills</TabsTrigger>
           <TabsTrigger value="refunds">Credits & Refunds</TabsTrigger>
-          <TabsTrigger value="posting" className="ml-2 border-l pl-4">Posting Gaps</TabsTrigger>
+          <div aria-hidden className="mx-1 h-5 w-px shrink-0 self-center bg-border" />
+          <TabsTrigger value="posting">Posting Gaps</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="outbox">Outbox</TabsTrigger>
         </TabsList>
